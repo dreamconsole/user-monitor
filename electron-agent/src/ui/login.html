@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>User Monitor Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --gray: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            background: #1e293b;
+            color: white;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            user-select: none;
+            -webkit-app-region: drag;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-left i {
+            color: #818cf8;
+        }
+
+        .app-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: -0.01em;
+        }
+
+        .user-role {
+            font-size: 0.75rem;
+            background: #334155;
+            padding: 2px 8px;
+            border-radius: 12px;
+            color: #cbd5e1;
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid var(--border);
+        }
+
+        /* Login View */
+        .login-view {
+            max-width: 320px;
+            margin: auto;
+            width: 100%;
+        }
+
+        .login-view h2 {
+            margin: 0 0 24px 0;
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            transition: border-color 0.2s, ring 0.2s;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        /* Tracking View */
+        .tracking-view {
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .timer-section {
+            text-align: center;
+            padding: 8px 0;
+        }
+
+        .timer-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .timer-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 3rem;
+            font-weight: 500;
+            color: var(--text-main);
+            margin: 0;
+            line-height: 1;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            margin-top: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        /* Status Colors */
+        .status-active {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-active .status-dot {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        .status-idle {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-idle .status-dot {
+            background: var(--warning);
+        }
+
+        .status-offline {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-offline .status-dot {
+            background: var(--error);
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-hover);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #16a34a;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-warning:hover:not(:disabled) {
+            background: #d97706;
+        }
+
+        .btn-error {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-error:hover:not(:disabled) {
+            background: #dc2626;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ghost:hover:not(:disabled) {
+            background: #f1f5f9;
+            color: var(--text-main);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(0.5);
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-size: 0.875rem;
+            background-color: white;
+            margin-bottom: 12px;
+        }
+
+        /* Footer */
+        footer {
+            padding: 12px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--gray);
+            background: white;
+        }
+
+        .error-overlay {
+            color: var(--error);
+            font-size: 0.8125rem;
+            margin-top: 12px;
+            text-align: center;
+            display: none;
+            padding: 8px;
+            background: #fee2e2;
+            border-radius: 6px;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .tracking-pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <i data-lucide="shield-check" size="20"></i>
+            <span class="app-name">User Monitor Agent</span>
+        </div>
+        <div class="user-role" id="roleBadge">Standard User</div>
+    </header>
+
+    <main>
+        <!-- Login View -->
+        <div class="login-view card" id="loginView">
+            <h2>Sign In</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Work Email</label>
+                    <input type="email" id="email" placeholder="name@company.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" id="submitBtn" class="btn-primary">
+                    <i data-lucide="log-in" size="18"></i>
+                    Login
+                </button>
+                <div id="errorMsg" class="error-overlay"></div>
+            </form>
+        </div>
+
+        <!-- Tracking View -->
+        <div class="tracking-view" id="trackingView">
+            <div class="card timer-section">
+                <div class="timer-label">Active Session Time</div>
+                <h1 class="timer-display" id="timerDisplay">00:00:00</h1>
+
+                <div id="statusBadge" class="status-badge status-offline">
+                    <div class="status-dot"></div>
+                    <span id="statusText">Offline</span>
+                </div>
+            </div>
+
+            <div id="startActions" class="btn-group">
+                <button id="startShiftBtn" class="btn-success">
+                    <i data-lucide="play" size="18"></i>
+                    Start Shift
+                </button>
+            </div>
+
+            <div id="activeActions" class="btn-group" style="display: none;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Current Activity</label>
+                    <select id="breakType">
+                        <option value="Lunch Break">Lunch Break</option>
+                        <option value="Tea Break">Tea Break</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Personal">Personal</option>
+                    </select>
+                </div>
+                <button id="breakBtn" class="btn-warning">
+                    <i data-lucide="coffee" size="18"></i>
+                    Take Break
+                </button>
+                <button id="endShiftBtn" class="btn-error">
+                    <i data-lucide="square" size="18"></i>
+                    End Shift
+                </button>
+            </div>
+
+            <div id="breakActions" class="btn-group" style="display: none;">
+                <div style="text-align: center; margin-bottom: 12px;">
+                    <p style="color: var(--text-muted); font-size: 0.875rem; margin: 0;">On Break</p>
+                    <strong id="currentBreakType" style="color: var(--warning);"></strong>
+                </div>
+                <button id="resumeBtn" class="btn-success">
+                    <i data-lucide="play" size="18"></i>
+                    Resume Work
+                </button>
+            </div>
+
+            <button id="logoutBtn" class="btn-ghost" style="margin-top: 12px;">
+                <i data-lucide="power" size="16"></i>
+                Sign Out
+            </button>
+        </div>
+    </main>
+
+    <footer>
+        <span>v1.0.0</span>
+        <span id="lastSyncText">Last Sync: Never</span>
+    </footer>
+
+    <script src="login.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

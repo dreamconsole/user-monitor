@@ -1,0 +1,166 @@
+import bcrypt from 'bcryptjs';
+import { query } from '../db.js';
+
+export const getUsers = async (req, res) => {
+    try {
+        // full_name as name, is_active as status
+        let sql = 'SELECT id, full_name as name, email, role, is_active, manager_id, timezone, emp_id, payroll_id, site, device_id, agent_version, token, last_heartbeat, force_logout, created_at FROM users WHERE org_id = $1';
+        const params = [req.user.org_id];
+
+        if (req.user.role === 'manager') {
+            sql += ' AND manager_id = $2';
+            params.push(req.user.id);
+        }
+
+        sql += ' ORDER BY created_at DESC';
+
+        const result = await query(sql, params);
+        // Map is_active to status for frontend
+        const users = result.rows.map(u => ({
+            ...u,
+            status: u.is_active ? 'active' : 'suspended'
+        }));
+        res.json(users);
+    } catch (error) {
+        console.error('getUsers error:', error);
+        res.status(500).json({ error: 'Failed to fetch users: ' + error.message });
+    }
+};
+
+export const createUser = async (req, res) => {
+    const {
+        name, email, password, role,
+        manager_id, timezone, emp_id, payroll_id, site
+    } = req.body;
+
+    // Basic validation
+    if (!name || !email || !password || !role) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        // Validate Manager (if provided)
+        if (manager_id) {
+            const managerCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [manager_id, req.user.org_id]);
+            if (managerCheck.rows.length === 0) {
+                return res.status(400).json({ error: 'Invalid manager selection' });
+            }
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const result = await query(
+            `INSERT INTO users (
+                org_id, full_name, email, password_hash, role, 
+                manager_id, timezone, emp_id, payroll_id, site
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+            RETURNING id, full_name as name, email, role, is_active, timezone, emp_id, created_at`,
+            [
+                req.user.org_id, name, email, hashedPassword, role,
+                manager_id || null, timezone || 'UTC', emp_id || null, payroll_id || null, site || null
+            ]
+        );
+
+        const newUser = {
+            ...result.rows[0],
+            status: result.rows[0].is_active ? 'active' : 'suspended'
+        };
+        res.status(201).json(newUser);
+    } catch (error) {
+        console.error('createUser error:', error);
+        if (error.code === '23505') {
+            return res.status(400).json({ error: 'Email already exists' });
+        }
+        res.status(500).json({ error: 'Failed to create user: ' + error.message });
+    }
+};
+
+export const updateUser = async (req, res) => {
+    const { id } = req.params;
+    const {
+        name, role, status, manager_id, timezone, emp_id, payroll_id, site, force_logout
+    } = req.body;
+
+    try {
+        // Validate Manager (if changing)
+        if (manager_id) {
+            const managerCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [manager_id, req.user.org_id]);
+            if (managerCheck.rows.length === 0) {
+                return res.status(400).json({ error: 'Invalid manager selection' });
+            }
+        }
+
+        const isActive = status === 'active';
+
+        const result = await query(
+            `UPDATE users SET 
+                full_name = COALESCE($1, full_name), 
+                role = COALESCE($2, role), 
+                is_active = COALESCE($3, is_active),
+                manager_id = $4,
+                timezone = COALESCE($5, timezone),
+                emp_id = COALESCE($6, emp_id),
+                payroll_id = COALESCE($7, payroll_id),
+                site = COALESCE($8, site),
+                force_logout = COALESCE($9, force_logout)
+            WHERE id = $10 AND org_id = $11 
+            RETURNING id, full_name as name, email, role, is_active, manager_id, timezone, emp_id, payroll_id, site, force_logout`,
+            [
+                name, role, isActive, manager_id || null, timezone,
+                emp_id, payroll_id, site, force_logout,
+                id, req.user.org_id
+            ]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const updatedUser = {
+            ...result.rows[0],
+            status: result.rows[0].is_active ? 'active' : 'suspended'
+        };
+        res.json(updatedUser);
+    } catch (error) {
+        console.error('updateUser error:', error);
+        res.status(500).json({ error: 'Failed to update user: ' + error.message });
+    }
+};
+
+export const deleteUser = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await query(
+            'DELETE FROM users WHERE id = $1 AND org_id = $2 RETURNING id',
+            [id, req.user.org_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({ message: 'User deleted' });
+    } catch (error) {
+        console.error('deleteUser error:', error);
+        res.status(500).json({ error: 'Failed to delete user: ' + error.message });
+    }
+};
+
+export const forceLogoutUser = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await query(
+            'UPDATE users SET force_logout = true WHERE id = $1 AND org_id = $2 RETURNING id',
+            [id, req.user.org_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({ message: 'User will be forced to logout on next heartbeat' });
+    } catch (error) {
+        console.error('forceLogoutUser error:', error);
+        res.status(500).json({ error: 'Failed to force logout user: ' + error.message });
+    }
+};
