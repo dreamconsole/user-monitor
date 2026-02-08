@@ -1,0 +1,82 @@
+================================================================================
+USER MONITORING SYSTEM - TABLE PURPOSES & OWNERSHIP
+================================================================================
+
+--- CRM OWNED (Admin & Configuration) ---
+
+1. organizations
+   - Owner/Source: CRM (Admin)
+   - Key Columns : id, name, domain, max_users_limit
+   - Purpose     : Stores company-level details and subscription limits.
+
+2. users
+   - Owner/Source: CRM (Admin)
+   - Key Columns : id, org_id, email, role, manager_id
+   - Purpose     : Manages user accounts, credentials, and organizational hierarchy.
+
+3. roles
+   - Owner/Source: CRM (Admin)
+   - Key Columns : name
+   - Purpose     : Defines available access levels (orgadmin, manager, user).
+
+4. org_features
+   - Owner/Source: CRM (Admin)
+   - Key Columns : org_id, screenshot_interval_seconds, is_activity_tracking_enabled
+   - Purpose     : Global feature toggles (Screenshots, AFK, Breaks) for a company.
+
+5. user_features
+   - Owner/Source: CRM (Admin)
+   - Key Columns : user_id, is_screenshots_enabled, is_breaks_enabled
+   - Purpose     : User-specific overrides for organizational features.
+
+6. break_master
+   - Owner/Source: CRM (Admin)
+   - Key Columns : id, name, max_duration_seconds, is_paid
+   - Purpose     : Defines types of breaks (e.g., Lunch, Tea) for an organization.
+
+7. audit_logs
+   - Owner/Source: CRM (System)
+   - Key Columns : actor_id, action, target_id, old_values, new_values
+   - Purpose     : Records administrative actions for security tracking.
+
+
+--- AGENT OWNED (Data Tracking & Monitoring) ---
+
+8. agent_sessions
+   - Owner/Source: Agent Software
+   - Key Columns : user_id, device_identifier, auth_token, token_expires_at
+   - Purpose     : Tracks active monitoring software instances on user devices.
+
+9. work_sessions
+   - Owner/Source: Agent Software
+   - Key Columns : id, user_id, start_time, total_work_seconds, total_idle_seconds
+   - Purpose     : Main table for shifts; aggregates work, idle, and break time.
+
+10. activity_logs
+    - Owner/Source: Agent Software
+    - Key Columns : session_id, log_time, keyboard_events, mouse_events, state
+    - Purpose     : High-volume snapshots of user activity (active/idle/afk).
+
+11. screenshots
+    - Owner/Source: Agent Software
+    - Key Columns : session_id, storage_path, captured_at
+    - Purpose     : Stores location and timing of screenshots captured by the agent.
+
+12. break_logs
+    - Owner/Source: Agent Software
+    - Key Columns : session_id, break_type_id, start_time, duration_seconds
+    - Purpose     : Detailed records of when users are on specific breaks.
+
+13. heartbeats
+    - Owner/Source: Agent Software
+    - Key Columns : user_id, device_id, last_seen_at, status
+    - Purpose     : Real-time "online" status tracking for the monitoring agent.
+
+
+--- LEGACY / DEPRECATED ---
+
+14. activity_sessions
+    - Owner/Source: Legacy
+    - Purpose     : Old method of tracking activity; now replaced by work_sessions.
+
+================================================================================
