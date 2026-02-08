@@ -30,10 +30,13 @@ class MonitorService {
         this.lastCheckTime = 0;
 
         // Start uIOhook
-        uIOhook.on('keydown', () => { this.keyboardEvents++; });
-        uIOhook.on('mousedown', () => { this.mouseEvents++; });
-        // uIOhook.on('mousemove', () => { this.mouseEvents++; }); // Could be too many events
+        uIOhook.on('keydown', () => { this.keyboardEvents++; this.lastInputTime = Date.now(); });
+        uIOhook.on('keyup', () => { this.keyboardEvents++; this.lastInputTime = Date.now(); });
+        uIOhook.on('mousedown', () => { this.mouseEvents++; this.lastInputTime = Date.now(); });
+        uIOhook.on('mouseup', () => { this.mouseEvents++; this.lastInputTime = Date.now(); });
+        uIOhook.on('mousemove', () => { this.mouseEvents++; this.lastInputTime = Date.now(); });
         uIOhook.start();
+        this.lastInputTime = Date.now();
     }
 
     getCurrentWorkSessionId() {
@@ -59,6 +62,7 @@ class MonitorService {
             this.isPaused = false;
             this.breakType = null;
             this.lastCheckTime = Date.now();
+            this.lastInputTime = Date.now();
 
             // Start a new Work Session (Shift)
             console.log('Calling startWorkSession...');
@@ -120,6 +124,7 @@ class MonitorService {
 
         // Final update before stopping
         if (this.currentWorkSessionId) {
+            // Check if we were idle since last check
             this.updateWorkSessionInDB();
             this.currentWorkSessionId = null;
             // Immediate sync to server
@@ -186,6 +191,9 @@ class MonitorService {
                 console.log(`Ended Break: ${this.currentBreakId}, Duration: ${duration}s`);
 
                 this.totalBreakSeconds += duration;
+
+                // Reset check time so we don't count break as work
+                this.lastCheckTime = Date.now();
                 this.updateWorkSessionInDB();
 
                 // Immediate sync to server
@@ -208,18 +216,35 @@ class MonitorService {
     checkAndLogActivity() {
         if (this.isPaused || !this.currentWorkSessionId) return;
 
-        const idleTime = powerMonitor.getSystemIdleTime();
+        const systemIdleTime = powerMonitor.getSystemIdleTime();
+        // Fallback: Check time since last uIOhook event
+        const inputIdleTime = Math.floor((Date.now() - this.lastInputTime) / 1000);
+        // Use the minimum of both to be generous to the user
+        const idleTime = Math.min(systemIdleTime, inputIdleTime);
+
         const now = Date.now();
         const secondsElapsed = Math.floor((now - this.lastCheckTime) / 1000);
         this.lastCheckTime = now;
 
-        console.log(`[checkAndLogActivity] Idle Time: ${idleTime}s, Elapsed: ${secondsElapsed}s, Session: ${this.currentWorkSessionId}`);
+        console.log(`[checkAndLogActivity] Idle: ${idleTime}s (Sys: ${systemIdleTime}s, Input: ${inputIdleTime}s), Elapsed: ${secondsElapsed}s`);
 
         let state = 'active';
+        const wasActive = this.currentState === 'ACTIVE';
 
         if (idleTime >= IDLE_THRESHOLD_SECONDS) {
             state = 'idle';
             this.totalIdleSeconds += secondsElapsed;
+
+            // LOGIC FIX: If we JUST crossed the threshold (e.g. idleTime is 300-360)
+            // The previous polls might have wrongly added time to totalWorkSeconds
+            // We should retrospective move that time to idle if this is the first 'idle' poll
+            if (wasActive) {
+                console.log('Transition to IDLE detected. Adjusting work/idle balance.');
+                // Move the threshold time from work to idle
+                const adjustment = Math.min(this.totalWorkSeconds, IDLE_THRESHOLD_SECONDS);
+                this.totalWorkSeconds -= adjustment;
+                this.totalIdleSeconds += adjustment;
+            }
         } else {
             state = 'active';
             this.totalWorkSeconds += secondsElapsed;
