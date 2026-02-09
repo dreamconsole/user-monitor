@@ -1,9 +1,29 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const { app, BrowserWindow, Tray, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, powerSaveBlocker } = require('electron');
+
+// Prevent timer throttling and renderer backgrounding
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
 // const { machineIdSync } = require('node-machine-id'); // Will use later
 const db = require('./db');
+let powerSaveId = null;
+
+function startPowerBlocker() {
+    if (powerSaveId === null || !powerSaveBlocker.isStarted(powerSaveId)) {
+        powerSaveId = powerSaveBlocker.start('prevent-app-suspension');
+        console.log('Power Save Blocker started:', powerSaveId);
+    }
+}
+
+function stopPowerBlocker() {
+    if (powerSaveId !== null && powerSaveBlocker.isStarted(powerSaveId)) {
+        powerSaveBlocker.stop(powerSaveId);
+        console.log('Power Save Blocker stopped:', powerSaveId);
+        powerSaveId = null;
+    }
+}
 
 let mainWindow;
 let tray = null;
@@ -26,7 +46,8 @@ function createWindow() {
         maximizable: false,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false // For POC simplicity; consider contextIsolation: true with preload for prod
+            contextIsolation: false, // For POC simplicity; consider contextIsolation: true with preload for prod
+            backgroundThrottling: false
         },
         show: false // Don't show until ready
     });
@@ -128,24 +149,28 @@ ipcMain.on('start-tracking', () => {
     console.log('Starting tracking...');
     const monitorService = require('./services/monitor');
     monitorService.start();
+    startPowerBlocker();
 });
 
 ipcMain.on('pause-tracking', (event, breakType) => {
     console.log(`Pausing tracking for break: ${breakType}`);
     const monitorService = require('./services/monitor');
     monitorService.pause(breakType);
+    stopPowerBlocker();
 });
 
 ipcMain.on('resume-tracking', () => {
     console.log('Resuming tracking...');
     const monitorService = require('./services/monitor');
     monitorService.resume();
+    startPowerBlocker();
 });
 
 ipcMain.on('end-shift', () => {
     console.log('Ending shift...');
     const monitorService = require('./services/monitor');
     monitorService.stop();
+    stopPowerBlocker();
 });
 
 ipcMain.on('logout', () => {

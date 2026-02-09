@@ -28,6 +28,7 @@ const currentBreakTypeSpan = document.getElementById('currentBreakType');
 
 let timerInterval = null;
 let secondsElapsed = 0;
+let sessionStartTime = null;
 let isTracking = false;
 
 function formatTime(s) {
@@ -65,11 +66,15 @@ function updateLastSync() {
 
 function startTimer() {
     if (timerInterval) clearInterval(timerInterval);
+    if (!sessionStartTime) {
+        sessionStartTime = Date.now() - (secondsElapsed * 1000);
+    }
     timerInterval = setInterval(() => {
-        secondsElapsed++;
+        const now = Date.now();
+        secondsElapsed = Math.floor((now - sessionStartTime) / 1000);
         timerDisplay.innerText = formatTime(secondsElapsed);
 
-        // Randomly update sync for visual effect, or every minute
+        // Update sync visual every minute
         if (secondsElapsed % 60 === 0) {
             updateLastSync();
         }
@@ -78,7 +83,11 @@ function startTimer() {
 }
 
 function stopTimer() {
-    if (timerInterval) clearInterval(timerInterval);
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+    sessionStartTime = null;
     updateStatus('OFFLINE');
 }
 
@@ -145,7 +154,11 @@ breakBtn.addEventListener('click', () => {
     activeActions.style.display = 'none';
     breakActions.style.display = 'flex';
     currentBreakTypeSpan.innerText = breakType;
-    stopTimer();
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+    sessionStartTime = null;
     updateStatus('idle');
 });
 

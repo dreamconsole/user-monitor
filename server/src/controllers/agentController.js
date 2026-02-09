@@ -6,11 +6,28 @@ import crypto from 'crypto';
 export const logHeartbeat = async (req, res) => {
     const { org_id, user_id, device_identifier } = req.body;
     try {
-        // Update last_heartbeat_at in agent_sessions
-        await query(
-            'UPDATE agent_sessions SET last_heartbeat_at = CURRENT_TIMESTAMP WHERE org_id = $1 AND user_id = $2 AND device_identifier = $3',
-            [org_id, user_id, device_identifier]
+        // Update last_heartbeat_at in agent_sessions or insert if not exists
+        const { agent_version, device_name } = req.body;
+        let { token } = req.body;
+
+        // If token is missing in body, try to get it from context/headers
+        if (!token && req.headers.authorization) {
+            token = req.headers.authorization.split(' ')[1];
+        }
+
+        const sessionUpdate = await query(
+            'UPDATE agent_sessions SET last_heartbeat_at = CURRENT_TIMESTAMP, auth_token = COALESCE($1, auth_token) WHERE org_id = $2 AND user_id = $3 AND device_identifier = $4',
+            [token || null, org_id, user_id, device_identifier]
         );
+
+        if (sessionUpdate.rowCount === 0) {
+            // Create a new agent session record if it doesn't exist
+            console.log(`[logHeartbeat] Creating new agent_session for User: ${user_id}, Device: ${device_identifier}`);
+            await query(
+                'INSERT INTO agent_sessions (org_id, user_id, device_identifier, device_name, auth_token, token_expires_at) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP + INTERVAL \'30 days\')',
+                [org_id, user_id, device_identifier, device_name || 'Generic Device', token || 'no-token']
+            ).catch(err => console.error('[logHeartbeat] Failed to create agent_session:', err.message));
+        }
 
         // Record historical heartbeat
         console.log(`[logHeartbeat] Recording for User: ${user_id}, Org: ${org_id}`);
@@ -20,8 +37,6 @@ export const logHeartbeat = async (req, res) => {
         );
 
         // Update users table with latest tracking info
-        // We also check for token and agent_version if passed in heartbeat
-        const { agent_version, token } = req.body;
         await query(
             `UPDATE users SET 
                 last_heartbeat = CURRENT_TIMESTAMP,
@@ -137,14 +152,24 @@ export const logBreak = async (req, res) => {
         // If break_type_id is not a UUID, try to find it by name
         const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (break_type_id && !UUID_REGEX.test(break_type_id)) {
+            // Find a match where the break master name contains the string or vice versa
             const btResult = await query(
-                'SELECT id FROM break_master WHERE org_id = $1 AND name ILIKE $2 || \'%\'',
+                `SELECT id FROM break_master 
+                 WHERE org_id = $1 
+                 AND (name ILIKE $2 || '%' OR $2 ILIKE name || '%')
+                 LIMIT 1`,
                 [org_id, break_type_id]
             );
+
             if (btResult.rows.length > 0) {
                 finalBreakTypeId = btResult.rows[0].id;
             } else {
-                finalBreakTypeId = null;
+                // Last ditch effort: substring match
+                const fuzzyResult = await query(
+                    'SELECT id FROM break_master WHERE org_id = $1 AND (name ILIKE \'%\' || $2 || \'%\' OR $2 ILIKE \'%\' || name || \'%\') LIMIT 1',
+                    [org_id, break_type_id]
+                );
+                finalBreakTypeId = fuzzyResult.rows.length > 0 ? fuzzyResult.rows[0].id : null;
             }
         }
 
