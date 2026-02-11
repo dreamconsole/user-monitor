@@ -12,7 +12,7 @@ const { API_URL } = require('../config');
 const monitorService = require('./monitor');
 const logger = require('./logger');
 
-const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const SYNC_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
 
 class SyncService {
     constructor() {
@@ -64,7 +64,7 @@ class SyncService {
 
         for (const row of rows) {
             try {
-                await axios.post(`${API_URL}/agent/activity-session`, {
+                const response = await axios.post(`${API_URL}/agent/activity-session`, {
                     id: row.id,
                     org_id: row.org_id,
                     user_id: row.user_id,
@@ -78,16 +78,19 @@ class SyncService {
                     headers: { Authorization: `Bearer ${authService.getToken()}` }
                 });
 
-                // Update status (Stay pending if it's the current active session? 
-                // No, we sync updates continuously. In a real app we might want a 'synced_at' timestamp)
-                // For this POC, we can mark as synced, but monitor.js will update it back to pending if it changes.
-                db.getDB().prepare(`
-                    UPDATE work_sessions SET sync_status = 'synced' WHERE id = ?
-                `).run(row.id);
+                this.checkForForcedLogout(response);
 
-                console.log(`Synced work session: ${row.id}`);
+                if (response.data && response.data.success) {
+                    db.getDB().prepare(`
+                        UPDATE work_sessions SET sync_status = 'synced' WHERE id = ?
+                    `).run(row.id);
+                    console.log(`Synced work session: ${row.id}`);
+                } else {
+                    console.warn(`Work session sync returned failure for ${row.id}:`, response.data);
+                }
             } catch (error) {
                 console.error(`Failed to sync work session ${row.id}`, error.message);
+                this.checkForForcedLogout(error.response);
             }
         }
     }
@@ -99,7 +102,7 @@ class SyncService {
 
         for (const row of rows) {
             try {
-                await axios.post(`${API_URL}/agent/activity-log`, {
+                const response = await axios.post(`${API_URL}/agent/activity-log`, {
                     session_id: row.session_id,
                     org_id: row.org_id,
                     user_id: row.user_id,
@@ -112,14 +115,19 @@ class SyncService {
                     headers: { Authorization: `Bearer ${authService.getToken()}` }
                 });
 
-                // Update status 
-                db.getDB().prepare(`
-                    UPDATE activity_logs SET sync_status = 'synced' WHERE id = ?
-                `).run(row.id);
+                this.checkForForcedLogout(response);
 
-                console.log(`Synced activity log: ${row.id}`);
+                if (response.data && response.data.success) {
+                    db.getDB().prepare(`
+                        UPDATE activity_logs SET sync_status = 'synced' WHERE id = ?
+                    `).run(row.id);
+                    console.log(`Synced activity log: ${row.id}`);
+                } else {
+                    console.warn(`Activity log sync returned failure for ${row.id}:`, response.data);
+                }
             } catch (error) {
                 console.error(`Failed to sync activity log ${row.id}`, error.message);
+                this.checkForForcedLogout(error.response);
             }
         }
     }
@@ -136,7 +144,7 @@ class SyncService {
                 let breakTypeId = row.break_type_id;
                 // Server will handle name-to-UUID resolution if it's not a UUID
 
-                await axios.post(`${API_URL}/agent/break-log`, {
+                const response = await axios.post(`${API_URL}/agent/break-log`, {
                     id: row.id,
                     org_id: row.org_id,
                     user_id: row.user_id,
@@ -149,14 +157,19 @@ class SyncService {
                     headers: { Authorization: `Bearer ${authService.getToken()}` }
                 });
 
-                // Update status 
-                db.getDB().prepare(`
-                    UPDATE break_logs SET sync_status = 'synced' WHERE id = ?
-                `).run(row.id);
+                this.checkForForcedLogout(response);
 
-                console.log(`Synced break log: ${row.id}`);
+                if (response.data && response.data.success) {
+                    db.getDB().prepare(`
+                        UPDATE break_logs SET sync_status = 'synced' WHERE id = ?
+                    `).run(row.id);
+                    console.log(`Synced break log: ${row.id}`);
+                } else {
+                    console.warn(`Break log sync returned failure for ${row.id}:`, response.data);
+                }
             } catch (error) {
                 console.error(`Failed to sync break log ${row.id}`, error.message);
+                this.checkForForcedLogout(error.response);
             }
         }
     }
@@ -181,22 +194,27 @@ class SyncService {
                 form.append('captured_at', new Date(row.captured_at).toISOString());
                 form.append('screenshot', fs.createReadStream(row.file_path));
 
-                await axios.post(`${API_URL}/agent/screenshot`, form, {
+                const response = await axios.post(`${API_URL}/agent/screenshot`, form, {
                     headers: {
                         Authorization: `Bearer ${authService.getToken()}`,
                         ...form.getHeaders()
                     }
                 });
 
-                db.getDB().prepare(`
-                    UPDATE screenshots SET sync_status = 'uploaded' WHERE id = ?
-                `).run(row.id);
+                this.checkForForcedLogout(response);
 
-                fs.unlinkSync(row.file_path);
-                console.log(`Synced screenshot: ${row.id}`);
-
+                if (response.data && response.data.success) {
+                    db.getDB().prepare(`
+                        UPDATE screenshots SET sync_status = 'uploaded' WHERE id = ?
+                    `).run(row.id);
+                    fs.unlinkSync(row.file_path);
+                    console.log(`Synced screenshot: ${row.id}`);
+                } else {
+                    console.warn(`Screenshot sync returned failure for ${row.id}:`, response.data);
+                }
             } catch (error) {
                 console.error(`Failed to sync screenshot ${row.id}`, error.message);
+                this.checkForForcedLogout(error.response);
             }
         }
     }
@@ -216,9 +234,11 @@ class SyncService {
 
             console.log(`[Heartbeat] Sending to ${API_URL}/agent/heartbeat`, payload);
 
-            await axios.post(`${API_URL}/agent/heartbeat`, payload, {
+            const response = await axios.post(`${API_URL}/agent/heartbeat`, payload, {
                 headers: { Authorization: `Bearer ${authService.getToken()}` }
             });
+
+            this.checkForForcedLogout(response);
 
             db.getDB().prepare(`
                 INSERT INTO heartbeat_logs (org_id, user_id, device_id, last_seen_at, status)
@@ -228,6 +248,26 @@ class SyncService {
         } catch (error) {
             const errorMsg = error.response ? JSON.stringify(error.response.data) : error.message;
             console.error('Heartbeat failed.', `Status: ${error.response?.status || 'N/A'}`, `Error: ${errorMsg}`);
+            this.checkForForcedLogout(error.response);
+        }
+    }
+
+    checkForForcedLogout(response) {
+        if (!response) return;
+
+        const isForcedLogout =
+            (response.status === 401 || response.status === 403) ||
+            (response.data && response.data.command === 'FORCE_LOGOUT');
+
+        if (isForcedLogout) {
+            console.warn('AUTH FAILURE or SERVER COMMAND: FORCE_LOGOUT RECEIVED. Logging out agent...');
+            const { app } = require('electron');
+            if (app) {
+                app.emit('force-logout');
+            } else {
+                // Fallback if app is not accessible here
+                process.send && process.send({ type: 'force-logout' });
+            }
         }
     }
 

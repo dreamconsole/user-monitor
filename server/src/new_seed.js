@@ -5,7 +5,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,22 +41,22 @@ async function seed() {
         const hashedPassword = await bcrypt.hash('password123', 10);
 
         const adminRes = await client.query(`
-            INSERT INTO users (org_id, full_name, email, password_hash, role)
-            VALUES ($1, 'Admin User', 'admin@acme.com', $2, 'orgadmin')
+            INSERT INTO users (org_id, full_name, email, password_hash, role, timezone)
+            VALUES ($1, 'Admin User', 'admin@acme.com', $2, 'orgadmin', 'Asia/Kolkata')
             RETURNING id
         `, [orgId, hashedPassword]);
         const adminId = adminRes.rows[0].id;
 
         const managerRes = await client.query(`
-            INSERT INTO users (org_id, manager_id, full_name, email, password_hash, role)
-            VALUES ($1, $2, 'Manager User', 'manager@acme.com', $3, 'manager')
+            INSERT INTO users (org_id, manager_id, full_name, email, password_hash, role, timezone)
+            VALUES ($1, $2, 'Manager User', 'manager@acme.com', $3, 'manager', 'Asia/Kolkata')
             RETURNING id
         `, [orgId, adminId, hashedPassword]);
         const managerId = managerRes.rows[0].id;
 
         const userRes = await client.query(`
-            INSERT INTO users (org_id, manager_id, full_name, email, password_hash, role)
-            VALUES ($1, $2, 'Standard User', 'user@acme.com', $3, 'user')
+            INSERT INTO users (org_id, manager_id, full_name, email, password_hash, role, timezone)
+            VALUES ($1, $2, 'Standard User', 'user@acme.com', $3, 'user', 'Asia/Kolkata')
             RETURNING id
         `, [orgId, managerId, hashedPassword]);
         const userId = userRes.rows[0].id;
@@ -74,8 +74,8 @@ async function seed() {
 
         console.log('Seeding Work Session...');
         const sessionRes = await client.query(`
-            INSERT INTO work_sessions (org_id, user_id, status)
-            VALUES ($1, $2, 'active')
+            INSERT INTO work_sessions (org_id, user_id, status, work_date)
+            VALUES ($1, $2, 'active', CURRENT_DATE)
             RETURNING id
         `, [orgId, userId]);
         const sessionId = sessionRes.rows[0].id;

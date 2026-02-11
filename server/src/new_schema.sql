@@ -10,6 +10,7 @@ CREATE TABLE organizations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     domain VARCHAR(255),
+    timezone VARCHAR(100) DEFAULT 'UTC',
     max_users_limit INTEGER DEFAULT 10,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -44,6 +45,14 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL,
     password_hash TEXT NOT NULL,
     role user_role DEFAULT 'user',
+    timezone VARCHAR(100) DEFAULT 'UTC',
+    emp_id TEXT,
+    payroll_id TEXT,
+    site TEXT,
+    device_id TEXT,
+    agent_version TEXT,
+    token TEXT,
+    last_heartbeat TIMESTAMPTZ,
     is_active BOOLEAN DEFAULT true,
     force_logout BOOLEAN DEFAULT false,
     last_login_at TIMESTAMPTZ,
@@ -59,7 +68,9 @@ CREATE TABLE user_features (
     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     is_screenshots_enabled BOOLEAN, -- NULL means use org default
+    screenshot_interval_seconds INTEGER,
     is_afk_tracking_enabled BOOLEAN,
+    afk_threshold_seconds INTEGER,
     is_breaks_enabled BOOLEAN,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -84,6 +95,7 @@ CREATE TABLE work_sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    work_date DATE NOT NULL DEFAULT CURRENT_DATE,
     start_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_time TIMESTAMPTZ,
     total_work_seconds INTEGER DEFAULT 0,
@@ -124,6 +136,10 @@ CREATE TABLE activity_logs (
 -- Example partition for January 2026
 CREATE TABLE activity_logs_y2026m01 PARTITION OF activity_logs
     FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
+
+-- Partition for February 2026
+CREATE TABLE activity_logs_y2026m02 PARTITION OF activity_logs
+    FOR VALUES FROM ('2026-02-01') TO ('2026-03-01');
 
 -- 9. Screenshots (Metadata only)
 CREATE TABLE screenshots (

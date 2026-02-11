@@ -174,6 +174,10 @@ ipcMain.on('end-shift', () => {
 });
 
 ipcMain.on('logout', () => {
+    performLogout();
+});
+
+function performLogout() {
     console.log('Logging out...');
     const monitorService = require('./services/monitor');
     monitorService.stop();
@@ -187,6 +191,11 @@ ipcMain.on('logout', () => {
     currentUser = null;
     app.relaunch();
     app.exit();
+}
+
+app.on('force-logout', () => {
+    console.log('Received force-logout event from service.');
+    performLogout();
 });
 
 ipcMain.on('get-user-data-path', (event) => {

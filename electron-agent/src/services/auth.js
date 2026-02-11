@@ -27,7 +27,19 @@ class AuthService {
             return null;
         }
 
-        return { user: this.user, token: this.token };
+        try {
+            console.log('Verifying token for auto-login...');
+            const response = await axios.get(`${API_URL}/auth/me`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            this.user = response.data.user;
+            store.set('user', this.user);
+            return { user: this.user, token: this.token };
+        } catch (error) {
+            console.error('Auto-login verification failed:', error.message);
+            this.logout();
+            return null;
+        }
     }
 
     async login(email, password) {

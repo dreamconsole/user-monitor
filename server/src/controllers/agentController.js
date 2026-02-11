@@ -6,6 +6,17 @@ import crypto from 'crypto';
 export const logHeartbeat = async (req, res) => {
     const { org_id, user_id, device_identifier } = req.body;
     try {
+        // Validate user and org existence first
+        const userCheck = await query('SELECT id, force_logout FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
+        if (userCheck.rows.length === 0) {
+            console.warn(`[logHeartbeat] Invalid Org/User: Org=${org_id}, User=${user_id}. Requesting Agent Logout.`);
+            return res.status(403).json({
+                success: false,
+                command: 'FORCE_LOGOUT',
+                error: 'Invalid organization or user session'
+            });
+        }
+
         // Update last_heartbeat_at in agent_sessions or insert if not exists
         const { agent_version, device_name } = req.body;
         let { token } = req.body;
@@ -47,9 +58,19 @@ export const logHeartbeat = async (req, res) => {
             [device_identifier, agent_version || null, token || null, user_id]
         );
 
-        // Check for force_logout flag
-        const userResult = await query('SELECT force_logout FROM users WHERE id = $1', [user_id]);
-        const forceLogout = userResult.rows[0]?.force_logout;
+        // Validate user and org existence first
+        const userResult = await query('SELECT force_logout FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
+
+        if (userResult.rows.length === 0) {
+            console.warn(`[logHeartbeat] Invalid Org/User: Org=${org_id}, User=${user_id}. Requesting Agent Logout.`);
+            return res.status(403).json({
+                success: false,
+                command: 'FORCE_LOGOUT',
+                error: 'Invalid organization or user session'
+            });
+        }
+
+        const forceLogout = userResult.rows[0].force_logout;
 
         if (forceLogout) {
             // Reset the flag and tell the agent to logout
@@ -71,6 +92,15 @@ export const logHeartbeat = async (req, res) => {
 export const syncActivitySession = async (req, res) => {
     const { id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, status } = req.body;
     try {
+        // Validate user and org existence
+        const userCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
+        if (userCheck.rows.length === 0) {
+            return res.status(403).json({
+                success: false,
+                command: 'FORCE_LOGOUT',
+                error: 'Invalid organization or user session'
+            });
+        }
         // activity_sessions is now work_sessions
         // Calculate work_date based on start_time AT TIME ZONE user's timezone
         // Use a CASE to handle the unrecognized 'Asia/Calcutta' alias often found in older systems
@@ -95,6 +125,13 @@ export const syncActivitySession = async (req, res) => {
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Work session sync failed:', error);
+        if (error.code === '23503') {
+            return res.status(403).json({
+                success: false,
+                command: 'FORCE_LOGOUT',
+                error: 'Invalid organization or user ID in session'
+            });
+        }
         res.status(500).json({
             success: false,
             error: 'Failed to sync work session',
@@ -131,6 +168,15 @@ export const logActivity = async (req, res) => {
     console.log('[logActivity] RECEIVED:', { org_id, user_id, session_id, log_time, keyboard_events, mouse_events, state });
 
     try {
+        // Validate user and org existence
+        const userCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
+        if (userCheck.rows.length === 0) {
+            return res.status(403).json({
+                success: false,
+                command: 'FORCE_LOGOUT',
+                error: 'Invalid organization or user session'
+            });
+        }
         const result = await query(
             `INSERT INTO activity_logs (org_id, user_id, session_id, log_time, keyboard_events, mouse_events, state, metadata)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
@@ -140,6 +186,13 @@ export const logActivity = async (req, res) => {
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('[logActivity] CRITICAL ERROR:', error);
+        if (error.code === '23503') {
+            return res.status(403).json({
+                success: false,
+                command: 'FORCE_LOGOUT',
+                error: 'Invalid organization or user ID in activity log'
+            });
+        }
         res.status(500).json({
             success: false,
             error: 'Failed to log activity',
@@ -153,6 +206,15 @@ export const logBreak = async (req, res) => {
     const { id, org_id, user_id, session_id, break_type_id, start_time, end_time, duration_seconds } = req.body;
 
     try {
+        // Validate user and org existence
+        const userCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
+        if (userCheck.rows.length === 0) {
+            return res.status(403).json({
+                success: false,
+                command: 'FORCE_LOGOUT',
+                error: 'Invalid organization or user session'
+            });
+        }
         let finalBreakTypeId = break_type_id;
 
         // If break_type_id is not a UUID, try to find it by name
@@ -190,6 +252,13 @@ export const logBreak = async (req, res) => {
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Break log failed:', error);
+        if (error.code === '23503') {
+            return res.status(403).json({
+                success: false,
+                command: 'FORCE_LOGOUT',
+                error: 'Invalid organization or user ID in break log'
+            });
+        }
         res.status(500).json({
             success: false,
             error: 'Failed to log break',

@@ -4,7 +4,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +34,8 @@ async function applySchema() {
             DROP TABLE IF EXISTS org_features CASCADE;
             DROP TABLE IF EXISTS organizations CASCADE;
             DROP TABLE IF EXISTS heartbeats CASCADE;
+            DROP TABLE IF EXISTS roles CASCADE;
+            DROP TABLE IF EXISTS activity_sessions CASCADE;
             DROP TYPE IF EXISTS user_role CASCADE;
             DROP TYPE IF EXISTS session_status CASCADE;
         `);
