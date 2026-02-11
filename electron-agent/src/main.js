@@ -179,18 +179,33 @@ ipcMain.on('logout', () => {
 
 function performLogout() {
     console.log('Logging out...');
-    const monitorService = require('./services/monitor');
-    monitorService.stop();
 
-    const syncService = require('./services/sync');
-    syncService.stop();
+    // Stop services
+    try {
+        const monitorService = require('./services/monitor');
+        monitorService.stop();
 
-    const authService = require('./services/auth');
-    authService.logout();
+        const syncService = require('./services/sync');
+        syncService.stop();
+
+        const authService = require('./services/auth');
+        authService.logout();
+    } catch (e) {
+        console.error('Error stopping services during logout:', e);
+    }
 
     currentUser = null;
-    app.relaunch();
-    app.exit();
+
+    // Instead of relaunch (which exits process), just reload window to login screen
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.loadFile(path.join(__dirname, 'ui/login.html'));
+        mainWindow.show();
+        console.log('Reloaded to login screen.');
+    } else {
+        // Fallback if window is gone
+        app.relaunch();
+        app.exit();
+    }
 }
 
 app.on('force-logout', () => {

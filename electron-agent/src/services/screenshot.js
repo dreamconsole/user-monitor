@@ -3,9 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
-
-const CAPTURE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-// const CAPTURE_INTERVAL_MS = 10 * 1000; // 10 seconds for testing
+const configService = require('./config');
 
 class ScreenshotService {
     constructor() {
@@ -15,6 +13,30 @@ class ScreenshotService {
         this.orgId = null;
         this.userId = null;
         this.deviceId = null;
+
+        // Dynamic Config
+        this.captureIntervalMs = (configService.get('screenshot_interval_seconds') || 600) * 1000;
+        this.isEnabled = configService.get('is_screenshots_enabled') !== false;
+
+        // Listen for config changes
+        configService.on('config-updated', (config) => {
+            console.log('[ScreenshotService] Config updated, applying new settings...');
+            const newInterval = (config.screenshot_interval_seconds || 600) * 1000;
+            const newEnabled = config.is_screenshots_enabled !== false;
+
+            this.isEnabled = newEnabled;
+
+            // If interval changed, restart
+            if (newInterval !== this.captureIntervalMs && this.interval) {
+                this.captureIntervalMs = newInterval;
+                if (this.currentState === 'ACTIVE') {
+                    this.stop();
+                    this.start(this.orgId, this.userId, this.deviceId, this.sessionId);
+                }
+            } else {
+                this.captureIntervalMs = newInterval;
+            }
+        });
     }
 
     start(orgId, userId, deviceId, sessionId) {
@@ -26,16 +48,22 @@ class ScreenshotService {
         this.currentState = 'ACTIVE'; // synced with monitor usually, defaulting to active
         this.lastCaptureTime = Date.now(); // Reset timer on start so we don't capture immediately unless check logic allows
 
+        // Refresh config on start
+        this.captureIntervalMs = (configService.get('screenshot_interval_seconds') || 600) * 1000;
+        this.isEnabled = configService.get('is_screenshots_enabled') !== false;
+
         if (this.interval) clearInterval(this.interval);
 
-        // Check every minute if we need to capture to avoid drifting too far
+        // Check every minute if we need to capture (timer tick)
+        // If the interval is very small (testing), we might want a tighter loop, but 1min is standard for now
         this.interval = setInterval(() => {
             this.checkAndCapture();
-        }, 60 * 1000);
+        }, 30 * 1000); // Check more frequently (30s) to catch smaller intervals
     }
 
     stop() {
         if (this.interval) clearInterval(this.interval);
+        this.interval = null;
         console.log('Screenshot Service stopped.');
     }
 
@@ -44,13 +72,13 @@ class ScreenshotService {
     }
 
     async checkAndCapture() {
-        if (this.currentState !== 'ACTIVE') {
-            // console.log('Skipping screenshot: User not ACTIVE');
+        if (this.currentState !== 'ACTIVE' || !this.isEnabled) {
+            // console.log('Skipping screenshot: User not ACTIVE or Screenhots disabled');
             return;
         }
 
         const now = Date.now();
-        if (now - this.lastCaptureTime >= CAPTURE_INTERVAL_MS) {
+        if (now - this.lastCaptureTime >= this.captureIntervalMs) {
             await this.capture();
         }
     }

@@ -3,9 +3,9 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const authService = require('./auth');
 const screenshotService = require('./screenshot');
+const configService = require('./config');
 const { uIOhook } = require('uiohook-napi');
 
-const IDLE_THRESHOLD_SECONDS = 300; // 5 minutes
 const POLL_INTERVAL_MS = 60 * 1000; // Check every 1 minute (for granular logging)
 
 class MonitorService {
@@ -28,6 +28,17 @@ class MonitorService {
         this.keyboardEvents = 0;
         this.mouseEvents = 0;
         this.lastCheckTime = 0;
+
+        // Dynamic Config Values
+        this.afkThresholdSeconds = configService.get('afk_threshold_seconds') || 300;
+        this.isAfkTrackingEnabled = configService.get('is_afk_tracking_enabled') !== false;
+
+        // Listen for config changes
+        configService.on('config-updated', (config) => {
+            console.log('[MonitorService] Config updated, applying new settings...');
+            this.afkThresholdSeconds = config.afk_threshold_seconds || 300;
+            this.isAfkTrackingEnabled = config.is_afk_tracking_enabled !== false;
+        });
 
         // Start uIOhook
         uIOhook.on('keydown', () => { this.keyboardEvents++; this.lastInputTime = Date.now(); });
@@ -63,6 +74,10 @@ class MonitorService {
             this.breakType = null;
             this.lastCheckTime = Date.now();
             this.lastInputTime = Date.now();
+
+            // Refresh config on start
+            this.afkThresholdSeconds = configService.get('afk_threshold_seconds') || 300;
+            this.isAfkTrackingEnabled = configService.get('is_afk_tracking_enabled') !== false;
 
             // Start a new Work Session (Shift)
             console.log('Calling startWorkSession...');
@@ -226,26 +241,31 @@ class MonitorService {
         const secondsElapsed = Math.floor((now - this.lastCheckTime) / 1000);
         this.lastCheckTime = now;
 
-        console.log(`[checkAndLogActivity] Idle: ${idleTime}s (Sys: ${systemIdleTime}s, Input: ${inputIdleTime}s), Elapsed: ${secondsElapsed}s`);
+        console.log(`[checkAndLogActivity] Idle: ${idleTime}s (Sys: ${systemIdleTime}s, Input: ${inputIdleTime}s), Elapsed: ${secondsElapsed}s, Threshold: ${this.afkThresholdSeconds}s`);
 
         let state = 'active';
         const wasActive = this.currentState === 'ACTIVE';
 
-        if (idleTime >= IDLE_THRESHOLD_SECONDS) {
-            state = 'idle';
-            this.totalIdleSeconds += secondsElapsed;
+        // Check if AFK tracking is enabled
+        if (this.isAfkTrackingEnabled) {
+            if (idleTime >= this.afkThresholdSeconds) {
+                state = 'idle';
+                this.totalIdleSeconds += secondsElapsed;
 
-            // LOGIC FIX: If we JUST crossed the threshold (e.g. idleTime is 300-360)
-            // The previous polls might have wrongly added time to totalWorkSeconds
-            // We should retrospective move that time to idle if this is the first 'idle' poll
-            if (wasActive) {
-                console.log('Transition to IDLE detected. Adjusting work/idle balance.');
-                // Move the threshold time from work to idle
-                const adjustment = Math.min(this.totalWorkSeconds, IDLE_THRESHOLD_SECONDS);
-                this.totalWorkSeconds -= adjustment;
-                this.totalIdleSeconds += adjustment;
+                // LOGIC FIX: If we JUST crossed the threshold
+                if (wasActive) {
+                    console.log('Transition to IDLE detected. Adjusting work/idle balance.');
+                    // Move the threshold time from work to idle
+                    const adjustment = Math.min(this.totalWorkSeconds, this.afkThresholdSeconds);
+                    this.totalWorkSeconds -= adjustment;
+                    this.totalIdleSeconds += adjustment;
+                }
+            } else {
+                state = 'active';
+                this.totalWorkSeconds += secondsElapsed;
             }
         } else {
+            // If AFK tracking is disabled, always active
             state = 'active';
             this.totalWorkSeconds += secondsElapsed;
         }

@@ -238,6 +238,12 @@ class SyncService {
                 headers: { Authorization: `Bearer ${authService.getToken()}` }
             });
 
+            // Update Configuration if provided
+            if (response.data && response.data.features) {
+                const configService = require('./config');
+                configService.update(response.data.features);
+            }
+
             this.checkForForcedLogout(response);
 
             db.getDB().prepare(`

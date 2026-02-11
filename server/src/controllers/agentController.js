@@ -7,7 +7,8 @@ export const logHeartbeat = async (req, res) => {
     const { org_id, user_id, device_identifier } = req.body;
     try {
         // Validate user and org existence first
-        const userCheck = await query('SELECT id, force_logout FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
+        // Validate user and org existence first
+        const userCheck = await query('SELECT id, force_logout, is_active FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
         if (userCheck.rows.length === 0) {
             console.warn(`[logHeartbeat] Invalid Org/User: Org=${org_id}, User=${user_id}. Requesting Agent Logout.`);
             return res.status(403).json({
@@ -15,6 +16,17 @@ export const logHeartbeat = async (req, res) => {
                 command: 'FORCE_LOGOUT',
                 error: 'Invalid organization or user session'
             });
+        }
+
+        const user = userCheck.rows[0];
+
+        if (user.force_logout || !user.is_active) {
+            console.warn(`[logHeartbeat] Forced Logout (Flag: ${user.force_logout}, Active: ${user.is_active}) for User ${user_id}`);
+            // Reset the flag if it was force_logout (active check doesn't need reset, just kicks out)
+            if (user.force_logout) {
+                await query('UPDATE users SET force_logout = false WHERE id = $1', [user_id]);
+            }
+            return res.status(200).json({ success: true, command: 'FORCE_LOGOUT' });
         }
 
         // Update last_heartbeat_at in agent_sessions or insert if not exists
@@ -41,7 +53,7 @@ export const logHeartbeat = async (req, res) => {
         }
 
         // Record historical heartbeat
-        console.log(`[logHeartbeat] Recording for User: ${user_id}, Org: ${org_id}`);
+        // console.log(`[logHeartbeat] Recording for User: ${user_id}, Org: ${org_id}`);
         await query(
             'INSERT INTO heartbeats (org_id, user_id, device_id, status) VALUES ($1, $2, $3, $4)',
             [org_id, user_id, device_identifier, 'ONLINE']
@@ -58,27 +70,29 @@ export const logHeartbeat = async (req, res) => {
             [device_identifier, agent_version || null, token || null, user_id]
         );
 
-        // Validate user and org existence first
-        const userResult = await query('SELECT force_logout FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
+        // Fetch Features (Org Defaults)
+        const orgFeaturesRes = await query('SELECT * FROM org_features WHERE org_id = $1', [org_id]);
+        const orgFeatures = orgFeaturesRes.rows[0] || {};
 
-        if (userResult.rows.length === 0) {
-            console.warn(`[logHeartbeat] Invalid Org/User: Org=${org_id}, User=${user_id}. Requesting Agent Logout.`);
-            return res.status(403).json({
-                success: false,
-                command: 'FORCE_LOGOUT',
-                error: 'Invalid organization or user session'
-            });
-        }
+        // Fetch User Overrides
+        const userFeaturesRes = await query('SELECT * FROM user_features WHERE user_id = $1', [user_id]);
+        const userFeatures = userFeaturesRes.rows[0] || {};
 
-        const forceLogout = userResult.rows[0].force_logout;
+        // Merge Features: User > Org > Defaults
+        // If user setting is NULL, fall back to Org. If Org is missing, use code defaults (handled by Agent, but good to send explicit nulls/values)
+        const features = {
+            is_activity_tracking_enabled: userFeatures.is_activity_tracking_enabled ?? orgFeatures.is_activity_tracking_enabled ?? true,
+            is_screenshots_enabled: userFeatures.is_screenshots_enabled ?? orgFeatures.is_screenshots_enabled ?? true,
+            screenshot_interval_seconds: userFeatures.screenshot_interval_seconds || orgFeatures.screenshot_interval_seconds || 600,
+            is_afk_tracking_enabled: userFeatures.is_afk_tracking_enabled ?? orgFeatures.is_afk_tracking_enabled ?? true,
+            afk_threshold_seconds: userFeatures.afk_threshold_seconds || orgFeatures.afk_threshold_seconds || 300,
+            is_breaks_enabled: userFeatures.is_breaks_enabled ?? orgFeatures.is_breaks_enabled ?? true
+        };
 
-        if (forceLogout) {
-            // Reset the flag and tell the agent to logout
-            await query('UPDATE users SET force_logout = false WHERE id = $1', [user_id]);
-            return res.status(200).json({ success: true, command: 'FORCE_LOGOUT' });
-        }
-
-        res.status(200).json({ success: true });
+        res.status(200).json({
+            success: true,
+            features
+        });
     } catch (error) {
         console.error('[logHeartbeat] CRITICAL ERROR:', error);
         res.status(500).json({

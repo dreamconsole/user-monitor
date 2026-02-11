@@ -1,0 +1,65 @@
+
+> user-monitor-agent@1.0.0 start
+> electron . --no-sandbox
+
+Verifying token for auto-login...
+Auto-login verification failed: Use `delete()` to clear values
+User logged in: {
+  id: '8f9af509-cdb3-4946-8afc-7a5009842d7b',
+  name: 'Standard User',
+  email: 'user@acme.com',
+  role: 'user',
+  org_id: 'e8afe728-9496-433f-9a12-87f1b912d039',
+  timezone: 'Asia/Kolkata'
+}
+--- handleLoginSuccess START ---
+Initializing DB...
+Initializing DB at: /home/arun/.config/User Monitor Agent/agent-data/org_e8afe728-9496-433f-9a12-87f1b912d039/user_8f9af509-cdb3-4946-8afc-7a5009842d7b/db.sqlite
+DB Initialized.
+Requiring Sync Service...
+hook_thread_proc [101]: Could not set thread priority 49 for thread 0x710A8AB946C0!
+Starting Sync Service...
+Starting Sync Service...
+Sync Service interval set.
+Sync Service Started.
+--- handleLoginSuccess END ---
+[Heartbeat] Sending to http://localhost:3000/agent/heartbeat {
+  org_id: 'e8afe728-9496-433f-9a12-87f1b912d039',
+  user_id: '8f9af509-cdb3-4946-8afc-7a5009842d7b',
+  device_identifier: 'df6e68be9f3bce4e5c73591d63c81261ef4ed1f1cc6e76b7af6a16845b6b264c',
+  status: 'ONLINE',
+  last_seen_at: 1770851176821
+}
+Agent Config Updated: {
+  is_activity_tracking_enabled: true,
+  is_screenshots_enabled: true,
+  screenshot_interval_seconds: 60,
+  is_afk_tracking_enabled: true,
+  afk_threshold_seconds: 180,
+  is_breaks_enabled: true
+}
+[ScreenshotService] Config updated, applying new settings...
+[MonitorService] Config updated, applying new settings...
+[Heartbeat] Sending to http://localhost:3000/agent/heartbeat {
+  org_id: 'e8afe728-9496-433f-9a12-87f1b912d039',
+  user_id: '8f9af509-cdb3-4946-8afc-7a5009842d7b',
+  device_identifier: 'df6e68be9f3bce4e5c73591d63c81261ef4ed1f1cc6e76b7af6a16845b6b264c',
+  status: 'ONLINE',
+  last_seen_at: 1770851236822
+}
+[Heartbeat] Sending to http://localhost:3000/agent/heartbeat {
+  org_id: 'e8afe728-9496-433f-9a12-87f1b912d039',
+  user_id: '8f9af509-cdb3-4946-8afc-7a5009842d7b',
+  device_identifier: 'df6e68be9f3bce4e5c73591d63c81261ef4ed1f1cc6e76b7af6a16845b6b264c',
+  status: 'ONLINE',
+  last_seen_at: 1770851296815
+}
+Heartbeat failed. Status: N/A Error: connect ECONNREFUSED 127.0.0.1:3000
+[Heartbeat] Sending to http://localhost:3000/agent/heartbeat {
+  org_id: 'e8afe728-9496-433f-9a12-87f1b912d039',
+  user_id: '8f9af509-cdb3-4946-8afc-7a5009842d7b',
+  device_identifier: 'df6e68be9f3bce4e5c73591d63c81261ef4ed1f1cc6e76b7af6a16845b6b264c',
+  status: 'ONLINE',
+  last_seen_at: 1770851356816
+}
+/var/www/html/user-monitor/electron-agent/node_modules/electron/dist/electron exited with signal SIGSEGV
