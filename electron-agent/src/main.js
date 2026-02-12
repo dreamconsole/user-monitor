@@ -216,3 +216,8 @@ app.on('force-logout', () => {
 ipcMain.on('get-user-data-path', (event) => {
     event.returnValue = app.getPath('userData');
 });
+
+ipcMain.handle('get-breaks', async () => {
+    const authService = require('./services/auth');
+    return await authService.fetchBreaks();
+});

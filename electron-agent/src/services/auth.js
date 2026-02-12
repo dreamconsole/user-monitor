@@ -101,6 +101,19 @@ class AuthService {
     getDeviceId() {
         return this.deviceId;
     }
+
+    async fetchBreaks() {
+        if (!this.token) return [];
+        try {
+            const response = await axios.get(`${API_URL}/agent/breaks`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            return response.data.breaks || [];
+        } catch (error) {
+            console.error('Failed to fetch breaks:', error.message);
+            return [];
+        }
+    }
 }
 
 module.exports = new AuthService();

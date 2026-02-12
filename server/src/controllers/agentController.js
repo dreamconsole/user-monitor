@@ -281,3 +281,67 @@ export const logBreak = async (req, res) => {
         });
     }
 };
+
+export const getBreaks = async (req, res) => {
+    // For GET requests, parameters are in req.query, but we primarily use req.user from token
+    const org_id = req.body?.org_id || req.query?.org_id;
+    // Note: agent routes use authenticateToken which sets req.user. However, some agent endpoints 
+    // might be called with just a token in the body/header. 
+    // The middleware `authenticateToken` ensures `req.user` is set.
+
+    // Fallback: use req.user.org_id from middleware if not in body/query
+    const targetOrgId = org_id || req.user.org_id;
+
+    try {
+        // 1. Get all active break types
+        const breaksResult = await query(
+            'SELECT id, name, max_duration_seconds, is_paid FROM break_master WHERE org_id = $1 AND is_active = true ORDER BY name ASC',
+            [targetOrgId]
+        );
+
+        // 2. Calculate used time for each break type for the current day
+        const userId = req.user.id;
+        const usageResult = await query(
+            `SELECT break_type_id, 
+                    SUM(
+                        CASE 
+                            WHEN duration_seconds IS NOT NULL THEN duration_seconds
+                            WHEN end_time IS NULL THEN EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - start_time))
+                            ELSE 0 
+                        END
+                    ) as total_used_seconds
+             FROM break_logs 
+             WHERE user_id = $1 
+               AND start_time::DATE = CURRENT_DATE
+             GROUP BY break_type_id`,
+            [userId]
+        );
+
+        // Map usage to a lookup object
+        const usageMap = {};
+        usageResult.rows.forEach(row => {
+            usageMap[row.break_type_id] = Math.floor(parseFloat(row.total_used_seconds) || 0);
+        });
+
+        // 3. Merge usage into break types
+        const breaksWithUsage = breaksResult.rows.map(b => {
+            const used = usageMap[b.id] || 0;
+            return {
+                ...b,
+                used_seconds: used,
+                remaining_seconds: b.max_duration_seconds ? Math.max(0, b.max_duration_seconds - used) : null
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            breaks: breaksWithUsage
+        });
+    } catch (error) {
+        console.error('getBreaks error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch breaks'
+        });
+    }
+};
