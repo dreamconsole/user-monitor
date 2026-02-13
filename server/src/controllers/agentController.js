@@ -263,6 +263,12 @@ export const logBreak = async (req, res) => {
              duration_seconds = EXCLUDED.duration_seconds`,
             [id, org_id, user_id, session_id, finalBreakTypeId, start_time, end_time || null, duration_seconds || 0]
         );
+        if (finalBreakTypeId && (duration_seconds > 0 || end_time)) {
+            // Check for violations asynchronously (fire and forget)
+            checkAndNotifyBreakViolation(org_id, user_id, finalBreakTypeId)
+                .catch(err => console.error('Break violation check failed:', err));
+        }
+
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Break log failed:', error);
@@ -281,6 +287,83 @@ export const logBreak = async (req, res) => {
         });
     }
 };
+
+// Helper to check break balance and notify manager
+export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
+    // 1. Get Break Definition & User Manager & Org ID
+    const metadataRes = await query(
+        `SELECT 
+            bm.name as break_name, 
+            bm.max_duration_seconds,
+            u.full_name as user_name,
+            u.manager_id,
+            u.org_id
+         FROM break_master bm
+         JOIN users u ON u.id = $1
+         WHERE bm.id = $2`,
+        [userId, breakTypeId]
+    );
+
+    if (metadataRes.rows.length === 0) return;
+    const { break_name, max_duration_seconds, user_name, manager_id, org_id: userOrgId } = metadataRes.rows[0];
+
+    // If no limit or no manager, nothing to do
+    if (!max_duration_seconds || !manager_id) return;
+
+    // Use passed orgId or fall back to user's org_id
+    const finalOrgId = orgId || userOrgId;
+
+    // 2. Calculate Total Usage for Today
+    const usageRes = await query(
+        `SELECT SUM(
+            CASE 
+                WHEN duration_seconds IS NOT NULL THEN duration_seconds
+                WHEN end_time IS NULL THEN EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - start_time))
+                ELSE 0 
+            END
+         ) as total_used
+         FROM break_logs 
+         WHERE user_id = $1 
+           AND break_type_id = $2
+           AND start_time::DATE = CURRENT_DATE`,
+        [userId, breakTypeId]
+    );
+
+    const totalUsed = parseInt(usageRes.rows[0].total_used || 0);
+
+    // 3. Check Violation
+    if (totalUsed > max_duration_seconds) {
+        const excess = totalUsed - max_duration_seconds;
+        const excessMinutes = Math.ceil(excess / 60);
+
+        // 4. Check if already notified TODAY for this break type
+        const existingNotif = await query(
+            `SELECT id FROM notifications 
+             WHERE recipient_id = $1 
+               AND actor_id = $2 
+               AND type = 'BREAK_VIOLATION'
+               AND title LIKE $3
+               AND created_at::DATE = CURRENT_DATE`,
+            [manager_id, userId, `%${break_name}%`]
+        );
+
+        if (existingNotif.rows.length === 0) {
+            // 5. Insert Notification
+            await query(
+                `INSERT INTO notifications (org_id, recipient_id, actor_id, type, title, message)
+                 VALUES ($1, $2, $3, 'BREAK_VIOLATION', $4, $5)`,
+                [
+                    finalOrgId,
+                    manager_id,
+                    userId,
+                    `Break Limit Exceeded: ${break_name}`,
+                    `${user_name} has exceeded the ${break_name} limit by ${excessMinutes} minutes.`
+                ]
+            );
+            console.log(`[Notification] Sent BREAK_VIOLATION for User ${userId} to Manager ${manager_id}`);
+        }
+    }
+}
 
 export const getBreaks = async (req, res) => {
     // For GET requests, parameters are in req.query, but we primarily use req.user from token

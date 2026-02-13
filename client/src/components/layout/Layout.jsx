@@ -22,6 +22,7 @@ import {
     Coffee,
     FileText
 } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Sidebar = ({ className, onLinkClick }) => {
     const location = useLocation();
@@ -99,6 +100,7 @@ export default function Layout({ children }) {
                             <span className="text-sm font-semibold">{user?.name}</span>
                             <span className="text-xs text-muted-foreground capitalize">{user?.role}</span>
                         </div>
+                        <NotificationBell />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="relative h-10 w-10 rounded-full border">

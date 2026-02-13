@@ -141,10 +141,10 @@ function startBreakTimer(durationLimit) {
     breakDurationLimit = durationLimit;
 
     updateStatus('BREAK');
-    timerDisplay.innerText = durationLimit ? formatTime(durationLimit) : "00:00:00";
+    timerDisplay.innerText = durationLimit !== null ? formatTime(durationLimit) : "00:00:00";
 
     // Change color if limit exists
-    if (durationLimit) {
+    if (durationLimit !== null) {
         timerDisplay.style.color = 'var(--warning)';
     }
 
@@ -152,26 +152,30 @@ function startBreakTimer(durationLimit) {
         const now = Date.now();
         breakSecondsElapsed = Math.floor((now - breakStartTime) / 1000);
 
-        if (breakDurationLimit) {
-            // Count DOWN
+        if (breakDurationLimit !== null) {
+            // Count DOWN logic
             const remaining = breakDurationLimit - breakSecondsElapsed;
+
             if (remaining <= 0) {
-                timerDisplay.innerText = "00:00:00";
+                // Time Exceeded
+                const exceededBy = Math.abs(remaining);
+                timerDisplay.innerText = `-${formatTime(exceededBy)}`;
                 timerDisplay.style.color = 'var(--error)';
 
                 // Notify user ONCE when limits are reached
-                if (remaining === 0) {
+                if (remaining === 0 && !window.breakLimitNotified) {
+                    window.breakLimitNotified = true;
                     new Notification("Break Time Over", {
-                        body: "You have exceeded your break limit. Please resume work immediately.",
-                        icon: "../assets/icon.png" // Optional
+                        body: "You have exceeded your break limit. Please resume work immediately."
                     });
-                    // Also flash the window if possible (requires main process IPC, skipping for now as Notification is standard)
                 }
             } else {
+                // Normal Countdown
                 timerDisplay.innerText = formatTime(remaining);
+                window.breakLimitNotified = false; // Reset flag if they somehow go back (unlikely)
             }
         } else {
-            // Count UP
+            // Count UP (No limit)
             timerDisplay.innerText = formatTime(breakSecondsElapsed);
         }
     }, 1000);

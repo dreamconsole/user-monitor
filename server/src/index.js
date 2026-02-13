@@ -11,6 +11,7 @@ import orgRoutes from './routes/org.js';
 import breakRoutes from './routes/breaks.js';
 import statsRoutes from './routes/stats.js';
 import reportRoutes from './routes/reports.js';
+import notificationRoutes from './routes/notifications.js';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/auth', authRoutes);
@@ -30,6 +32,7 @@ app.use('/org', orgRoutes);
 app.use('/breaks', breakRoutes);
 app.use('/stats', statsRoutes);
 app.use('/reports', reportRoutes);
+app.use('/notifications', notificationRoutes);
 
 app.get('/', (req, res) => {
     res.send({ message: 'User Monitor API' });
@@ -47,7 +50,11 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Something went wrong!', details: err.message });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
+
+    // Start Cron Jobs
+    const { startCronJobs } = await import('./cron.js');
+    startCronJobs();
 });
 // Pair Extraordinaire badge attempt

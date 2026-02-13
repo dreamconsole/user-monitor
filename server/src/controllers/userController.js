@@ -4,15 +4,25 @@ import { query } from '../db.js';
 export const getUsers = async (req, res) => {
     try {
         // full_name as name, is_active as status
-        let sql = 'SELECT id, full_name as name, email, role, is_active, manager_id, timezone, emp_id, payroll_id, site, device_id, agent_version, token, last_heartbeat, force_logout, created_at FROM users WHERE org_id = $1';
+        // Check for active break: exists in break_logs with end_time IS NULL
+        let sql = `
+            SELECT 
+                u.id, u.full_name as name, u.email, u.role, u.is_active, 
+                u.manager_id, u.timezone, u.emp_id, u.payroll_id, u.site, 
+                u.device_id, u.agent_version, u.token, u.last_heartbeat, 
+                u.force_logout, u.created_at,
+                EXISTS(SELECT 1 FROM break_logs bl WHERE bl.user_id = u.id AND bl.end_time IS NULL) as is_on_break
+            FROM users u 
+            WHERE u.org_id = $1
+        `;
         const params = [req.user.org_id];
 
         if (req.user.role === 'manager') {
-            sql += ' AND manager_id = $2';
+            sql += ' AND u.manager_id = $2';
             params.push(req.user.id);
         }
 
-        sql += ' ORDER BY created_at DESC';
+        sql += ' ORDER BY u.created_at DESC';
 
         const result = await query(sql, params);
         // Map is_active to status for frontend

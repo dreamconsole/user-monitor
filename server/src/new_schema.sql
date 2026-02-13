@@ -191,3 +191,18 @@ CREATE INDEX idx_activity_logs_user_date ON activity_logs (user_id, log_time);
 CREATE INDEX idx_work_sessions_user_date ON work_sessions (user_id, start_time);
 CREATE INDEX idx_users_org_role ON users (org_id, role);
 CREATE INDEX idx_agent_sessions_token ON agent_sessions (auth_token);
+
+-- 13. Notifications (Manager Alerts)
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- The Manager
+    actor_id UUID REFERENCES users(id) ON DELETE SET NULL, -- The Employee
+    type VARCHAR(50) NOT NULL, -- 'BREAK_VIOLATION', 'IDLE_VIOLATION'
+    title VARCHAR(255) NOT NULL,
+    message TEXT,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_notifications_recipient ON notifications(recipient_id, is_read);

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Search, Filter, FileText, Coffee, Image as ImageIcon } from 'lucide-react';
+import { Download, Search, Filter, FileText, Coffee, Monitor, Image as ImageIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { utcToLocal } from '@/lib/dateUtils';
 
@@ -96,6 +96,8 @@ export default function Reports() {
         }
     };
 
+    const [selectedScreenshot, setSelectedScreenshot] = useState(null);
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -108,9 +110,10 @@ export default function Reports() {
                         data={data}
                         filename={`report_${activeTab}`}
                         headers={
-                            activeTab === 'summary' ? ['Work Date', 'User Name', 'Work Hours', 'Idle Hours'] :
+                            activeTab === 'summary' ? ['Work Date', 'User Name', 'Shift Start', 'Shift End', 'Work Hours', 'Idle Hours', 'Break Hours'] :
                                 activeTab === 'breaks' ? ['User Name', 'Break Type', 'Duration Minutes', 'Start Time'] :
-                                    ['User Name', 'Captured At', 'File Path']
+                                    activeTab === 'idle' ? ['User Name', 'Start Time', 'End Time', 'Duration Minutes'] :
+                                        ['User Name', 'Captured At', 'File Path']
                         }
                     />
                 </div>
@@ -166,10 +169,10 @@ export default function Reports() {
             </Card>
 
             {/* Tabs */}
-            <div className="flex border-b">
+            <div className="flex border-b overflow-x-auto">
                 <button
                     onClick={() => setActiveTab('summary')}
-                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'summary' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'summary' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                 >
                     <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4" />
@@ -178,7 +181,7 @@ export default function Reports() {
                 </button>
                 <button
                     onClick={() => setActiveTab('breaks')}
-                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'breaks' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'breaks' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                 >
                     <div className="flex items-center gap-2">
                         <Coffee className="w-4 h-4" />
@@ -186,8 +189,17 @@ export default function Reports() {
                     </div>
                 </button>
                 <button
+                    onClick={() => setActiveTab('idle')}
+                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'idle' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                >
+                    <div className="flex items-center gap-2">
+                        <Monitor className="w-4 h-4" />
+                        Idle Events
+                    </div>
+                </button>
+                <button
                     onClick={() => setActiveTab('screenshots')}
-                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'screenshots' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'screenshots' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                 >
                     <div className="flex items-center gap-2">
                         <ImageIcon className="w-4 h-4" />
@@ -208,8 +220,11 @@ export default function Reports() {
                                     <TableRow>
                                         <TableHead>Date</TableHead>
                                         <TableHead>User</TableHead>
+                                        <TableHead>Shift Start</TableHead>
+                                        <TableHead>Shift End</TableHead>
                                         <TableHead>Work Hours</TableHead>
                                         <TableHead>Idle Hours</TableHead>
+                                        <TableHead>Break Hours</TableHead>
                                         <TableHead className="text-right">Productivity</TableHead>
                                     </TableRow>
                                 )}
@@ -218,6 +233,14 @@ export default function Reports() {
                                         <TableHead>Start Time</TableHead>
                                         <TableHead>User</TableHead>
                                         <TableHead>Type</TableHead>
+                                        <TableHead className="text-right">Duration</TableHead>
+                                    </TableRow>
+                                )}
+                                {activeTab === 'idle' && (
+                                    <TableRow>
+                                        <TableHead>Start Time</TableHead>
+                                        <TableHead>End Time</TableHead>
+                                        <TableHead>User</TableHead>
                                         <TableHead className="text-right">Duration</TableHead>
                                     </TableRow>
                                 )}
@@ -232,7 +255,7 @@ export default function Reports() {
                             <TableBody>
                                 {data.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground italic">No data found for the selected range.</TableCell>
+                                        <TableCell colSpan={8} className="h-24 text-center text-muted-foreground italic">No data found for the selected range.</TableCell>
                                     </TableRow>
                                 ) : (
                                     data.map((row, i) => (
@@ -241,8 +264,11 @@ export default function Reports() {
                                                 <>
                                                     <TableCell className="font-medium">{new Date(row.work_date).toLocaleDateString()}</TableCell>
                                                     <TableCell>{row.user_name}</TableCell>
+                                                    <TableCell>{row.shift_start ? utcToLocal(row.shift_start, user.timezone, 'HH:mm') : '-'}</TableCell>
+                                                    <TableCell>{row.shift_end ? utcToLocal(row.shift_end, user.timezone, 'HH:mm') : 'Active'}</TableCell>
                                                     <TableCell>{parseFloat(row.work_hours).toFixed(1)}h</TableCell>
                                                     <TableCell>{parseFloat(row.idle_hours).toFixed(1)}h</TableCell>
+                                                    <TableCell>{(parseFloat(row.break_seconds || 0) / 3600).toFixed(1)}h</TableCell>
                                                     <TableCell className="text-right">
                                                         <span className="text-xs font-bold">
                                                             {((row.work_hours / (parseFloat(row.work_hours) + parseFloat(row.idle_hours) || 1)) * 100).toFixed(0)}%
@@ -258,12 +284,28 @@ export default function Reports() {
                                                     <TableCell className="text-right">{parseFloat(row.duration_minutes).toFixed(0)} min</TableCell>
                                                 </>
                                             )}
+                                            {activeTab === 'idle' && (
+                                                <>
+                                                    <TableCell className="font-medium">{utcToLocal(row.start_time, user.timezone, 'MMM dd, HH:mm')}</TableCell>
+                                                    <TableCell className="text-muted-foreground">{utcToLocal(row.end_time, user.timezone, 'HH:mm')}</TableCell>
+                                                    <TableCell>{row.user_name}</TableCell>
+                                                    <TableCell className="text-right font-mono">{parseFloat(row.duration_minutes).toFixed(0)} min</TableCell>
+                                                </>
+                                            )}
+
                                             {activeTab === 'screenshots' && (
                                                 <>
                                                     <TableCell className="font-medium">{utcToLocal(row.captured_at, user.timezone, 'MMM dd, HH:mm:ss')}</TableCell>
                                                     <TableCell>{row.user_name}</TableCell>
                                                     <TableCell className="text-right">
-                                                        <Button variant="ghost" size="sm" className="text-primary hover:text-primary hover:bg-primary/10">View Image</Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-primary hover:text-primary hover:bg-primary/10"
+                                                            onClick={() => setSelectedScreenshot(row)}
+                                                        >
+                                                            View Image
+                                                        </Button>
                                                     </TableCell>
                                                 </>
                                             )}
@@ -275,6 +317,32 @@ export default function Reports() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Screenshot Viewer Dialog */}
+            {selectedScreenshot && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedScreenshot(null)}>
+                    <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="p-4 border-b flex items-center justify-between">
+                            <div>
+                                <h3 className="font-semibold">{selectedScreenshot.user_name}</h3>
+                                <p className="text-xs text-muted-foreground">{utcToLocal(selectedScreenshot.captured_at, user.timezone, 'MMM dd, HH:mm:ss')}</p>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => setSelectedScreenshot(null)}>
+                                <span className="sr-only">Close</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                            </Button>
+                        </div>
+                        <div className="flex-1 overflow-auto bg-slate-950 flex items-center justify-center p-4">
+                            <img
+                                src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/${selectedScreenshot.file_path}`}
+                                alt="Screenshot"
+                                className="max-w-full max-h-full object-contain shadow-lg"
+                                onError={(e) => { e.target.src = 'https://placehold.co/600x400?text=Image+Not+Found'; }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

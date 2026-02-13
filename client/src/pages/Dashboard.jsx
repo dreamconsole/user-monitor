@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 import useAuthStore from '@/lib/useAuthStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -31,64 +32,158 @@ const KpiCard = ({ label, value, icon: Icon, desc, color }) => (
 );
 
 const AdminDashboard = ({ stats }) => {
+    // Helper for trend chart
+    const maxHours = Math.max(...(stats.productivityTrend?.map(d => (Number(d.work_seconds) + Number(d.idle_seconds)) / 3600) || [12]));
+
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard
-                    label="Total Employees"
-                    value={stats.totalUsers}
-                    icon={UsersIcon}
-                    desc="Registered in organization"
-                />
-                <KpiCard
-                    label="Active Now"
-                    value={stats.activeUsers}
-                    icon={Activity}
-                    desc="Agent sending heartbeats"
-                    color="text-green-500"
-                />
+                <Link to="/users">
+                    <KpiCard
+                        label="Total Employees"
+                        value={stats.totalUsers}
+                        icon={UsersIcon}
+                        desc="Registered in organization"
+                        color="hover:bg-muted/50 transition-colors cursor-pointer"
+                    />
+                </Link>
+                <Link to="/users?status=online">
+                    <KpiCard
+                        label="Active Now"
+                        value={stats.activeUsers}
+                        icon={Activity}
+                        desc="Agent sending heartbeats"
+                        color="text-green-500 hover:bg-muted/50 transition-colors cursor-pointer"
+                    />
+                </Link>
                 <KpiCard
                     label="Work Hours Today"
                     value={`${stats.totalWorkHours}h`}
                     icon={Clock}
                     desc="Cumulative across all users"
                 />
-                <KpiCard
-                    label="Absent Today"
-                    value={stats.notLoggedInCount}
-                    icon={UserMinus}
-                    desc="Users with no session today"
-                    color="text-orange-500"
-                />
+                <Link to="/users?status=offline">
+                    <KpiCard
+                        label="Absent Today"
+                        value={stats.notLoggedInCount}
+                        icon={UserMinus}
+                        desc="Users with no session today"
+                        color="text-orange-500 hover:bg-muted/50 transition-colors cursor-pointer"
+                    />
+                </Link>
             </div>
 
+            <div className="grid gap-4 md:grid-cols-3">
+                {/* Productivity Mix */}
+                <Card className="shadow-sm col-span-1">
+                    <CardHeader>
+                        <CardTitle>Productivity Mix</CardTitle>
+                        <CardDescription>Work vs. Idle time today.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-6">
+                            <div className="relative h-48 w-48 mx-auto">
+                                <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
+                                    <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="20" fill="transparent" className="text-muted/20" />
+                                    <circle
+                                        cx="50" cy="50" r="40"
+                                        stroke="currentColor" strokeWidth="20"
+                                        fill="transparent"
+                                        strokeDasharray={`${(stats.totalWorkHours / (parseFloat(stats.totalWorkHours) + parseFloat(stats.totalIdleHours) || 1)) * 251.2} 251.2`}
+                                        className="text-primary transition-all duration-1000 ease-out"
+                                    />
+                                </svg>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span className="text-3xl font-bold">{stats.totalWorkHours}h</span>
+                                    <span className="text-xs text-muted-foreground">Work</span>
+                                </div>
+                            </div>
+                            <div className="flex justify-center gap-4 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 bg-primary rounded-full" />
+                                    <span>Work ({parseFloat(stats.totalWorkHours || 0).toFixed(1)}h)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 bg-muted rounded-full" />
+                                    <span>Idle ({parseFloat(stats.totalIdleHours || 0).toFixed(1)}h)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 7-Day Trend */}
+                <Card className="shadow-sm col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <BarChart3 className="w-4 h-4" />
+                            7-Day Productivity Trend
+                        </CardTitle>
+                        <CardDescription>Daily active hours over the last week.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-[240px] flex items-end justify-between gap-4 pt-4">
+                            {stats.productivityTrend?.map((day, i) => {
+                                const workH = Number(day.work_seconds) / 3600;
+                                const idleH = Number(day.idle_seconds) / 3600;
+                                const totalH = workH + idleH;
+                                const heightPct = (totalH / (maxHours * 1.1)) * 100; // Scale to max + 10%
+
+                                return (
+                                    <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                                        <div className="w-full bg-muted/30 rounded-t-md relative flex flex-col-reverse overflow-hidden hover:bg-muted/40 transition-colors" style={{ height: `${heightPct}%` }}>
+                                            {/* Work Segment */}
+                                            <div
+                                                className="bg-primary w-full transition-all"
+                                                style={{ height: `${(workH / (totalH || 1)) * 100}%` }}
+                                                title={`Work: ${workH.toFixed(1)}h`}
+                                            />
+                                            {/* Idle Segment (Top part of bar in column-reverse, essentially transparent or colored differently?) 
+                                                Wait, flex-col-reverse stack from bottom. 
+                                                If I want stacked bar:
+                                                Container h = total.
+                                                Item 1 (Active) h% of total.
+                                                Item 2 (Idle) h% of total.
+                                            */}
+                                            <div
+                                                className="bg-orange-300 w-full transition-all"
+                                                style={{ height: `${(idleH / (totalH || 1)) * 100}%` }}
+                                                title={`Idle: ${idleH.toFixed(1)}h`}
+                                            />
+                                        </div>
+                                        <div className="text-center">
+                                            <span className="text-[10px] text-muted-foreground uppercase block">{utcToLocal(day.date, stats.orgTimezone, 'EEE')}</span>
+                                            <span className="text-[10px] font-bold">{totalH.toFixed(1)}h</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Status Distribution Heatmap-ish Row */}
             <Card className="shadow-sm">
-                <CardHeader>
-                    <CardTitle>Organization Productivity</CardTitle>
-                    <CardDescription>Comparison of productive work vs. idle time today.</CardDescription>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Real-time Workforce Status</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="space-y-4">
-                        <div className="h-6 w-full bg-muted rounded-full overflow-hidden flex">
-                            <div
-                                className="bg-primary h-full transition-all"
-                                style={{ width: `${(stats.totalWorkHours / (parseFloat(stats.totalWorkHours) + parseFloat(stats.totalIdleHours) || 1)) * 100}%` }}
-                            />
-                            <div
-                                className="bg-orange-300 h-full transition-all"
-                                style={{ width: `${(stats.totalIdleHours / (parseFloat(stats.totalWorkHours) + parseFloat(stats.totalIdleHours) || 1)) * 100}%` }}
-                            />
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 bg-primary rounded-sm" />
-                                <span>Work Hours: {stats.totalWorkHours}h</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 bg-orange-300 rounded-sm" />
-                                <span>Idle Hours: {stats.totalIdleHours}h</span>
-                            </div>
-                        </div>
+                    <div className="flex items-center gap-1 h-8 w-full rounded-md overflow-hidden bg-muted/20">
+                        {Array.from({ length: stats.statusDistribution?.online || 0 }).map((_, i) => (
+                            <div key={`on-${i}`} className="h-full flex-1 bg-green-500 hover:opacity-80 transition-opacity" title="Online User" />
+                        ))}
+                        {Array.from({ length: stats.statusDistribution?.offline || 0 }).map((_, i) => (
+                            <div key={`off-${i}`} className="h-full flex-1 bg-slate-300 hover:opacity-80 transition-opacity" title="Offline User" />
+                        ))}
+                        {/* Fallback if empty */}
+                        {(stats.statusDistribution?.online === 0 && stats.statusDistribution?.offline === 0) && (
+                            <div className="text-xs text-muted-foreground w-full text-center py-1">No users found</div>
+                        )}
+                    </div>
+                    <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                        <div className="font-medium text-green-600">{stats.statusDistribution?.online} Online</div>
+                        <div>{stats.statusDistribution?.offline} Offline</div>
                     </div>
                 </CardContent>
             </Card>
@@ -160,7 +255,9 @@ const ManagerDashboard = ({ stats }) => {
                                             {member.start_time ? (
                                                 <Badge variant="default" className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Active</Badge>
                                             ) : (
-                                                <Badge variant="secondary">Offline</Badge>
+                                                <Link to={`/users?status=offline`}>
+                                                    <Badge variant="secondary" className="hover:bg-muted-foreground/20 cursor-pointer">Offline</Badge>
+                                                </Link>
                                             )}
                                         </TableCell>
                                     </TableRow>
