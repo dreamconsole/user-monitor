@@ -1,8 +1,8 @@
-const activeWin = require('active-win');
+const nativeTracker = require('./nativeTracker');
 const db = require('../db');
 const { v4: uuidv4 } = require('uuid');
 
-const POLL_INTERVAL_MS = 5000; // Check every 5 seconds
+const POLL_INTERVAL_MS = 60000; // Check every 1 minute
 
 class AppTracker {
     constructor() {
@@ -32,10 +32,10 @@ class AppTracker {
 
     async checkCurrentApp() {
         try {
-            const activeWindow = await activeWin();
+            const activeWindow = await nativeTracker.getActiveWindow();
 
             if (!activeWindow) {
-                // No active window (e.g., screen locked)
+                // No active window (e.g., screen locked) or tracking failed
                 if (this.currentApp) {
                     await this.logAppSwitch(null);
                 }

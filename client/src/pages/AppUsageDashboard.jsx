@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, TrendingUp, Clock, PieChart as PieChartIcon } from 'lucide-react';
+import { Calendar, TrendingUp, Clock, PieChart as PieChartIcon, Users as UsersIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import useAuthStore from '@/lib/useAuthStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -12,6 +13,7 @@ const COLORS = {
 };
 
 export default function AppUsageDashboard() {
+    const { user, isAuthenticated } = useAuthStore();
     const [loading, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState({
         start_date: new Date().toISOString().split('T')[0],
@@ -19,20 +21,77 @@ export default function AppUsageDashboard() {
     });
     const [dashboardData, setDashboardData] = useState(null);
     const [productivityData, setProductivityData] = useState([]);
-    const [user, setUser] = useState(null);
+    const [error, setError] = useState(null);
+
+    // For Manager/Admin: user selection
+    const [availableUsers, setAvailableUsers] = useState([]);
+    const [selectedUserId, setSelectedUserId] = useState(null);
 
     useEffect(() => {
-        const userData = JSON.parse(localStorage.getItem('user'));
-        setUser(userData);
-        if (userData) {
-            fetchDashboardData(userData.id);
-        }
-    }, [dateRange]);
+        console.log('[AppUsageDashboard] Auth state:', { user, isAuthenticated });
 
-    const fetchDashboardData = async (userId) => {
+        if (!isAuthenticated || !user) {
+            console.error('[AppUsageDashboard] User not authenticated');
+            setError('Please login to view app usage data');
+            setLoading(false);
+            return;
+        }
+
+        // For regular users, show their own data
+        if (user.role === 'user') {
+            setSelectedUserId(user.id);
+        } else {
+            // For Manager/Admin, fetch list of users they can view
+            fetchAvailableUsers();
+        }
+    }, [user, isAuthenticated]);
+
+    useEffect(() => {
+        if (selectedUserId) {
+            fetchDashboardData(selectedUserId);
+        }
+    }, [dateRange, selectedUserId]);
+
+    const fetchAvailableUsers = async () => {
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
+
+            console.log('[AppUsageDashboard] Fetching available users for role:', user.role);
+
+            const response = await axios.get(`${API_URL}/users`, { headers });
+            const users = response.data;
+
+            console.log('[AppUsageDashboard] Available users:', users);
+
+            setAvailableUsers(users);
+
+            // Auto-select first user or current user
+            if (users.length > 0) {
+                const defaultUser = users.find(u => u.id === user.id) || users[0];
+                setSelectedUserId(defaultUser.id);
+            } else {
+                setError('No users found');
+                setLoading(false);
+            }
+        } catch (error) {
+            console.error('[AppUsageDashboard] Error fetching users:', error);
+            setError('Failed to load users list');
+            setLoading(false);
+        }
+    };
+
+    const fetchDashboardData = async (userId) => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+
+            console.log('[AppUsageDashboard] Fetching data for user:', userId);
+            console.log('[AppUsageDashboard] Date range:', dateRange);
+            console.log('[AppUsageDashboard] API URL:', API_URL);
 
             const [dashboardRes, productivityRes] = await Promise.all([
                 axios.get(
@@ -45,11 +104,33 @@ export default function AppUsageDashboard() {
                 )
             ]);
 
+            console.log('[AppUsageDashboard] Dashboard response:', dashboardRes.data);
+            console.log('[AppUsageDashboard] Productivity response:', productivityRes.data);
+
             setDashboardData(dashboardRes.data);
             setProductivityData(productivityRes.data);
         } catch (error) {
-            console.error('Failed to fetch dashboard data:', error);
-            alert('Failed to load dashboard data');
+            console.error('[AppUsageDashboard] Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                url: error.config?.url
+            });
+
+            let errorMessage = 'Failed to load dashboard data';
+            if (error.response?.status === 401) {
+                errorMessage = 'Authentication failed. Please login again.';
+            } else if (error.response?.status === 403) {
+                errorMessage = 'You do not have permission to view this data.';
+            } else if (error.response?.status === 404) {
+                errorMessage = 'API endpoint not found. Please check server is running.';
+            } else if (error.code === 'ERR_NETWORK') {
+                errorMessage = 'Cannot connect to server. Please check if server is running on ' + API_URL;
+            } else if (error.response?.data?.error) {
+                errorMessage = error.response.data.error;
+            }
+
+            alert(errorMessage + '\n\nCheck browser console (F12) for details.');
         } finally {
             setLoading(false);
         }
@@ -90,6 +171,23 @@ export default function AppUsageDashboard() {
         }));
     };
 
+    if (error) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                    <div className="text-red-500 text-lg font-semibold mb-2">{error}</div>
+                    <p className="text-gray-600 mb-4">Check the browser console (F12) for more details</p>
+                    <button
+                        onClick={() => window.location.href = '/login'}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                        Go to Login
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -108,21 +206,42 @@ export default function AppUsageDashboard() {
                     <h1 className="text-2xl font-bold text-gray-900">App Usage Dashboard</h1>
                     <p className="text-gray-600 mt-1">Track your application usage and productivity</p>
                 </div>
-                <div className="flex gap-2 items-center">
-                    <Calendar size={20} className="text-gray-400" />
-                    <input
-                        type="date"
-                        value={dateRange.start_date}
-                        onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
-                        className="px-3 py-2 border border-gray-300 rounded-lg"
-                    />
-                    <span className="text-gray-500">to</span>
-                    <input
-                        type="date"
-                        value={dateRange.end_date}
-                        onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
-                        className="px-3 py-2 border border-gray-300 rounded-lg"
-                    />
+                <div className="flex gap-4 items-center">
+                    {/* User Selector for Manager/Admin */}
+                    {(user.role === 'orgadmin' || user.role === 'manager') && availableUsers.length > 0 && (
+                        <div className="flex items-center gap-2">
+                            <UsersIcon size={20} className="text-gray-400" />
+                            <select
+                                value={selectedUserId || ''}
+                                onChange={(e) => setSelectedUserId(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                            >
+                                {availableUsers.map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.name} ({u.email})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Date Range Selector */}
+                    <div className="flex gap-2 items-center">
+                        <Calendar size={20} className="text-gray-400" />
+                        <input
+                            type="date"
+                            value={dateRange.start_date}
+                            onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
+                            className="px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                        <span className="text-gray-500">to</span>
+                        <input
+                            type="date"
+                            value={dateRange.end_date}
+                            onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
+                            className="px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                    </div>
                 </div>
             </div>
 

@@ -12,7 +12,7 @@ const { API_URL } = require('../config');
 const monitorService = require('./monitor');
 const logger = require('./logger');
 
-const SYNC_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
+const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 class SyncService {
     constructor() {
