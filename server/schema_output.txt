@@ -1,0 +1,33 @@
+Connecting...
+Connected.
+--- users columns ---
+id (uuid)
+org_id (uuid)
+manager_id (uuid)
+full_name (character varying)
+email (character varying)
+password_hash (text)
+role (USER-DEFINED)
+timezone (character varying)
+emp_id (text)
+payroll_id (text)
+site (text)
+device_id (text)
+agent_version (text)
+token (text)
+last_heartbeat (timestamp with time zone)
+is_active (boolean)
+force_logout (boolean)
+last_login_at (timestamp with time zone)
+created_at (timestamp with time zone)
+updated_at (timestamp with time zone)
+
+--- organizations columns ---
+id (uuid)
+name (character varying)
+domain (character varying)
+timezone (character varying)
+max_users_limit (integer)
+is_active (boolean)
+created_at (timestamp with time zone)
+updated_at (timestamp with time zone)

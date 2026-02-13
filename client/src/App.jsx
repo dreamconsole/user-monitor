@@ -10,6 +10,9 @@ import Users from '@/pages/Users';
 import Settings from '@/pages/Settings';
 import Breaks from '@/pages/Breaks';
 import Reports from '@/pages/Reports';
+import AppCategories from '@/pages/AppCategories';
+import AppMapping from '@/pages/AppMapping';
+import AppUsageDashboard from '@/pages/AppUsageDashboard';
 import Layout from './components/layout/Layout';
 
 const AppLayout = () => (
@@ -55,7 +58,12 @@ function App() {
             <Route element={<RoleGuard allowedRoles={['orgadmin']} />}>
               <Route path="/settings" element={<Settings />} />
               <Route path="/breaks" element={<Breaks />} />
+              <Route path="/app-categories" element={<AppCategories />} />
+              <Route path="/app-mapping" element={<AppMapping />} />
             </Route>
+
+            {/* All authenticated users */}
+            <Route path="/app-usage" element={<AppUsageDashboard />} />
 
           </Route>
         </Route>

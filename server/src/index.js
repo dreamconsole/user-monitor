@@ -12,6 +12,7 @@ import breakRoutes from './routes/breaks.js';
 import statsRoutes from './routes/stats.js';
 import reportRoutes from './routes/reports.js';
 import notificationRoutes from './routes/notifications.js';
+import appTrackingRoutes from './routes/appTracking.js';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use('/breaks', breakRoutes);
 app.use('/stats', statsRoutes);
 app.use('/reports', reportRoutes);
 app.use('/notifications', notificationRoutes);
+app.use('/app-tracking', appTrackingRoutes);
 
 app.get('/', (req, res) => {
     res.send({ message: 'User Monitor API' });

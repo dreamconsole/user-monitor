@@ -1,0 +1,6 @@
+DATABASE_URL present: true
+Attempting connection...
+Connected successfully!
+DATABASE_URL present: true
+Attempting connection...
+Connected successfully!

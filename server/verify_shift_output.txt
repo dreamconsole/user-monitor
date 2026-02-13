@@ -1,0 +1,35 @@
+"Verifying Shift Settings..."
+"Testing with Org: TestOrg_1770934479590 (be31db29-e833-4375-b1dd-a1463c8183a9)"
+"Updated Org Settings"
+"Org Settings Readback:"
+{
+  "shift_start_time": "10:00",
+  "work_days": [
+    "Mon",
+    "Wed",
+    "Fri"
+  ]
+}
+"No users found in this org."
+"Verifying Shift Settings..."
+"Testing with Org: Acme Corp (e8afe728-9496-433f-9a12-87f1b912d039)"
+"Updated Org Settings"
+"Org Settings Readback:"
+{
+  "shift_start_time": "10:00",
+  "work_days": [
+    "Mon",
+    "Wed",
+    "Fri"
+  ]
+}
+"Testing with User: Standard User (8f9af509-cdb3-4946-8afc-7a5009842d7b)"
+"Updated User Settings"
+"User Settings Readback:"
+{
+  "shift_start_time": "11:00",
+  "work_days": [
+    "Tue",
+    "Thu"
+  ]
+}

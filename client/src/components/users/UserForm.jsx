@@ -10,7 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { getBrowserTimezone } from '@/lib/dateUtils';
+
+const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const createSchema = z.object({
     name: z.string().min(2, "Full name is required"),
@@ -22,6 +25,9 @@ const createSchema = z.object({
     emp_id: z.string().min(1, "Employee ID is required"),
     payroll_id: z.string().optional(),
     site: z.string().optional(),
+    shift_start_time: z.string().nullable().optional(),
+    shift_end_time: z.string().nullable().optional(),
+    work_days: z.any().nullable().optional(),
 });
 
 const updateSchema = z.object({
@@ -34,6 +40,9 @@ const updateSchema = z.object({
     payroll_id: z.string().optional(),
     site: z.string().optional(),
     force_logout: z.boolean().optional(),
+    shift_start_time: z.string().nullable().optional(),
+    shift_end_time: z.string().nullable().optional(),
+    work_days: z.any().nullable().optional(),
 });
 
 export default function UserForm({ user, onSubmit, isSubmitting }) {
@@ -49,6 +58,8 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
         is_breaks_enabled: false,
         screenshot_interval_seconds: false,
         afk_threshold_seconds: false,
+        shift_start_time: false,
+        work_days: false
     });
 
     useEffect(() => {
@@ -102,11 +113,15 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
             emp_id: '',
             payroll_id: '',
             site: '',
-            force_logout: false
+            force_logout: false,
+            shift_start_time: null,
+            shift_end_time: null,
+            work_days: null
         }
     });
 
     const roleWatch = watch('role');
+    const workDaysWatch = watch('work_days');
 
     useEffect(() => {
         if (user) {
@@ -119,6 +134,17 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
             setValue('payroll_id', user.payroll_id || '');
             setValue('site', user.site || '');
             setValue('force_logout', user.force_logout || false);
+
+            // Shift settings
+            setValue('shift_start_time', user.shift_start_time || null);
+            setValue('shift_end_time', user.shift_end_time || null);
+            setValue('work_days', user.work_days || null);
+
+            setOverrides(prev => ({
+                ...prev,
+                shift_start_time: !!user.shift_start_time,
+                work_days: !!user.work_days
+            }));
         } else {
             reset({
                 name: '',
@@ -131,7 +157,10 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                 emp_id: '',
                 payroll_id: '',
                 site: '',
-                force_logout: false
+                force_logout: false,
+                shift_start_time: null,
+                shift_end_time: null,
+                work_days: null
             });
         }
     }, [user, setValue, reset]);
@@ -151,11 +180,40 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
 
         const finalData = {
             ...data,
-            manager_id: data.manager_id === 'none' ? null : data.manager_id
+            manager_id: data.manager_id === 'none' ? null : data.manager_id,
+            // Explicitly set shift settings to null if overrides are off
+            shift_start_time: overrides.shift_start_time ? data.shift_start_time : null,
+            shift_end_time: overrides.shift_start_time ? data.shift_end_time : null,
+            work_days: overrides.work_days ? JSON.stringify(data.work_days) : null
         };
 
         // Pass both user data and features to the parent onSubmit
         await onSubmit(finalData, finalFeatures);
+    };
+
+    const toggleShiftOverride = (key) => {
+        const isEnabled = !overrides[key];
+        setOverrides(prev => ({ ...prev, [key]: isEnabled }));
+        if (isEnabled) {
+            if (key === 'shift_start_time') {
+                setValue('shift_start_time', defaults?.shift_start_time || '09:00');
+                setValue('shift_end_time', defaults?.shift_end_time || '18:00');
+            } else if (key === 'work_days') {
+                setValue('work_days', defaults?.work_days || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
+            }
+        } else {
+            setValue(key, null);
+            if (key === 'shift_start_time') setValue('shift_end_time', null);
+        }
+    };
+
+    const toggleWorkDay = (day) => {
+        const current = workDaysWatch || [];
+        if (current.includes(day)) {
+            setValue('work_days', current.filter(d => d !== day));
+        } else {
+            setValue('work_days', [...current, day]);
+        }
     };
 
     const toggleOverride = (key) => {
@@ -293,6 +351,85 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                             onCheckedChange={(val) => setValue('force_logout', val)}
                         />
                     </div>
+                )}
+
+                {/* Shift Configuration Section */}
+                {isEdit && defaults && (
+                    <>
+                        <Separator className="my-6" />
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Shift Configuration</h3>
+
+                        <div className="space-y-4">
+                            {/* Shift Times */}
+                            <Card className="border-none bg-muted/30">
+                                <CardContent className="pt-4 space-y-3 font-normal">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex flex-col gap-0.5">
+                                            <Label className="text-sm">Shift Time</Label>
+                                            <span className="text-[10px] text-muted-foreground">Org Default: {defaults.shift_start_time} - {defaults.shift_end_time}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Switch
+                                                checked={overrides.shift_start_time}
+                                                onCheckedChange={() => toggleShiftOverride('shift_start_time')}
+                                            />
+                                            <Label className="text-xs text-muted-foreground">Override</Label>
+                                        </div>
+                                    </div>
+
+                                    {overrides.shift_start_time && (
+                                        <div className="grid grid-cols-2 gap-4 pt-2">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">Start Time</Label>
+                                                <Input type="time" {...register('shift_start_time')} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">End Time</Label>
+                                                <Input type="time" {...register('shift_end_time')} />
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Work Days */}
+                            <Card className="border-none bg-muted/30">
+                                <CardContent className="pt-4 space-y-3 font-normal">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex flex-col gap-0.5">
+                                            <Label className="text-sm">Working Days</Label>
+                                            <span className="text-[10px] text-muted-foreground">Org Default: {Array.isArray(defaults.work_days) ? defaults.work_days.join(', ') : 'N/A'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Switch
+                                                checked={overrides.work_days}
+                                                onCheckedChange={() => toggleShiftOverride('work_days')}
+                                            />
+                                            <Label className="text-xs text-muted-foreground">Override</Label>
+                                        </div>
+                                    </div>
+
+                                    {overrides.work_days && (
+                                        <div className="flex flex-wrap gap-2 pt-2">
+                                            {DAYS_OF_WEEK.map(day => {
+                                                const isSelected = workDaysWatch?.includes(day);
+                                                return (
+                                                    <Badge
+                                                        key={day}
+                                                        variant={isSelected ? "default" : "outline"}
+                                                        className="cursor-pointer px-3 py-1 text-xs select-none hover:bg-primary/90 transition-colors"
+                                                        onClick={() => toggleWorkDay(day)}
+                                                    >
+                                                        {day}
+                                                    </Badge>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </>
                 )}
 
                 {isEdit && user.device_id && (

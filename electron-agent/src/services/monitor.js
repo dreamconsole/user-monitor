@@ -96,6 +96,12 @@ class MonitorService {
             // Also start screenshot service loop
             console.log('Starting screenshot service...');
             screenshotService.start(this.orgId, this.userId, this.deviceId, this.currentWorkSessionId);
+
+            // Start app tracking
+            console.log('Starting app tracker...');
+            const appTracker = require('./appTracker');
+            appTracker.start();
+
             console.log('Monitor Service Started successfully.');
         } catch (error) {
             console.error('CRITICAL ERROR in MonitorService.start:', error);
@@ -150,6 +156,11 @@ class MonitorService {
         if (global.statusUpdateCallback) global.statusUpdateCallback('OFFLINE');
 
         screenshotService.stop();
+
+        // Stop app tracking
+        const appTracker = require('./appTracker');
+        appTracker.stop();
+
         console.log('Monitor Service stopped.');
     }
 

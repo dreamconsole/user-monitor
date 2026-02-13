@@ -5,7 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+
+const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function Settings() {
     const [loading, setLoading] = useState(true);
@@ -14,6 +18,11 @@ export default function Settings() {
         name: '',
         max_users_limit: 0,
         timezone: 'UTC',
+        shift_start_time: '09:00',
+        shift_end_time: '18:00',
+        shift_duration: 9.00,
+        work_days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        start_of_day: '00:00',
         features: {
             is_activity_tracking_enabled: true,
             is_screenshots_enabled: true,
@@ -32,7 +41,15 @@ export default function Settings() {
     const fetchSettings = async () => {
         try {
             const { data } = await api.get('/org/settings');
-            setSettings(data);
+            // Ensure defaults if null
+            setSettings({
+                ...data,
+                shift_start_time: data.shift_start_time || '09:00',
+                shift_end_time: data.shift_end_time || '18:00',
+                shift_duration: data.shift_duration || 9.00,
+                work_days: data.work_days || ["Mon", "Tue", "Wed", "Thu", "Fri"],
+                start_of_day: data.start_of_day || '00:00'
+            });
         } catch (error) {
             console.error('Failed to fetch settings:', error);
             alert('Failed to load settings');
@@ -61,12 +78,50 @@ export default function Settings() {
         }));
     };
 
+    const calculateDuration = (start, end) => {
+        if (!start || !end) return 0;
+        const [startH, startM] = start.split(':').map(Number);
+        const [endH, endM] = end.split(':').map(Number);
+        let duration = (endH + endM / 60) - (startH + startM / 60);
+        if (duration < 0) duration += 24; // Handle overnight
+        return parseFloat(duration.toFixed(2));
+    };
+
+    const handleShiftChange = (key, value) => {
+        setSettings(prev => {
+            const newSettings = { ...prev, [key]: value };
+            if (key === 'shift_start_time' || key === 'shift_end_time') {
+                newSettings.shift_duration = calculateDuration(
+                    key === 'shift_start_time' ? value : prev.shift_start_time,
+                    key === 'shift_end_time' ? value : prev.shift_end_time
+                );
+            }
+            return newSettings;
+        });
+    };
+
+    const toggleDay = (day) => {
+        setSettings(prev => {
+            const currentDays = prev.work_days || [];
+            if (currentDays.includes(day)) {
+                return { ...prev, work_days: currentDays.filter(d => d !== day) };
+            } else {
+                return { ...prev, work_days: [...currentDays, day] };
+            }
+        });
+    };
+
     const handleSave = async () => {
         setSaving(true);
         try {
             await api.patch('/org/settings', {
                 features: settings.features,
-                timezone: settings.timezone
+                timezone: settings.timezone,
+                shift_start_time: settings.shift_start_time,
+                shift_end_time: settings.shift_end_time,
+                shift_duration: settings.shift_duration,
+                work_days: JSON.stringify(settings.work_days),
+                start_of_day: settings.start_of_day
             });
             alert('Settings saved successfully!');
         } catch (error) {
@@ -80,7 +135,7 @@ export default function Settings() {
     if (loading) return <div className="p-8">Loading settings...</div>;
 
     return (
-        <div className="space-y-6 max-w-4xl">
+        <div className="space-y-6 h-[85vh] overflow-y-auto pr-4 pb-12">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Organization Settings</h1>
                 <p className="text-muted-foreground">Manage your organization-level monitoring preferences and limits.</p>
@@ -118,6 +173,75 @@ export default function Settings() {
                             </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">Default timezone for users and organization reporting.</p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Shift Settings</CardTitle>
+                    <CardDescription>Define default working hours and days for the organization.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                            <Label>Shift Start Time</Label>
+                            <Input
+                                type="time"
+                                value={settings.shift_start_time}
+                                onChange={(e) => handleShiftChange('shift_start_time', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Shift End Time</Label>
+                            <Input
+                                type="time"
+                                value={settings.shift_end_time}
+                                onChange={(e) => handleShiftChange('shift_end_time', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Calculated Duration (Hours)</Label>
+                            <Input
+                                type="number"
+                                value={settings.shift_duration}
+                                readOnly
+                                className="bg-muted"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <Label>Working Days</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {DAYS_OF_WEEK.map(day => {
+                                const isSelected = settings.work_days?.includes(day);
+                                return (
+                                    <Badge
+                                        key={day}
+                                        variant={isSelected ? "default" : "outline"}
+                                        className="cursor-pointer px-4 py-1.5 text-sm select-none hover:bg-primary/90 transition-colors"
+                                        onClick={() => toggleDay(day)}
+                                    >
+                                        {day}
+                                    </Badge>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label>Start of the Day</Label>
+                            <Input
+                                type="time"
+                                value={settings.start_of_day}
+                                onChange={(e) => setSettings(prev => ({ ...prev, start_of_day: e.target.value }))}
+                            />
+                            <p className="text-xs text-muted-foreground">Used for daily reporting cut-offs (e.g. 00:00 midnight).</p>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

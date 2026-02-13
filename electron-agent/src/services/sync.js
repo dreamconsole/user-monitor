@@ -48,6 +48,7 @@ class SyncService {
             await this.syncActivityLogs();
             await this.syncBreakLogs();
             await this.syncScreenshots();
+            await this.syncAppUsageLogs();
             await this.sendHeartbeat();
         } catch (error) {
             console.error('Sync failed:', error.message);
@@ -216,6 +217,38 @@ class SyncService {
                 console.error(`Failed to sync screenshot ${row.id}`, error.message);
                 this.checkForForcedLogout(error.response);
             }
+        }
+    }
+
+    async syncAppUsageLogs() {
+        const logs = db.getUnsyncedAppUsageLogs();
+
+        if (logs.length === 0) return;
+
+        try {
+            const response = await axios.post(`${API_URL}/app-tracking/usage/log`, {
+                logs: logs.map(log => ({
+                    executable_name: log.executable_name,
+                    window_title: log.window_title,
+                    start_time: log.start_time,
+                    end_time: log.end_time,
+                    duration_seconds: log.duration_seconds
+                }))
+            }, {
+                headers: { Authorization: `Bearer ${authService.getToken()}` }
+            });
+
+            this.checkForForcedLogout(response);
+
+            if (response.data) {
+                // Mark logs as synced
+                const ids = logs.map(log => log.id);
+                db.markAppUsageLogsSynced(ids);
+                console.log(`Synced ${logs.length} app usage logs`);
+            }
+        } catch (error) {
+            console.error('Failed to sync app usage logs:', error.message);
+            this.checkForForcedLogout(error.response);
         }
     }
 

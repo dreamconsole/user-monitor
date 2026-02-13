@@ -227,19 +227,19 @@ export default function Users() {
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
                                                 {(isAdmin || (isManager && user.manager_id === currentUser.id)) && (
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-500 hover:bg-orange-50" onClick={(e) => handleForceLogout(e, user.id)} title="Force Logout">
-                                                        <LogOut className="w-4 h-4" />
-                                                    </Button>
-                                                )}
-                                                {isAdmin && (
                                                     <>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-500 hover:bg-orange-50" onClick={(e) => handleForceLogout(e, user.id)} title="Force Logout">
+                                                            <LogOut className="w-4 h-4" />
+                                                        </Button>
                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleEdit(e, user)}>
                                                             <Edit className="w-4 h-4" />
                                                         </Button>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={(e) => handleDelete(e, user.id)}>
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
                                                     </>
+                                                )}
+                                                {isAdmin && (
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={(e) => handleDelete(e, user.id)}>
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
                                                 )}
                                             </div>
                                         </TableCell>

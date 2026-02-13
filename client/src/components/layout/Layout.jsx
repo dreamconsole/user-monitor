@@ -20,7 +20,10 @@ import {
     Building2,
     Settings,
     Coffee,
-    FileText
+    FileText,
+    FolderTree,
+    Link2,
+    BarChart3
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -31,9 +34,12 @@ const Sidebar = ({ className, onLinkClick }) => {
     const links = [
         { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['orgadmin', 'manager', 'user'] },
         { href: '/users', label: 'Users', icon: Users, roles: ['orgadmin', 'manager'] },
+        { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
+        { href: '/app-usage', label: 'App Usage', icon: BarChart3, roles: ['orgadmin', 'manager', 'user'] },
+        { href: '/app-categories', label: 'App Categories', icon: FolderTree, roles: ['orgadmin'] },
+        { href: '/app-mapping', label: 'App Mapping', icon: Link2, roles: ['orgadmin'] },
         { href: '/settings', label: 'Organization Settings', icon: Settings, roles: ['orgadmin'] },
         { href: '/breaks', label: 'Break Management', icon: Coffee, roles: ['orgadmin'] },
-        { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
     ];
 
     const filteredLinks = links.filter(link => link.roles.includes(user?.role));

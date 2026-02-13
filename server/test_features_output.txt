@@ -1,0 +1,18 @@
+"Testing User Features Query..."
+"Testing with Org ID: 20d3b05a-30df-482f-b18d-9bd1dd2f9812"
+"Query Result:"
+undefined
+"No org_features found. Trying separate query fallback..."
+"Fallback Result:"
+{
+  "shift_start_time": "09:00",
+  "shift_end_time": "18:00",
+  "shift_duration": "9.00",
+  "work_days": [
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri"
+  ]
+}

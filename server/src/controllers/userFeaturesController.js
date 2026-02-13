@@ -11,15 +11,27 @@ export const getUserFeatures = async (req, res) => {
             [userId, orgId]
         );
 
-        // Get org defaults
-        const orgFeaturesResult = await query(
-            'SELECT * FROM org_features WHERE org_id = $1',
+        // Get org defaults (features + shift settings)
+        const orgResult = await query(
+            `SELECT 
+                of.*,
+                o.shift_start_time, o.shift_end_time, o.shift_duration, o.work_days
+            FROM org_features of
+            JOIN organizations o ON o.id = of.org_id
+            WHERE of.org_id = $1`,
             [orgId]
         );
 
+        // If org_features is missing for some reason, try fetching just org
+        let defaults = orgResult.rows[0] || {};
+        if (!orgResult.rows.length) {
+            const orgOnly = await query('SELECT shift_start_time, shift_end_time, shift_duration, work_days FROM organizations WHERE id = $1', [orgId]);
+            defaults = { ...defaults, ...orgOnly.rows[0] };
+        }
+
         res.json({
             overrides: userFeaturesResult.rows[0] || null,
-            defaults: orgFeaturesResult.rows[0] || {}
+            defaults: defaults
         });
     } catch (error) {
         console.error('getUserFeatures error:', error);
@@ -37,6 +49,17 @@ export const updateUserFeatures = async (req, res) => {
     }
 
     try {
+        // PERMISSION CHECK: If Manager, ensure they own this user
+        if (req.user.role === 'manager') {
+            const userCheck = await query('SELECT manager_id FROM users WHERE id = $1 AND org_id = $2', [userId, orgId]);
+            if (userCheck.rows.length === 0) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+            if (userCheck.rows[0].manager_id !== req.user.id) {
+                return res.status(403).json({ error: 'Unauthorized: You can only manage features for your direct reports.' });
+            }
+        }
+
         // Use UPSERT (INSERT ... ON CONFLICT)
         const result = await query(
             `INSERT INTO user_features (

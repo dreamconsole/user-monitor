@@ -11,6 +11,7 @@ export const getUsers = async (req, res) => {
                 u.manager_id, u.timezone, u.emp_id, u.payroll_id, u.site, 
                 u.device_id, u.agent_version, u.token, u.last_heartbeat, 
                 u.force_logout, u.created_at,
+                u.shift_start_time, u.shift_end_time, u.shift_duration, u.work_days, u.start_of_day,
                 EXISTS(SELECT 1 FROM break_logs bl WHERE bl.user_id = u.id AND bl.end_time IS NULL) as is_on_break
             FROM users u 
             WHERE u.org_id = $1
@@ -40,7 +41,8 @@ export const getUsers = async (req, res) => {
 export const createUser = async (req, res) => {
     const {
         name, email, password, role,
-        manager_id, timezone, emp_id, payroll_id, site
+        manager_id, timezone, emp_id, payroll_id, site,
+        shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
     } = req.body;
 
     // Basic validation
@@ -62,12 +64,14 @@ export const createUser = async (req, res) => {
         const result = await query(
             `INSERT INTO users (
                 org_id, full_name, email, password_hash, role, 
-                manager_id, timezone, emp_id, payroll_id, site
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+                manager_id, timezone, emp_id, payroll_id, site,
+                shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
             RETURNING id, full_name as name, email, role, is_active, timezone, emp_id, created_at`,
             [
                 req.user.org_id, name, email, hashedPassword, role,
-                manager_id || null, timezone || 'UTC', emp_id || null, payroll_id || null, site || null
+                manager_id || null, timezone || 'UTC', emp_id || null, payroll_id || null, site || null,
+                shift_start_time || null, shift_end_time || null, shift_duration || null, work_days || null, start_of_day || null
             ]
         );
 
@@ -88,10 +92,26 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
     const { id } = req.params;
     const {
-        name, role, status, manager_id, timezone, emp_id, payroll_id, site, force_logout
+        name, role, status, manager_id, timezone, emp_id, payroll_id, site, force_logout,
+        shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
     } = req.body;
 
     try {
+        // PERMISSION CHECK: If Manager, ensure they own this user
+        if (req.user.role === 'manager') {
+            const userCheck = await query('SELECT manager_id FROM users WHERE id = $1 AND org_id = $2', [id, req.user.org_id]);
+            if (userCheck.rows.length === 0) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+            if (userCheck.rows[0].manager_id !== req.user.id) {
+                return res.status(403).json({ error: 'Unauthorized: You can only manage your direct reports.' });
+            }
+            // Prevent managers from changing roles or assigning new managers
+            if (role || manager_id) {
+                return res.status(403).json({ error: 'Managers cannot change user roles or reassign managers.' });
+            }
+        }
+
         // Validate Manager (if changing)
         if (manager_id) {
             const managerCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [manager_id, req.user.org_id]);
@@ -112,12 +132,19 @@ export const updateUser = async (req, res) => {
                 emp_id = COALESCE($6, emp_id),
                 payroll_id = COALESCE($7, payroll_id),
                 site = COALESCE($8, site),
-                force_logout = COALESCE($9, force_logout)
-            WHERE id = $10 AND org_id = $11 
-            RETURNING id, full_name as name, email, role, is_active, manager_id, timezone, emp_id, payroll_id, site, force_logout`,
+                force_logout = COALESCE($9, force_logout),
+                shift_start_time = $10,
+                shift_end_time = $11,
+                shift_duration = $12,
+                work_days = $13,
+                start_of_day = $14
+            WHERE id = $15 AND org_id = $16 
+            RETURNING id, full_name as name, email, role, is_active, manager_id, timezone, emp_id, payroll_id, site, force_logout,
+                shift_start_time, shift_end_time, shift_duration, work_days, start_of_day`,
             [
                 name, role, isActive, manager_id || null, timezone,
                 emp_id, payroll_id, site, force_logout,
+                shift_start_time, shift_end_time, shift_duration, work_days, start_of_day,
                 id, req.user.org_id
             ]
         );

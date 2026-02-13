@@ -4,9 +4,12 @@ export const getOrgSettings = async (req, res) => {
     try {
         const orgId = req.user.org_id;
 
-        // Get org details and features
+        // Get org details and features including shift settings
         const orgResult = await query(
-            'SELECT name, max_users_limit, timezone FROM organizations WHERE id = $1',
+            `SELECT 
+                name, max_users_limit, timezone,
+                shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
+            FROM organizations WHERE id = $1`,
             [orgId]
         );
 
@@ -32,75 +35,106 @@ export const getOrgSettings = async (req, res) => {
 };
 
 export const updateOrgSettings = async (req, res) => {
-    const { features, timezone } = req.body;
+    const {
+        features, timezone,
+        shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
+    } = req.body;
     const orgId = req.user.org_id;
 
-    if (!features) {
-        return res.status(400).json({ error: 'Missing features data' });
-    }
-
     try {
-        if (timezone) {
-            await query(
-                'UPDATE organizations SET timezone = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-                [timezone, orgId]
-            );
-        }
-
-        // Update org_features
-        const result = await query(
-            `UPDATE org_features SET 
-                is_activity_tracking_enabled = COALESCE($1, is_activity_tracking_enabled),
-                is_screenshots_enabled = COALESCE($2, is_screenshots_enabled),
-                screenshot_interval_seconds = COALESCE($3, screenshot_interval_seconds),
-                is_afk_tracking_enabled = COALESCE($4, is_afk_tracking_enabled),
-                afk_threshold_seconds = COALESCE($5, afk_threshold_seconds),
-                is_breaks_enabled = COALESCE($6, is_breaks_enabled),
-                is_force_logout_enabled = COALESCE($7, is_force_logout_enabled),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE org_id = $8
-            RETURNING *`,
+        // Update Organization settings
+        await query(
+            `UPDATE organizations SET 
+                timezone = COALESCE($1, timezone),
+                shift_start_time = COALESCE($2, shift_start_time),
+                shift_end_time = COALESCE($3, shift_end_time),
+                shift_duration = COALESCE($4, shift_duration),
+                work_days = COALESCE($5, work_days),
+                start_of_day = COALESCE($6, start_of_day),
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE id = $7`,
             [
-                features.is_activity_tracking_enabled,
-                features.is_screenshots_enabled,
-                features.screenshot_interval_seconds,
-                features.is_afk_tracking_enabled,
-                features.afk_threshold_seconds,
-                features.is_breaks_enabled,
-                features.is_force_logout_enabled,
+                timezone,
+                shift_start_time,
+                shift_end_time,
+                shift_duration,
+                work_days,
+                start_of_day,
                 orgId
             ]
         );
 
-        if (result.rows.length === 0) {
-            // If doesn't exist, insert (though it should be created at org registration)
-            const insertResult = await query(
-                `INSERT INTO org_features (
-                    org_id, 
-                    is_activity_tracking_enabled,
-                    is_screenshots_enabled,
-                    screenshot_interval_seconds,
-                    is_afk_tracking_enabled,
-                    afk_threshold_seconds,
-                    is_breaks_enabled,
-                    is_force_logout_enabled
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        // Update org_features if provided
+        if (features) {
+            const result = await query(
+                `UPDATE org_features SET 
+                    is_activity_tracking_enabled = COALESCE($1, is_activity_tracking_enabled),
+                    is_screenshots_enabled = COALESCE($2, is_screenshots_enabled),
+                    screenshot_interval_seconds = COALESCE($3, screenshot_interval_seconds),
+                    is_afk_tracking_enabled = COALESCE($4, is_afk_tracking_enabled),
+                    afk_threshold_seconds = COALESCE($5, afk_threshold_seconds),
+                    is_breaks_enabled = COALESCE($6, is_breaks_enabled),
+                    is_force_logout_enabled = COALESCE($7, is_force_logout_enabled),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE org_id = $8
                 RETURNING *`,
                 [
-                    orgId,
-                    features.is_activity_tracking_enabled ?? true,
-                    features.is_screenshots_enabled ?? true,
-                    features.screenshot_interval_seconds ?? 300,
-                    features.is_afk_tracking_enabled ?? true,
-                    features.afk_threshold_seconds ?? 300,
-                    features.is_breaks_enabled ?? true,
-                    features.is_force_logout_enabled ?? true
+                    features.is_activity_tracking_enabled,
+                    features.is_screenshots_enabled,
+                    features.screenshot_interval_seconds,
+                    features.is_afk_tracking_enabled,
+                    features.afk_threshold_seconds,
+                    features.is_breaks_enabled,
+                    features.is_force_logout_enabled,
+                    orgId
                 ]
             );
-            return res.json(insertResult.rows[0]);
+
+            if (result.rows.length === 0) {
+                await query(
+                    `INSERT INTO org_features (
+                        org_id, 
+                        is_activity_tracking_enabled,
+                        is_screenshots_enabled,
+                        screenshot_interval_seconds,
+                        is_afk_tracking_enabled,
+                        afk_threshold_seconds,
+                        is_breaks_enabled,
+                        is_force_logout_enabled
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    [
+                        orgId,
+                        features.is_activity_tracking_enabled ?? true,
+                        features.is_screenshots_enabled ?? true,
+                        features.screenshot_interval_seconds ?? 300,
+                        features.is_afk_tracking_enabled ?? true,
+                        features.afk_threshold_seconds ?? 300,
+                        features.is_breaks_enabled ?? true,
+                        features.is_force_logout_enabled ?? true
+                    ]
+                );
+            }
         }
 
-        res.json(result.rows[0]);
+        // Return updated settings
+        const orgResult = await query(
+            `SELECT 
+                name, max_users_limit, timezone,
+                shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
+            FROM organizations WHERE id = $1`,
+            [orgId]
+        );
+
+        const featuresResult = await query(
+            'SELECT * FROM org_features WHERE org_id = $1',
+            [orgId]
+        );
+
+        res.json({
+            ...orgResult.rows[0],
+            features: featuresResult.rows[0]
+        });
+
     } catch (error) {
         console.error('updateOrgSettings error:', error);
         res.status(500).json({ error: 'Failed to update settings: ' + error.message });

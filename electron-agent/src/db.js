@@ -98,11 +98,25 @@ function initDB(orgId, userId) {
         )
     `;
 
+    const createAppUsageLogsTable = `
+        CREATE TABLE IF NOT EXISTS app_usage_logs_local (
+            id TEXT PRIMARY KEY,
+            app_name TEXT,
+            executable_name TEXT,
+            window_title TEXT,
+            start_time TEXT,
+            end_time TEXT,
+            duration_seconds INTEGER,
+            synced INTEGER DEFAULT 0
+        )
+    `;
+
     db.exec(createWorkSessionsTable);
     db.exec(createActivityLogsTable);
     db.exec(createScreenshotsTable);
     db.exec(createHeartbeatTable);
     db.exec(createBreakLogsTable);
+    db.exec(createAppUsageLogsTable);
 
     // Migration: Add total_break_seconds to work_sessions if missing
     const columns = db.prepare("PRAGMA table_info(work_sessions)").all();
@@ -141,10 +155,34 @@ function closeDB() {
     }
 }
 
+// App usage log helpers
+function insertAppUsageLog(log) {
+    const stmt = db.prepare(`
+        INSERT INTO app_usage_logs_local (id, app_name, executable_name, window_title, start_time, end_time, duration_seconds, synced)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(log.id, log.app_name, log.executable_name, log.window_title, log.start_time, log.end_time, log.duration_seconds, log.synced);
+}
+
+function getUnsyncedAppUsageLogs() {
+    const stmt = db.prepare('SELECT * FROM app_usage_logs_local WHERE synced = 0 ORDER BY start_time LIMIT 100');
+    return stmt.all();
+}
+
+function markAppUsageLogsSynced(ids) {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    const stmt = db.prepare(`UPDATE app_usage_logs_local SET synced = 1 WHERE id IN (${placeholders})`);
+    stmt.run(...ids);
+}
+
 module.exports = {
     initDB,
     getDB,
     isInitialized,
     closeDB,
-    getAgentDataPath
+    getAgentDataPath,
+    insertAppUsageLog,
+    getUnsyncedAppUsageLogs,
+    markAppUsageLogsSynced
 };

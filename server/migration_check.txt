@@ -1,0 +1,17 @@
+App Tracking Tables:
+  ✓ app_categories
+  ✓ app_usage_logs
+  ✓ tracked_apps
+  ✓ user_app_summary
+
+Default Categories:
+  - Work - Programming (productive)
+  - Work - Programming (productive)
+  - Work - Programming (productive)
+  - Work - Office Apps (productive)
+  - Work - Office Apps (productive)
+  - Work - Office Apps (productive)
+  - Communication (neutral)
+  - Communication (neutral)
+  - Communication (neutral)
+  - Media (non_productive)
