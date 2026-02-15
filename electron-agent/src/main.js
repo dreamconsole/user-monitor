@@ -46,14 +46,16 @@ function createWindow() {
         maximizable: false,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false, // For POC simplicity; consider contextIsolation: true with preload for prod
+            contextIsolation: false, // TODO: migrate to contextIsolation: true with preload script
             backgroundThrottling: false
         },
         show: false // Don't show until ready
     });
 
-    // Open DevTools for debugging
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // Only open DevTools in development
+    if (process.env.NODE_ENV === 'development') {
+        mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
 
     mainWindow.loadFile(path.join(__dirname, 'ui/login.html'));
 
