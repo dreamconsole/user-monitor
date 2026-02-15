@@ -1,0 +1,132 @@
+
+══════════════════════════════════════════════════════════════════════
+  COMPREHENSIVE TEST REPORT - User Monitor System
+  Generated: 2026-02-14T22:18:57.109Z
+  Duration: 2.9s
+══════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────┐
+│           TEST SUMMARY                  │
+├─────────────────────────────────────────┤
+│  Total Tests:      75                   │
+│  Passed:           69  [PASS]                │
+│  Failed:            6  [FAIL]                │
+│  Pass Rate:       92.0%                │
+│  Errors Found:      0                   │
+└─────────────────────────────────────────┘
+
+── SECTION BREAKDOWN ──────────────────────────────────────
+
+  [PASS] 1. Server Connectivity
+     Passed: 5 | Failed: 0 | Rate: 100%
+  [WARN] 2. Authentication
+     Passed: 8 | Failed: 1 | Rate: 89%
+  [WARN] 3. User Management (CRUD)
+     Passed: 11 | Failed: 1 | Rate: 92%
+  [PASS] 4. Break Types (CRUD)
+     Passed: 7 | Failed: 0 | Rate: 100%
+  [PASS] 5. Organization Settings
+     Passed: 4 | Failed: 0 | Rate: 100%
+  [PASS] 6. App Categories (CRUD)
+     Passed: 6 | Failed: 0 | Rate: 100%
+  [PASS] 7. Tracked Apps (CRUD)
+     Passed: 7 | Failed: 0 | Rate: 100%
+  [WARN] 8. Agent Endpoints
+     Passed: 6 | Failed: 1 | Rate: 86%
+  [WARN] 9. Stats & Reports
+     Passed: 10 | Failed: 1 | Rate: 91%
+  [WARN] 10. Notifications
+     Passed: 1 | Failed: 1 | Rate: 50%
+  [WARN] 11. Cleanup (Delete Operations)
+     Passed: 4 | Failed: 1 | Rate: 80%
+
+── PASSED TESTS (69) ─────────────────────────────────
+
+  [PASS] [1. Server Connectivity] GET / - Root endpoint responds
+  [PASS] [1. Server Connectivity] GET /env-check - JWT Secret configured
+  [PASS] [1. Server Connectivity] GET client (localhost:5173) - Frontend responds
+  [PASS] [1. Server Connectivity] CORS headers present
+  [PASS] [1. Server Connectivity] Unknown route handling
+  [PASS] [2. Authentication] POST /auth/register-org - Register new organization
+  [PASS] [2. Authentication] POST /auth/register-org - Duplicate email rejected
+  [PASS] [2. Authentication] POST /auth/login - Valid credentials
+  [PASS] [2. Authentication] POST /auth/login - Wrong password rejected
+  [PASS] [2. Authentication] POST /auth/login - Non-existent email rejected
+  [PASS] [2. Authentication] GET /auth/me - Authenticated user profile
+  [PASS] [2. Authentication] GET /auth/me - No token returns 401
+  [PASS] [2. Authentication] GET /auth/me - Invalid token returns 403
+  [PASS] [3. User Management (CRUD)] POST /users - Create manager
+  [PASS] [3. User Management (CRUD)] POST /users - Create user with all fields
+  [PASS] [3. User Management (CRUD)] POST /users - Missing required fields returns 400
+  [PASS] [3. User Management (CRUD)] POST /users - Duplicate email returns 400
+  [PASS] [3. User Management (CRUD)] GET /users - List users
+  [PASS] [3. User Management (CRUD)] GET /users - Manager sees only direct reports
+  [PASS] [3. User Management (CRUD)] PATCH /users/:id - Update user
+  [PASS] [3. User Management (CRUD)] PATCH /users/:id - Non-existent user returns 404
+  [PASS] [3. User Management (CRUD)] GET /users/:id/features - Get user features
+  [PASS] [3. User Management (CRUD)] POST /users/:id/force-logout - Force logout
+  [PASS] [3. User Management (CRUD)] GET /users - Regular user denied access (403)
+  [PASS] [4. Break Types (CRUD)] POST /breaks - Create break type
+  [PASS] [4. Break Types (CRUD)] POST /breaks - Missing name returns 400
+  [PASS] [4. Break Types (CRUD)] GET /breaks - List break types
+  [PASS] [4. Break Types (CRUD)] PATCH /breaks/:id - Update break type
+  [PASS] [4. Break Types (CRUD)] PATCH /breaks/:id - Non-existent break returns 404
+  [PASS] [4. Break Types (CRUD)] DELETE /breaks/:id - Delete break type
+  [PASS] [4. Break Types (CRUD)] DELETE /breaks/:id - Non-existent break returns 404
+  [PASS] [5. Organization Settings] GET /org/settings - Get organization settings
+  [PASS] [5. Organization Settings] PATCH /org/settings - Update organization settings
+  [PASS] [5. Organization Settings] GET /org/settings - Verify updated settings
+  [PASS] [5. Organization Settings] GET /org/settings - Regular user denied (403)
+  [PASS] [6. App Categories (CRUD)] POST /app-tracking/categories - Create category
+  [PASS] [6. App Categories (CRUD)] POST /app-tracking/categories - Missing productivity_type returns 400
+  [PASS] [6. App Categories (CRUD)] POST /app-tracking/categories - Invalid productivity_type returns 400
+  [PASS] [6. App Categories (CRUD)] GET /app-tracking/categories - List categories
+  [PASS] [6. App Categories (CRUD)] PATCH /app-tracking/categories/:id - Update category
+  [PASS] [6. App Categories (CRUD)] PATCH /app-tracking/categories/:id - Non-existent returns 404
+  [PASS] [7. Tracked Apps (CRUD)] POST /app-tracking/apps - Create tracked app
+  [PASS] [7. Tracked Apps (CRUD)] POST /app-tracking/apps - Missing executable_name returns 400
+  [PASS] [7. Tracked Apps (CRUD)] GET /app-tracking/apps - List tracked apps
+  [PASS] [7. Tracked Apps (CRUD)] GET /app-tracking/apps?unmapped=true - List unmapped apps
+  [PASS] [7. Tracked Apps (CRUD)] PATCH /app-tracking/apps/:id - Update tracked app
+  [PASS] [7. Tracked Apps (CRUD)] PATCH /app-tracking/apps/:id/map - Map app to category
+  [PASS] [7. Tracked Apps (CRUD)] PATCH /app-tracking/apps/:id/map - Missing category_id returns 400
+  [PASS] [8. Agent Endpoints] POST /agent/heartbeat - Send heartbeat
+  [PASS] [8. Agent Endpoints] POST /agent/activity-session - Sync work session
+  [PASS] [8. Agent Endpoints] POST /agent/activity-log - Log activity
+  [PASS] [8. Agent Endpoints] GET /agent/breaks - Get break types
+  [PASS] [8. Agent Endpoints] POST /agent/break-log - Log break
+  [PASS] [8. Agent Endpoints] POST /agent/heartbeat - Invalid org/user handled
+  [PASS] [9. Stats & Reports] GET /stats/admin - Admin dashboard stats
+  [PASS] [9. Stats & Reports] GET /stats/manager - Manager dashboard stats
+  [PASS] [9. Stats & Reports] GET /stats/user - User stats
+  [PASS] [9. Stats & Reports] GET /stats/user/:userId/hourly - Hourly stats
+  [PASS] [9. Stats & Reports] GET /reports/summary - Daily summary report
+  [PASS] [9. Stats & Reports] GET /reports/breaks - Break usage report
+  [PASS] [9. Stats & Reports] GET /reports/idle - Idle events report
+  [PASS] [9. Stats & Reports] GET /app-tracking/reports/admin - Admin app tracking report
+  [PASS] [9. Stats & Reports] GET /app-tracking/reports/user/:userId - User app tracking report
+  [PASS] [9. Stats & Reports] GET /app-tracking/reports/productivity/:userId - Productivity report
+  [PASS] [10. Notifications] GET /notifications - Get notifications
+  [PASS] [11. Cleanup (Delete Operations)] DELETE /app-tracking/apps/:id - Delete tracked app
+  [PASS] [11. Cleanup (Delete Operations)] DELETE /app-tracking/categories/:id - Delete category
+  [PASS] [11. Cleanup (Delete Operations)] DELETE /users/:id - Delete test user
+  [PASS] [11. Cleanup (Delete Operations)] DELETE /users/:id - Delete test manager
+
+── FAILED TESTS (6) ─────────────────────────────────
+
+  [FAIL] [2. Authentication] POST /auth/register-org - Missing fields validation: Status: 500
+  [FAIL] [3. User Management (CRUD)] PATCH /users/:id/features - Update user features: Status: 400
+  [FAIL] [8. Agent Endpoints] POST /app-tracking/usage/log - Log app usage: Status: 400
+  [FAIL] [9. Stats & Reports] GET /reports/screenshots - Screenshots report: Status: 500
+  [FAIL] [10. Notifications] POST /notifications/mark-read - Mark as read: Status: 400
+  [FAIL] [11. Cleanup (Delete Operations)] DELETE /breaks/:id - Delete break type: Status: 500
+
+── AUTO-GENERATED RECOMMENDATIONS ─────────────────────────
+
+  [WARN]  [2. Authentication] "POST /auth/register-org - Missing fields validation" returned 500 - Check server logs for internal errors
+  [WARN]  [9. Stats & Reports] "GET /reports/screenshots - Screenshots report" returned 500 - Check server logs for internal errors
+  [WARN]  [11. Cleanup (Delete Operations)] "DELETE /breaks/:id - Delete break type" returned 500 - Check server logs for internal errors
+
+══════════════════════════════════════════════════════════════════════
+  END OF REPORT
+══════════════════════════════════════════════════════════════════════
