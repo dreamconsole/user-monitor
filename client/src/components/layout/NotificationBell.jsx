@@ -11,20 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import useAuthStore from '@/lib/useAuthStore';
-import axios from 'axios';
-
-// Create an axios instance with auth
-const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
-});
-
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
+import api from '@/lib/api';
 
 export default function NotificationBell() {
     const [notifications, setNotifications] = useState([]);

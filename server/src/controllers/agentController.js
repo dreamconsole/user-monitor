@@ -2,6 +2,7 @@ import { query } from '../db.js';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { broadcastToManagers } from '../websocket.js';
 
 export const logHeartbeat = async (req, res) => {
     const { org_id, user_id, device_identifier } = req.body;
@@ -89,17 +90,22 @@ export const logHeartbeat = async (req, res) => {
             is_breaks_enabled: userFeatures.is_breaks_enabled ?? orgFeatures.is_breaks_enabled ?? true
         };
 
+        // Broadcast heartbeat to managers for live dashboard updates
+        try {
+            broadcastToManagers(org_id, {
+                type: 'USER_HEARTBEAT',
+                userId: user_id,
+                timestamp: new Date().toISOString()
+            });
+        } catch (_) { /* non-critical */ }
+
         res.status(200).json({
             success: true,
             features
         });
     } catch (error) {
         console.error('[logHeartbeat] CRITICAL ERROR:', error);
-        res.status(500).json({
-            error: 'Failed to log heartbeat',
-            details: error.message,
-            code: error.code
-        });
+        res.status(500).json({ error: 'Failed to log heartbeat' });
     }
 };
 
@@ -146,12 +152,7 @@ export const syncActivitySession = async (req, res) => {
                 error: 'Invalid organization or user ID in session'
             });
         }
-        res.status(500).json({
-            success: false,
-            error: 'Failed to sync work session',
-            details: error.message,
-            code: error.code // PostgreSQL error code
-        });
+        res.status(500).json({ success: false, error: 'Failed to sync work session' });
     }
 };
 
@@ -173,7 +174,7 @@ export const uploadScreenshot = async (req, res) => {
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Screenshot upload failed:', error);
-        res.status(500).json({ error: 'Failed to upload screenshot: ' + error.message });
+        res.status(500).json({ error: 'Failed to upload screenshot' });
     }
 };
 
@@ -207,12 +208,7 @@ export const logActivity = async (req, res) => {
                 error: 'Invalid organization or user ID in activity log'
             });
         }
-        res.status(500).json({
-            success: false,
-            error: 'Failed to log activity',
-            details: error.message,
-            code: error.code
-        });
+        res.status(500).json({ success: false, error: 'Failed to log activity' });
     }
 };
 
@@ -279,12 +275,7 @@ export const logBreak = async (req, res) => {
                 error: 'Invalid organization or user ID in break log'
             });
         }
-        res.status(500).json({
-            success: false,
-            error: 'Failed to log break',
-            details: error.message,
-            code: error.code
-        });
+        res.status(500).json({ success: false, error: 'Failed to log break' });
     }
 };
 

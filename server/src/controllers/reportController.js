@@ -1,17 +1,16 @@
 import { query } from '../db.js';
 
 /**
- * GET /reports/summary
- * Filters: startDate, endDate, userId (optional)
- * Role: Admin (all), Manager (team only)
+ * Fetches daily summary data. Used by reports API and PDF export.
+ * @param {Object} req - Express request with user and query params
+ * @returns {Promise<Array>} Rows
  */
-export const getDailySummary = async (req, res) => {
+export async function fetchDailySummaryData(req) {
     const { startDate, endDate, userId } = req.query;
     const orgId = req.user.org_id;
     const { role, id: currentUserId } = req.user;
 
-    try {
-        let sql = `
+    let sql = `
             SELECT 
                 ws.work_date,
                 u.id as user_id,
@@ -29,42 +28,51 @@ export const getDailySummary = async (req, res) => {
             JOIN users u ON ws.user_id = u.id
             WHERE ws.org_id = $1
         `;
-        const params = [orgId];
-        let paramCount = 1;
+    const params = [orgId];
+    let paramCount = 1;
 
-        if (startDate) {
-            paramCount++;
-            sql += ` AND ws.start_time >= $${paramCount}`;
-            params.push(`${startDate} 00:00:00+00`);
-        }
-        if (endDate) {
-            paramCount++;
-            sql += ` AND ws.start_time <= $${paramCount}`;
-            params.push(`${endDate} 23:59:59+00`);
-        }
+    if (startDate) {
+        paramCount++;
+        sql += ` AND ws.start_time >= $${paramCount}`;
+        params.push(`${startDate} 00:00:00+00`);
+    }
+    if (endDate) {
+        paramCount++;
+        sql += ` AND ws.start_time <= $${paramCount}`;
+        params.push(`${endDate} 23:59:59+00`);
+    }
 
-        // Role-based filtering
-        if (role === 'manager') {
-            paramCount++;
-            sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
-            params.push(currentUserId);
-        } else if (role === 'user') {
-            paramCount++;
-            sql += ` AND u.id = $${paramCount}`;
-            params.push(currentUserId);
-        }
+    if (role === 'manager') {
+        paramCount++;
+        sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
+        params.push(currentUserId);
+    } else if (role === 'user') {
+        paramCount++;
+        sql += ` AND u.id = $${paramCount}`;
+        params.push(currentUserId);
+    }
 
-        // Specific user filter
-        if (userId && role !== 'user') {
-            paramCount++;
-            sql += ` AND u.id = $${paramCount}`;
-            params.push(userId);
-        }
+    if (userId && role !== 'user') {
+        paramCount++;
+        sql += ` AND u.id = $${paramCount}`;
+        params.push(userId);
+    }
 
-        sql += ` GROUP BY ws.work_date, u.id, u.full_name ORDER BY ws.work_date DESC, u.full_name ASC`;
+    sql += ` GROUP BY ws.work_date, u.id, u.full_name ORDER BY ws.work_date DESC, u.full_name ASC`;
 
-        const result = await query(sql, params);
-        res.json(result.rows);
+    const result = await query(sql, params);
+    return result.rows;
+}
+
+/**
+ * GET /reports/summary
+ * Filters: startDate, endDate, userId (optional)
+ * Role: Admin (all), Manager (team only)
+ */
+export const getDailySummary = async (req, res) => {
+    try {
+        const rows = await fetchDailySummaryData(req);
+        res.json(rows);
     } catch (error) {
         console.error('getDailySummary error:', error);
         res.status(500).json({ error: 'Failed to fetch daily summary' });
@@ -72,16 +80,14 @@ export const getDailySummary = async (req, res) => {
 };
 
 /**
- * GET /reports/breaks
- * Filters: startDate, endDate, userId (optional)
+ * Fetches break usage data. Used by reports API and PDF export.
  */
-export const getBreakUsage = async (req, res) => {
+export async function fetchBreakUsageData(req) {
     const { startDate, endDate, userId } = req.query;
     const orgId = req.user.org_id;
     const { role, id: currentUserId } = req.user;
 
-    try {
-        let sql = `
+    let sql = `
             SELECT 
                 bl.start_time,
                 bl.end_time,
@@ -93,40 +99,50 @@ export const getBreakUsage = async (req, res) => {
             JOIN break_master bm ON bl.break_type_id = bm.id
             WHERE bl.org_id = $1
         `;
-        const params = [orgId];
-        let paramCount = 1;
+    const params = [orgId];
+    let paramCount = 1;
 
-        if (startDate) {
-            paramCount++;
-            sql += ` AND bl.start_time >= $${paramCount}`;
-            params.push(`${startDate} 00:00:00+00`);
-        }
-        if (endDate) {
-            paramCount++;
-            sql += ` AND bl.start_time <= $${paramCount}`;
-            params.push(`${endDate} 23:59:59+00`);
-        }
+    if (startDate) {
+        paramCount++;
+        sql += ` AND bl.start_time >= $${paramCount}`;
+        params.push(`${startDate} 00:00:00+00`);
+    }
+    if (endDate) {
+        paramCount++;
+        sql += ` AND bl.start_time <= $${paramCount}`;
+        params.push(`${endDate} 23:59:59+00`);
+    }
 
-        if (role === 'manager') {
-            paramCount++;
-            sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
-            params.push(currentUserId);
-        } else if (role === 'user') {
-            paramCount++;
-            sql += ` AND u.id = $${paramCount}`;
-            params.push(currentUserId);
-        }
+    if (role === 'manager') {
+        paramCount++;
+        sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
+        params.push(currentUserId);
+    } else if (role === 'user') {
+        paramCount++;
+        sql += ` AND u.id = $${paramCount}`;
+        params.push(currentUserId);
+    }
 
-        if (userId && role !== 'user') {
-            paramCount++;
-            sql += ` AND u.id = $${paramCount}`;
-            params.push(userId);
-        }
+    if (userId && role !== 'user') {
+        paramCount++;
+        sql += ` AND u.id = $${paramCount}`;
+        params.push(userId);
+    }
 
-        sql += ` ORDER BY bl.start_time DESC`;
+    sql += ` ORDER BY bl.start_time DESC`;
 
-        const result = await query(sql, params);
-        res.json(result.rows);
+    const result = await query(sql, params);
+    return result.rows;
+}
+
+/**
+ * GET /reports/breaks
+ * Filters: startDate, endDate, userId (optional)
+ */
+export const getBreakUsage = async (req, res) => {
+    try {
+        const rows = await fetchBreakUsageData(req);
+        res.json(rows);
     } catch (error) {
         console.error('getBreakUsage error:', error);
         res.status(500).json({ error: 'Failed to fetch break usage' });
@@ -134,15 +150,14 @@ export const getBreakUsage = async (req, res) => {
 };
 
 /**
- * GET /reports/screenshots
+ * Fetches screenshots data. Used by reports API and PDF export.
  */
-export const getScreenshots = async (req, res) => {
+export async function fetchScreenshotsData(req) {
     const { startDate, endDate, userId } = req.query;
     const orgId = req.user.org_id;
     const { role, id: currentUserId } = req.user;
 
-    try {
-        let sql = `
+    let sql = `
             SELECT 
                 s.id,
                 s.captured_at,
@@ -152,40 +167,49 @@ export const getScreenshots = async (req, res) => {
             JOIN users u ON s.user_id = u.id
             WHERE s.org_id = $1
         `;
-        const params = [orgId];
-        let paramCount = 1;
+    const params = [orgId];
+    let paramCount = 1;
 
-        if (startDate) {
-            paramCount++;
-            sql += ` AND s.captured_at >= $${paramCount}`;
-            params.push(`${startDate} 00:00:00+00`);
-        }
-        if (endDate) {
-            paramCount++;
-            sql += ` AND s.captured_at <= $${paramCount}`;
-            params.push(`${endDate} 23:59:59+00`);
-        }
+    if (startDate) {
+        paramCount++;
+        sql += ` AND s.captured_at >= $${paramCount}`;
+        params.push(`${startDate} 00:00:00+00`);
+    }
+    if (endDate) {
+        paramCount++;
+        sql += ` AND s.captured_at <= $${paramCount}`;
+        params.push(`${endDate} 23:59:59+00`);
+    }
 
-        if (role === 'manager') {
-            paramCount++;
-            sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
-            params.push(currentUserId);
-        } else if (role === 'user') {
-            paramCount++;
-            sql += ` AND u.id = $${paramCount}`;
-            params.push(currentUserId);
-        }
+    if (role === 'manager') {
+        paramCount++;
+        sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
+        params.push(currentUserId);
+    } else if (role === 'user') {
+        paramCount++;
+        sql += ` AND u.id = $${paramCount}`;
+        params.push(currentUserId);
+    }
 
-        if (userId && role !== 'user') {
-            paramCount++;
-            sql += ` AND u.id = $${paramCount}`;
-            params.push(userId);
-        }
+    if (userId && role !== 'user') {
+        paramCount++;
+        sql += ` AND u.id = $${paramCount}`;
+        params.push(userId);
+    }
 
-        sql += ` ORDER BY s.captured_at DESC LIMIT 100`;
+    sql += ` ORDER BY s.captured_at DESC LIMIT 100`;
 
-        const result = await query(sql, params);
-        res.json(result.rows);
+    const result = await query(sql, params);
+    return result.rows;
+}
+
+/**
+ * GET /reports/screenshots
+ */
+export const getScreenshots = async (req, res) => {
+    try {
+        const rows = await fetchScreenshotsData(req);
+        res.json(rows);
     } catch (error) {
         console.error('getScreenshots error:', error);
         res.status(500).json({ error: 'Failed to fetch screenshots' });

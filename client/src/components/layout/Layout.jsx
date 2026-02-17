@@ -23,9 +23,12 @@ import {
     FileText,
     FolderTree,
     Link2,
-    BarChart3
+    BarChart3,
+    CalendarDays,
+    GitCompareArrows
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import ThemeToggle from '../ThemeToggle';
 
 const Sidebar = ({ className, onLinkClick }) => {
     const location = useLocation();
@@ -33,7 +36,9 @@ const Sidebar = ({ className, onLinkClick }) => {
 
     const links = [
         { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['orgadmin', 'manager', 'user'] },
+        { href: '/timeline', label: 'Timeline', icon: CalendarDays, roles: ['orgadmin', 'manager', 'user'] },
         { href: '/users', label: 'Users', icon: Users, roles: ['orgadmin', 'manager'] },
+        { href: '/team-comparison', label: 'Team Comparison', icon: GitCompareArrows, roles: ['orgadmin', 'manager'] },
         { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
         { href: '/app-usage', label: 'App Usage', icon: BarChart3, roles: ['orgadmin', 'manager', 'user'] },
         { href: '/app-categories', label: 'App Categories', icon: FolderTree, roles: ['orgadmin'] },
@@ -101,11 +106,12 @@ export default function Layout({ children }) {
 
                     <div className="flex-1" />
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         <div className="flex flex-col items-end hidden sm:flex text-right">
                             <span className="text-sm font-semibold">{user?.name}</span>
                             <span className="text-xs text-muted-foreground capitalize">{user?.role}</span>
                         </div>
+                        <ThemeToggle />
                         <NotificationBell />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -123,6 +129,13 @@ export default function Layout({ children }) {
                                         <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
                                     </div>
                                 </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild className="cursor-pointer">
+                                    <Link to="/profile">
+                                        <Users className="mr-3 h-4 w-4" />
+                                        My Profile
+                                    </Link>
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={logout} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
                                     <LogOut className="mr-3 h-4 w-4" />

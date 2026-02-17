@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
+import { toast } from 'sonner';
 import { Calendar, TrendingUp, Clock, PieChart as PieChartIcon, Users as UsersIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import useAuthStore from '@/lib/useAuthStore';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const COLORS = {
     productive: '#10b981',
@@ -28,10 +27,7 @@ export default function AppUsageDashboard() {
     const [selectedUserId, setSelectedUserId] = useState(null);
 
     useEffect(() => {
-        console.log('[AppUsageDashboard] Auth state:', { user, isAuthenticated });
-
         if (!isAuthenticated || !user) {
-            console.error('[AppUsageDashboard] User not authenticated');
             setError('Please login to view app usage data');
             setLoading(false);
             return;
@@ -54,15 +50,8 @@ export default function AppUsageDashboard() {
 
     const fetchAvailableUsers = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const headers = { Authorization: `Bearer ${token}` };
-
-            console.log('[AppUsageDashboard] Fetching available users for role:', user.role);
-
-            const response = await axios.get(`${API_URL}/users`, { headers });
+            const response = await api.get('/users');
             const users = response.data;
-
-            console.log('[AppUsageDashboard] Available users:', users);
 
             setAvailableUsers(users);
 
@@ -75,7 +64,6 @@ export default function AppUsageDashboard() {
                 setLoading(false);
             }
         } catch (error) {
-            console.error('[AppUsageDashboard] Error fetching users:', error);
             setError('Failed to load users list');
             setLoading(false);
         }
@@ -86,51 +74,22 @@ export default function AppUsageDashboard() {
         setError(null);
 
         try {
-            const token = localStorage.getItem('token');
-            const headers = { Authorization: `Bearer ${token}` };
-
-            console.log('[AppUsageDashboard] Fetching data for user:', userId);
-            console.log('[AppUsageDashboard] Date range:', dateRange);
-            console.log('[AppUsageDashboard] API URL:', API_URL);
-
             const [dashboardRes, productivityRes] = await Promise.all([
-                axios.get(
-                    `${API_URL}/app-tracking/reports/user/${userId}?start_date=${dateRange.start_date}&end_date=${dateRange.end_date}`,
-                    { headers }
-                ),
-                axios.get(
-                    `${API_URL}/app-tracking/reports/productivity/${userId}?start_date=${dateRange.start_date}&end_date=${dateRange.end_date}`,
-                    { headers }
-                )
+                api.get(`/app-tracking/reports/user/${userId}?start_date=${dateRange.start_date}&end_date=${dateRange.end_date}`),
+                api.get(`/app-tracking/reports/productivity/${userId}?start_date=${dateRange.start_date}&end_date=${dateRange.end_date}`)
             ]);
-
-            console.log('[AppUsageDashboard] Dashboard response:', dashboardRes.data);
-            console.log('[AppUsageDashboard] Productivity response:', productivityRes.data);
 
             setDashboardData(dashboardRes.data);
             setProductivityData(productivityRes.data);
         } catch (error) {
-            console.error('[AppUsageDashboard] Error details:', {
-                message: error.message,
-                response: error.response?.data,
-                status: error.response?.status,
-                url: error.config?.url
-            });
-
             let errorMessage = 'Failed to load dashboard data';
-            if (error.response?.status === 401) {
-                errorMessage = 'Authentication failed. Please login again.';
-            } else if (error.response?.status === 403) {
+            if (error.response?.status === 403) {
                 errorMessage = 'You do not have permission to view this data.';
-            } else if (error.response?.status === 404) {
-                errorMessage = 'API endpoint not found. Please check server is running.';
-            } else if (error.code === 'ERR_NETWORK') {
-                errorMessage = 'Cannot connect to server. Please check if server is running on ' + API_URL;
             } else if (error.response?.data?.error) {
                 errorMessage = error.response.data.error;
             }
 
-            alert(errorMessage + '\n\nCheck browser console (F12) for details.');
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }

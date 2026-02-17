@@ -72,7 +72,7 @@ export const logAppUsage = async (req, res) => {
         res.json({ message: 'App usage logged successfully', count: logs.length });
     } catch (error) {
         console.error('logAppUsage error:', error);
-        res.status(500).json({ error: 'Failed to log app usage: ' + error.message });
+        res.status(500).json({ error: 'Failed to log app usage' });
     }
 };
 
@@ -117,6 +117,6 @@ export const getUserAppUsage = async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         console.error('getUserAppUsage error:', error);
-        res.status(500).json({ error: 'Failed to fetch app usage: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch app usage' });
     }
 };

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
+import { toast } from 'sonner';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function AppCategories() {
     const [categories, setCategories] = useState([]);
@@ -21,14 +20,11 @@ export default function AppCategories() {
 
     const fetchCategories = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get(`${API_URL}/app-tracking/categories`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get('/app-tracking/categories');
             setCategories(response.data);
         } catch (error) {
             console.error('Failed to fetch categories:', error);
-            alert('Failed to load categories');
+            toast.error('Failed to load categories');
         } finally {
             setLoading(false);
         }
@@ -37,31 +33,27 @@ export default function AppCategories() {
     const handleCreate = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
-            await axios.post(`${API_URL}/app-tracking/categories`, formData, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.post('/app-tracking/categories', formData);
             setFormData({ name: '', productivity_type: 'neutral', description: '' });
             setShowCreateForm(false);
+            toast.success('Category created successfully');
             fetchCategories();
         } catch (error) {
             console.error('Failed to create category:', error);
-            alert(error.response?.data?.error || 'Failed to create category');
+            toast.error(error.response?.data?.error || 'Failed to create category');
         }
     };
 
     const handleUpdate = async (id) => {
         try {
-            const token = localStorage.getItem('token');
             const category = categories.find(c => c.id === id);
-            await axios.patch(`${API_URL}/app-tracking/categories/${id}`, category, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.patch(`/app-tracking/categories/${id}`, category);
             setEditingId(null);
+            toast.success('Category updated successfully');
             fetchCategories();
         } catch (error) {
             console.error('Failed to update category:', error);
-            alert('Failed to update category');
+            toast.error('Failed to update category');
         }
     };
 
@@ -69,14 +61,12 @@ export default function AppCategories() {
         if (!confirm('Are you sure you want to delete this category?')) return;
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.delete(`${API_URL}/app-tracking/categories/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.delete(`/app-tracking/categories/${id}`);
+            toast.success('Category deleted');
             fetchCategories();
         } catch (error) {
             console.error('Failed to delete category:', error);
-            alert(error.response?.data?.error || 'Failed to delete category');
+            toast.error(error.response?.data?.error || 'Failed to delete category');
         }
     };
 

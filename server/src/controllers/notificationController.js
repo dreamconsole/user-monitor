@@ -23,9 +23,14 @@ export const getNotifications = async (req, res) => {
 
         const result = await query(sql, params);
 
-        // efficient count
-        const countSql = `SELECT COUNT(*) as total FROM notifications WHERE recipient_id = $1 ${is_read !== undefined ? `AND is_read = ${is_read === 'true'}` : ''}`;
-        const countRes = await query(countSql, [userId]);
+        // efficient count (parameterized to avoid SQL injection)
+        let countSql = 'SELECT COUNT(*) as total FROM notifications WHERE recipient_id = $1';
+        const countParams = [userId];
+        if (is_read !== undefined) {
+            countSql += ' AND is_read = $2';
+            countParams.push(is_read === 'true');
+        }
+        const countRes = await query(countSql, countParams);
 
         res.status(200).json({
             success: true,

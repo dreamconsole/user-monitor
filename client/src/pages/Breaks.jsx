@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -45,7 +46,7 @@ export default function Breaks() {
             await api.delete(`/breaks/${id}`);
             setBreaks(breaks.filter(b => b.id !== id));
         } catch (error) {
-            alert('Failed to delete break type');
+            toast.error('Failed to delete break type');
         }
     };
 
@@ -62,13 +63,33 @@ export default function Breaks() {
             setSheetOpen(false);
         } catch (error) {
             console.error(error);
-            alert(error.response?.data?.error || 'Operation failed');
+            toast.error(error.response?.data?.error || 'Operation failed');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    if (loading) return <div className="p-8">Loading breaks...</div>;
+    if (loading) {
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="h-8 w-48 bg-muted animate-pulse rounded mb-2" />
+                        <div className="h-4 w-72 bg-muted animate-pulse rounded" />
+                    </div>
+                </div>
+                <div className="border rounded-lg bg-card shadow-sm p-4 space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="flex gap-4 py-3">
+                            <div className="h-4 flex-1 bg-muted animate-pulse rounded" />
+                            <div className="h-4 flex-[0.5] bg-muted animate-pulse rounded" />
+                            <div className="h-4 flex-[0.5] bg-muted animate-pulse rounded" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

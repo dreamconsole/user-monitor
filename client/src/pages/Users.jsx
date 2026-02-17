@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '@/lib/api';
+import { toast } from 'sonner';
 import useAuthStore from '@/lib/useAuthStore';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, LogOut, Filter, X } from 'lucide-react';
+import { Plus, Edit, Trash2, LogOut, Filter, X, Users as UsersIcon } from 'lucide-react';
 import UserForm from '@/components/users/UserForm';
 import UserActivityDetail from '@/components/users/UserActivityDetail';
 import { utcToLocal } from '@/lib/dateUtils';
@@ -91,7 +92,7 @@ export default function Users() {
             await api.delete(`/users/${id}`);
             setUsers(users.filter(u => u.id !== id));
         } catch (error) {
-            alert('Failed to delete user');
+            toast.error('Failed to delete user');
         }
     };
 
@@ -100,9 +101,9 @@ export default function Users() {
         if (!window.confirm('Force logout this user? They will be signed out on their next agent heartbeat.')) return;
         try {
             await api.post(`/users/${id}/force-logout`);
-            alert('Force logout command sent');
+            toast.success('Force logout command sent');
         } catch (error) {
-            alert('Failed to send force logout command');
+            toast.error('Failed to send force logout command');
         }
     };
 
@@ -120,7 +121,7 @@ export default function Users() {
             setSheetOpen(false);
         } catch (error) {
             console.error(error);
-            alert(error.response?.data?.error || 'Operation failed');
+            toast.error(error.response?.data?.error || 'Operation failed');
         } finally {
             setIsSubmitting(false);
         }
@@ -138,7 +139,28 @@ export default function Users() {
         return diff < 2 * 60 * 1000 ? 'online' : 'offline';
     };
 
-    if (loading) return <div className="p-8">Loading users...</div>;
+    if (loading) {
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="h-8 w-48 bg-muted animate-pulse rounded mb-2" />
+                        <div className="h-4 w-64 bg-muted animate-pulse rounded" />
+                    </div>
+                </div>
+                <div className="border rounded-lg bg-card shadow-sm p-4 space-y-3">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="flex gap-4 py-3">
+                            <div className="h-4 flex-1 bg-muted animate-pulse rounded" />
+                            <div className="h-4 flex-1 bg-muted animate-pulse rounded" />
+                            <div className="h-4 flex-[0.5] bg-muted animate-pulse rounded" />
+                            <div className="h-4 flex-[0.5] bg-muted animate-pulse rounded" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -176,6 +198,16 @@ export default function Users() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
+                        {filteredUsers.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <UsersIcon className="w-8 h-8 opacity-40" />
+                                        <span>No users found</span>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
                         {filteredUsers.map((user) => {
                             const status = getUserStatus(user);
                             const statusColor = {

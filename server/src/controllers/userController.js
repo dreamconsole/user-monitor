@@ -3,8 +3,9 @@ import { query } from '../db.js';
 
 export const getUsers = async (req, res) => {
     try {
-        // full_name as name, is_active as status
-        // Check for active break: exists in break_logs with end_time IS NULL
+        const { page = 1, limit = 50, search } = req.query;
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
         let sql = `
             SELECT 
                 u.id, u.full_name as name, u.email, u.role, u.is_active, 
@@ -17,16 +18,32 @@ export const getUsers = async (req, res) => {
             WHERE u.org_id = $1
         `;
         const params = [req.user.org_id];
+        let paramCount = 1;
 
         if (req.user.role === 'manager') {
-            sql += ' AND u.manager_id = $2';
+            paramCount++;
+            sql += ` AND u.manager_id = $${paramCount}`;
             params.push(req.user.id);
         }
 
+        if (search) {
+            paramCount++;
+            sql += ` AND (u.full_name ILIKE $${paramCount} OR u.email ILIKE $${paramCount})`;
+            params.push(`%${search}%`);
+        }
+
+        // Exclude soft-deleted users
+        sql += ' AND (u.deleted_at IS NULL)';
+
         sql += ' ORDER BY u.created_at DESC';
+        paramCount++;
+        sql += ` LIMIT $${paramCount}`;
+        params.push(parseInt(limit));
+        paramCount++;
+        sql += ` OFFSET $${paramCount}`;
+        params.push(offset);
 
         const result = await query(sql, params);
-        // Map is_active to status for frontend
         const users = result.rows.map(u => ({
             ...u,
             status: u.is_active ? 'active' : 'suspended'
@@ -34,7 +51,7 @@ export const getUsers = async (req, res) => {
         res.json(users);
     } catch (error) {
         console.error('getUsers error:', error);
-        res.status(500).json({ error: 'Failed to fetch users: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch users' });
     }
 };
 
@@ -85,7 +102,7 @@ export const createUser = async (req, res) => {
         if (error.code === '23505') {
             return res.status(400).json({ error: 'Email already exists' });
         }
-        res.status(500).json({ error: 'Failed to create user: ' + error.message });
+        res.status(500).json({ error: 'Failed to create user' });
     }
 };
 
@@ -160,7 +177,7 @@ export const updateUser = async (req, res) => {
         res.json(updatedUser);
     } catch (error) {
         console.error('updateUser error:', error);
-        res.status(500).json({ error: 'Failed to update user: ' + error.message });
+        res.status(500).json({ error: 'Failed to update user' });
     }
 };
 
@@ -168,10 +185,20 @@ export const deleteUser = async (req, res) => {
     const { id } = req.params;
 
     try {
-        const result = await query(
-            'DELETE FROM users WHERE id = $1 AND org_id = $2 RETURNING id',
-            [id, req.user.org_id]
-        );
+        // Try soft delete first, fall back to hard delete if column doesn't exist
+        let result;
+        try {
+            result = await query(
+                'UPDATE users SET deleted_at = CURRENT_TIMESTAMP, is_active = false WHERE id = $1 AND org_id = $2 RETURNING id',
+                [id, req.user.org_id]
+            );
+        } catch (softDeleteErr) {
+            // deleted_at column may not exist yet — fall back to hard delete
+            result = await query(
+                'DELETE FROM users WHERE id = $1 AND org_id = $2 RETURNING id',
+                [id, req.user.org_id]
+            );
+        }
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
@@ -179,7 +206,7 @@ export const deleteUser = async (req, res) => {
         res.json({ message: 'User deleted' });
     } catch (error) {
         console.error('deleteUser error:', error);
-        res.status(500).json({ error: 'Failed to delete user: ' + error.message });
+        res.status(500).json({ error: 'Failed to delete user' });
     }
 };
 
@@ -198,6 +225,6 @@ export const forceLogoutUser = async (req, res) => {
         res.json({ message: 'User will be forced to logout on next heartbeat' });
     } catch (error) {
         console.error('forceLogoutUser error:', error);
-        res.status(500).json({ error: 'Failed to force logout user: ' + error.message });
+        res.status(500).json({ error: 'Failed to force logout user' });
     }
 };

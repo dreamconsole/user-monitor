@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -52,7 +53,7 @@ export default function Settings() {
             });
         } catch (error) {
             console.error('Failed to fetch settings:', error);
-            alert('Failed to load settings');
+            toast.error('Failed to load settings');
         } finally {
             setLoading(false);
         }
@@ -123,16 +124,38 @@ export default function Settings() {
                 work_days: JSON.stringify(settings.work_days),
                 start_of_day: settings.start_of_day
             });
-            alert('Settings saved successfully!');
+            toast.success('Settings saved successfully!');
         } catch (error) {
             console.error('Failed to save settings:', error);
-            alert('Failed to save settings');
+            toast.error('Failed to save settings');
         } finally {
             setSaving(false);
         }
     };
 
-    if (loading) return <div className="p-8">Loading settings...</div>;
+    if (loading) {
+        return (
+            <div className="space-y-6 p-6">
+                <div>
+                    <div className="h-8 w-64 bg-muted animate-pulse rounded mb-2" />
+                    <div className="h-4 w-96 bg-muted animate-pulse rounded" />
+                </div>
+                {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="bg-card border rounded-lg p-6 space-y-4">
+                        <div className="h-5 w-40 bg-muted animate-pulse rounded" />
+                        <div className="space-y-3">
+                            {Array.from({ length: 4 }).map((_, j) => (
+                                <div key={j} className="flex justify-between items-center">
+                                    <div className="h-4 w-48 bg-muted animate-pulse rounded" />
+                                    <div className="h-6 w-12 bg-muted animate-pulse rounded-full" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 h-[85vh] overflow-y-auto pr-4 pb-12">

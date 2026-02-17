@@ -78,6 +78,17 @@ export const deleteBreak = async (req, res) => {
     const { id } = req.params;
 
     try {
+        // Check if break type is referenced in break_logs
+        const inUse = await query(
+            'SELECT COUNT(*) as count FROM break_logs WHERE break_type_id = $1',
+            [id]
+        );
+        if (parseInt(inUse.rows[0].count) > 0) {
+            return res.status(400).json({
+                error: 'Cannot delete break type that has been used in logs. Deactivate it instead by setting is_active to false.'
+            });
+        }
+
         const result = await query(
             'DELETE FROM break_master WHERE id = $1 AND org_id = $2 RETURNING id',
             [id, req.user.org_id]
@@ -89,6 +100,9 @@ export const deleteBreak = async (req, res) => {
         res.json({ message: 'Break type deleted' });
     } catch (error) {
         console.error('deleteBreak error:', error);
+        if (error.code === '23503') {
+            return res.status(400).json({ error: 'Cannot delete break type that is still in use.' });
+        }
         res.status(500).json({ error: 'Failed to delete break type' });
     }
 };

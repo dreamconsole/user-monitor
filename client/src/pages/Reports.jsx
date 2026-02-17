@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
+import { toast } from 'sonner';
 import useAuthStore from '@/lib/useAuthStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -116,6 +117,41 @@ export default function Reports() {
                                         ['User Name', 'Captured At', 'File Path']
                         }
                     />
+                    {['summary', 'breaks', 'screenshots'].includes(activeTab) && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                                try {
+                                    const reportTypeMap = { summary: 'daily-summary', breaks: 'break-usage', screenshots: 'screenshots' };
+                                    const params = new URLSearchParams({
+                                        startDate: filters.startDate,
+                                        endDate: filters.endDate,
+                                    });
+                                    if (filters.userId !== 'all') params.set('userId', filters.userId);
+                                    const response = await api.get(`/exports/pdf/${reportTypeMap[activeTab]}?${params}`, {
+                                        responseType: 'blob'
+                                    });
+                                    const blob = new Blob([response.data], { type: 'application/pdf' });
+                                    const url = URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = `report_${activeTab}_${filters.startDate}.pdf`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    URL.revokeObjectURL(url);
+                                    toast.success('PDF downloaded');
+                                } catch {
+                                    toast.error('Failed to generate PDF');
+                                }
+                            }}
+                            disabled={!data || data.length === 0}
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export PDF
+                        </Button>
+                    )}
                 </div>
             </div>
 

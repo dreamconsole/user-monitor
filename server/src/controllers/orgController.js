@@ -30,7 +30,7 @@ export const getOrgSettings = async (req, res) => {
         res.json(settings);
     } catch (error) {
         console.error('getOrgSettings error:', error);
-        res.status(500).json({ error: 'Failed to fetch settings: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch settings' });
     }
 };
 
@@ -137,6 +137,6 @@ export const updateOrgSettings = async (req, res) => {
 
     } catch (error) {
         console.error('updateOrgSettings error:', error);
-        res.status(500).json({ error: 'Failed to update settings: ' + error.message });
+        res.status(500).json({ error: 'Failed to update settings' });
     }
 };

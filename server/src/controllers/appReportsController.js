@@ -31,7 +31,7 @@ export const getAdminDashboard = async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         console.error('getAdminDashboard error:', error);
-        res.status(500).json({ error: 'Failed to fetch admin dashboard: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch admin dashboard' });
     }
 };
 
@@ -68,7 +68,7 @@ export const getManagerDashboard = async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         console.error('getManagerDashboard error:', error);
-        res.status(500).json({ error: 'Failed to fetch manager dashboard: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch manager dashboard' });
     }
 };
 
@@ -130,7 +130,7 @@ export const getUserDashboard = async (req, res) => {
         });
     } catch (error) {
         console.error('getUserDashboard error:', error);
-        res.status(500).json({ error: 'Failed to fetch user dashboard: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch user dashboard' });
     }
 };
 
@@ -175,6 +175,6 @@ export const getProductivitySummary = async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         console.error('getProductivitySummary error:', error);
-        res.status(500).json({ error: 'Failed to fetch productivity summary: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch productivity summary' });
     }
 };

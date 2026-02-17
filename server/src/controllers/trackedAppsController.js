@@ -25,7 +25,7 @@ export const getTrackedApps = async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         console.error('getTrackedApps error:', error);
-        res.status(500).json({ error: 'Failed to fetch tracked apps: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch tracked apps' });
     }
 };
 
@@ -65,7 +65,7 @@ export const mapAppToCategory = async (req, res) => {
         res.json(result.rows[0]);
     } catch (error) {
         console.error('mapAppToCategory error:', error);
-        res.status(500).json({ error: 'Failed to map app to category: ' + error.message });
+        res.status(500).json({ error: 'Failed to map app to category' });
     }
 };
 
@@ -92,7 +92,7 @@ export const createTrackedApp = async (req, res) => {
             return res.status(409).json({ error: 'App with this executable name already exists' });
         }
         console.error('createTrackedApp error:', error);
-        res.status(500).json({ error: 'Failed to create tracked app: ' + error.message });
+        res.status(500).json({ error: 'Failed to create tracked app' });
     }
 };
 
@@ -120,7 +120,7 @@ export const updateTrackedApp = async (req, res) => {
         res.json(result.rows[0]);
     } catch (error) {
         console.error('updateTrackedApp error:', error);
-        res.status(500).json({ error: 'Failed to update tracked app: ' + error.message });
+        res.status(500).json({ error: 'Failed to update tracked app' });
     }
 };
 
@@ -142,6 +142,6 @@ export const deleteTrackedApp = async (req, res) => {
         res.json({ message: 'App deleted successfully' });
     } catch (error) {
         console.error('deleteTrackedApp error:', error);
-        res.status(500).json({ error: 'Failed to delete tracked app: ' + error.message });
+        res.status(500).json({ error: 'Failed to delete tracked app' });
     }
 };

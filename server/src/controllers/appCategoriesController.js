@@ -16,7 +16,7 @@ export const getAppCategories = async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         console.error('getAppCategories error:', error);
-        res.status(500).json({ error: 'Failed to fetch app categories: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch app categories' });
     }
 };
 
@@ -47,7 +47,7 @@ export const createAppCategory = async (req, res) => {
             return res.status(409).json({ error: 'Category with this name already exists' });
         }
         console.error('createAppCategory error:', error);
-        res.status(500).json({ error: 'Failed to create app category: ' + error.message });
+        res.status(500).json({ error: 'Failed to create app category' });
     }
 };
 
@@ -84,7 +84,7 @@ export const updateAppCategory = async (req, res) => {
             return res.status(409).json({ error: 'Category with this name already exists' });
         }
         console.error('updateAppCategory error:', error);
-        res.status(500).json({ error: 'Failed to update app category: ' + error.message });
+        res.status(500).json({ error: 'Failed to update app category' });
     }
 };
 
@@ -118,6 +118,6 @@ export const deleteAppCategory = async (req, res) => {
         res.json({ message: 'Category deleted successfully' });
     } catch (error) {
         console.error('deleteAppCategory error:', error);
-        res.status(500).json({ error: 'Failed to delete app category: ' + error.message });
+        res.status(500).json({ error: 'Failed to delete app category' });
     }
 };

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
+import { toast } from 'sonner';
 import { Search, Filter, MapPin } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function AppMapping() {
     const [apps, setApps] = useState([]);
@@ -17,24 +16,20 @@ export default function AppMapping() {
 
     const fetchData = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const headers = { Authorization: `Bearer ${token}` };
-
-            // Fetch apps
             const appsUrl = filter === 'unmapped'
-                ? `${API_URL}/app-tracking/apps?unmapped=true`
-                : `${API_URL}/app-tracking/apps`;
+                ? '/app-tracking/apps?unmapped=true'
+                : '/app-tracking/apps';
 
             const [appsRes, categoriesRes] = await Promise.all([
-                axios.get(appsUrl, { headers }),
-                axios.get(`${API_URL}/app-tracking/categories`, { headers })
+                api.get(appsUrl),
+                api.get('/app-tracking/categories')
             ]);
 
             setApps(appsRes.data);
             setCategories(categoriesRes.data);
         } catch (error) {
             console.error('Failed to fetch data:', error);
-            alert('Failed to load data');
+            toast.error('Failed to load data');
         } finally {
             setLoading(false);
         }
@@ -42,16 +37,12 @@ export default function AppMapping() {
 
     const handleMapApp = async (appId, categoryId) => {
         try {
-            const token = localStorage.getItem('token');
-            await axios.patch(
-                `${API_URL}/app-tracking/apps/${appId}/map`,
-                { category_id: categoryId },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            await api.patch(`/app-tracking/apps/${appId}/map`, { category_id: categoryId });
+            toast.success('App mapped successfully');
             fetchData();
         } catch (error) {
             console.error('Failed to map app:', error);
-            alert('Failed to map app to category');
+            toast.error('Failed to map app to category');
         }
     };
 

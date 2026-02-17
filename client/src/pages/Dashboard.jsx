@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 import useAuthStore from '@/lib/useAuthStore';
+import useWebSocket from '@/lib/useWebSocket';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -356,24 +357,37 @@ export default function Dashboard() {
     const { user } = useAuthStore();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [lastUpdate, setLastUpdate] = useState(null);
+
+    const fetchStats = useCallback(async () => {
+        try {
+            let endpoint = '/stats/user';
+            if (user.role === 'orgadmin') endpoint = '/stats/admin';
+            else if (user.role === 'manager') endpoint = '/stats/manager';
+
+            const { data } = await api.get(endpoint);
+            setStats(data);
+            setLastUpdate(new Date());
+        } catch (error) {
+            console.error('Failed to fetch stats:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
+
+    // WebSocket for real-time updates
+    const handleWsMessage = useCallback((data) => {
+        if (data.type === 'USER_HEARTBEAT' || data.type === 'ACTIVITY_UPDATE') {
+            // Refresh dashboard when we get real-time events
+            fetchStats();
+        }
+    }, [fetchStats]);
+
+    const { connected } = useWebSocket(handleWsMessage);
 
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                let endpoint = '/stats/user';
-                if (user.role === 'orgadmin') endpoint = '/stats/admin';
-                else if (user.role === 'manager') endpoint = '/stats/manager';
-
-                const { data } = await api.get(endpoint);
-                setStats(data);
-            } catch (error) {
-                console.error('Failed to fetch stats:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
         if (user) fetchStats();
-    }, [user]);
+    }, [user, fetchStats]);
 
     if (loading) return (
         <div className="flex items-center justify-center h-[50vh]">
@@ -388,9 +402,15 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.name}</h1>
-                <p className="text-muted-foreground">Here's what's happening in {user.org_name || 'your organization'} today.</p>
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.name}</h1>
+                    <p className="text-muted-foreground">Here's what's happening in {user.org_name || 'your organization'} today.</p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+                    {connected ? 'Live' : 'Offline'}
+                </div>
             </div>
 
             {user.role === 'orgadmin' && <AdminDashboard stats={stats} />}

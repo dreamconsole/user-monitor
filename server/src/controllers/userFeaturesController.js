@@ -35,7 +35,7 @@ export const getUserFeatures = async (req, res) => {
         });
     } catch (error) {
         console.error('getUserFeatures error:', error);
-        res.status(500).json({ error: 'Failed to fetch user features: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch user features' });
     }
 };
 
@@ -94,6 +94,6 @@ export const updateUserFeatures = async (req, res) => {
         res.json(result.rows[0]);
     } catch (error) {
         console.error('updateUserFeatures error:', error);
-        res.status(500).json({ error: 'Failed to update user features: ' + error.message });
+        res.status(500).json({ error: 'Failed to update user features' });
     }
 };
