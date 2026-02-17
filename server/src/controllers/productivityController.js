@@ -241,7 +241,7 @@ export const getTeamProductivity = async (req, res) => {
         if (role === 'manager') {
             usersResult = await query(
                 `SELECT id, full_name FROM users
-                 WHERE org_id = $1 AND (manager_id = $2 OR id = $2) AND is_active = true`,
+                 WHERE org_id = $1 AND manager_id = $2 AND is_active = true`,
                 [orgId, req.user.id]
             );
         } else {

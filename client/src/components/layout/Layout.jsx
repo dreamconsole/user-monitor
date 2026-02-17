@@ -21,11 +21,10 @@ import {
     Settings,
     Coffee,
     FileText,
-    FolderTree,
-    Link2,
-    BarChart3,
+    Layers,
+    FileInput,
+    Activity,
     CalendarDays,
-    GitCompareArrows
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -36,15 +35,15 @@ const Sidebar = ({ className, onLinkClick }) => {
 
     const links = [
         { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['orgadmin', 'manager', 'user'] },
-        { href: '/timeline', label: 'Timeline', icon: CalendarDays, roles: ['orgadmin', 'manager', 'user'] },
         { href: '/users', label: 'Users', icon: Users, roles: ['orgadmin', 'manager'] },
-        { href: '/team-comparison', label: 'Team Comparison', icon: GitCompareArrows, roles: ['orgadmin', 'manager'] },
-        { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
-        { href: '/app-usage', label: 'App Usage', icon: BarChart3, roles: ['orgadmin', 'manager', 'user'] },
-        { href: '/app-categories', label: 'App Categories', icon: FolderTree, roles: ['orgadmin'] },
-        { href: '/app-mapping', label: 'App Mapping', icon: Link2, roles: ['orgadmin'] },
+        { href: '/team-comparison', label: 'Team Comparison', icon: Users, roles: ['orgadmin', 'manager'] },
+        // Timeline removed as requested
+        // { href: '/timeline', label: 'Timeline', icon: CalendarDays, roles: ['orgadmin', 'manager', 'user'] },
+        { href: '/app-management', label: 'App Management', icon: Activity, roles: ['orgadmin', 'manager', 'user'] },
         { href: '/settings', label: 'Organization Settings', icon: Settings, roles: ['orgadmin'] },
         { href: '/breaks', label: 'Break Management', icon: Coffee, roles: ['orgadmin'] },
+        // App Categories & Mapping moved to App Management
+        { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
     ];
 
     const filteredLinks = links.filter(link => link.roles.includes(user?.role));

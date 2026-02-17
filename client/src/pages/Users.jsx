@@ -298,7 +298,7 @@ export default function Users() {
 
             {/* Detail Drawer - 80% Width */}
             <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
-                <SheetContent className="sm:max-w-[80vw] w-full p-0 sm:p-0">
+                <SheetContent className="sm:max-w-[80vw] w-full p-0 sm:p-0" hideClose={true}>
                     <SheetHeader className="sr-only">
                         <SheetTitle>User Activity Details</SheetTitle>
                         <SheetDescription>View hourly activity and logs</SheetDescription>

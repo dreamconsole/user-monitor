@@ -30,8 +30,8 @@ app.use(express.json({ limit: '10mb' }));
 
 // Rate limiting - general
 const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 min
-    max: 500,
+    windowMs: 30 * 60 * 1000, // 30 min
+    max: 1000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' }
@@ -40,8 +40,8 @@ app.use(generalLimiter);
 
 // Rate limiting - strict for auth endpoints
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 min
-    max: 20,
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 100,
     message: { error: 'Too many authentication attempts, please try again later.' }
 });
 
@@ -78,7 +78,7 @@ app.get('/health', async (req, res) => {
 // Error handling - do NOT expose internal error details to clients
 app.use((err, req, res, next) => {
     const errorLog = `[${new Date().toISOString()}] ${req.method} ${req.url}\n${err.stack}\n\n`;
-    fs.promises.appendFile('server-errors.log', errorLog).catch(() => {});
+    fs.promises.appendFile('server-errors.log', errorLog).catch(() => { });
     console.error(err.stack);
     res.status(500).json({ error: 'Something went wrong!' });
 });

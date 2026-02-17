@@ -15,9 +15,7 @@ import Users from '@/pages/Users';
 import Settings from '@/pages/Settings';
 import Breaks from '@/pages/Breaks';
 import Reports from '@/pages/Reports';
-import AppCategories from '@/pages/AppCategories';
-import AppMapping from '@/pages/AppMapping';
-import AppUsageDashboard from '@/pages/AppUsageDashboard';
+import AppManagement from '@/pages/AppManagement';
 import Timeline from '@/pages/Timeline';
 import Profile from '@/pages/Profile';
 import TeamComparison from '@/pages/TeamComparison';
@@ -61,26 +59,30 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
 
-            {/* Admin & Manager Only */}
-            <Route element={<RoleGuard allowedRoles={['orgadmin', 'manager']} />}>
-              <Route path="/users" element={<Users />} />
-              <Route path="/team-comparison" element={<TeamComparison />} />
-            </Route>
+              {/* Admin & Manager Only */}
+              <Route element={<RoleGuard allowedRoles={['orgadmin', 'manager']} />}>
+                <Route path="/users" element={<Users />} />
+                <Route path="/team-comparison" element={<TeamComparison />} />
+              </Route>
 
               <Route path="/reports" element={<Reports />} />
+
+              {/* App Management (Consolidated) */}
+              <Route path="/app-management" element={<AppManagement />} />
+
+              {/* Legacy Redirects or Keep accessible if needed, but sidebar will link to /app-management */}
+              <Route path="/app-usage" element={<Navigate to="/app-management" replace />} />
 
               {/* Admin Only */}
               <Route element={<RoleGuard allowedRoles={['orgadmin']} />}>
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/breaks" element={<Breaks />} />
-                <Route path="/app-categories" element={<AppCategories />} />
-                <Route path="/app-mapping" element={<AppMapping />} />
+                {/* App Cat/Map are now in AppManagement, accessible by admin */}
               </Route>
 
-            {/* All authenticated users */}
-            <Route path="/app-usage" element={<AppUsageDashboard />} />
-            <Route path="/timeline" element={<Timeline />} />
-            <Route path="/profile" element={<Profile />} />
+              {/* All authenticated users */}
+              <Route path="/timeline" element={<Timeline />} />
+              <Route path="/profile" element={<Profile />} />
 
             </Route>
           </Route>
