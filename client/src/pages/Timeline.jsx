@@ -3,16 +3,10 @@ import api from '@/lib/api';
 import useAuthStore from '@/lib/useAuthStore';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
     Dialog,
     DialogContent,
 } from '@/components/ui/dialog';
+import UserSearchSelect from '@/components/UserSearchSelect';
 import { CalendarDays } from 'lucide-react';
 import CalendarView from '@/components/timeline/CalendarView';
 import DailyTimeline from '@/components/timeline/DailyTimeline';
@@ -115,18 +109,13 @@ export default function Timeline() {
                 </div>
                 <div className="flex items-center gap-3">
                     {showPicker && (
-                        <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                            <SelectTrigger className="w-[220px]">
-                                <SelectValue placeholder="Select user" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {users.map(u => (
-                                    <SelectItem key={u.id} value={u.id}>
-                                        {u.name} {u.role === 'manager' ? '(Mgr)' : u.role === 'orgadmin' ? '(Admin)' : ''}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <UserSearchSelect
+                            users={users}
+                            value={selectedUserId}
+                            onChange={setSelectedUserId}
+                            placeholder="Select user..."
+                            className="w-[250px]"
+                        />
                     )}
                 </div>
             </div>

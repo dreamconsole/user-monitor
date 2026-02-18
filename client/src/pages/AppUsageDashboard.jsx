@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Calendar, TrendingUp, Clock, PieChart as PieChartIcon, Users as UsersIcon } from 'lucide-react';
+import UserSearchSelect from '@/components/UserSearchSelect';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import useAuthStore from '@/lib/useAuthStore';
 
@@ -169,18 +170,14 @@ export default function AppUsageDashboard() {
                     {/* User Selector for Manager/Admin */}
                     {(user.role === 'orgadmin' || user.role === 'manager') && availableUsers.length > 0 && (
                         <div className="flex items-center gap-2">
-                            <UsersIcon size={20} className="text-gray-400" />
-                            <select
-                                value={selectedUserId || ''}
-                                onChange={(e) => setSelectedUserId(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
-                            >
-                                {availableUsers.map(u => (
-                                    <option key={u.id} value={u.id}>
-                                        {u.name} ({u.email})
-                                    </option>
-                                ))}
-                            </select>
+                            <UsersIcon size={20} className="text-muted-foreground" />
+                            <UserSearchSelect
+                                users={availableUsers}
+                                value={selectedUserId}
+                                onChange={setSelectedUserId}
+                                placeholder="Select user..."
+                                className="w-[250px]"
+                            />
                         </div>
                     )}
 

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import UserSearchSelect from '@/components/UserSearchSelect';
 import { Download, Search, Filter, FileText, Coffee, Monitor, Image as ImageIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { utcToLocal } from '@/lib/dateUtils';
@@ -180,20 +181,14 @@ export default function Reports() {
                         {user.role !== 'user' && (
                             <div className="space-y-2">
                                 <Label className="text-xs uppercase font-bold text-muted-foreground">Team Member</Label>
-                                <Select
+                                <UserSearchSelect
+                                    users={users}
                                     value={filters.userId}
-                                    onValueChange={(v) => setFilters(f => ({ ...f, userId: v }))}
-                                >
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="All Users" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Users</SelectItem>
-                                        {users.map(u => (
-                                            <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                    onChange={(v) => setFilters(f => ({ ...f, userId: v }))}
+                                    placeholder="All Users"
+                                    showAllOption
+                                    allOptionLabel="All Users"
+                                />
                             </div>
                         )}
                         <Button variant="secondary" className="h-9" onClick={fetchReport}>

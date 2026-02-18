@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, LogOut, Filter, X, Users as UsersIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit, Trash2, LogOut, X, Users as UsersIcon, Search } from 'lucide-react';
 import UserForm from '@/components/users/UserForm';
 import UserActivityDetail from '@/components/users/UserActivityDetail';
 import { utcToLocal } from '@/lib/dateUtils';
@@ -28,8 +30,11 @@ export default function Users() {
     const [detailUser, setDetailUser] = useState(null);
     const [detailOpen, setDetailOpen] = useState(false);
 
-    // Filters
-    const filterStatus = searchParams.get('status'); // 'offline'
+    // Search & Filters
+    const [searchQuery, setSearchQuery] = useState('');
+    const [roleFilter, setRoleFilter] = useState('all');
+    const [accountFilter, setAccountFilter] = useState('all');
+    const filterStatus = searchParams.get('status'); // 'offline' or 'online' from URL
 
     const fetchUsers = async () => {
         try {
@@ -46,28 +51,51 @@ export default function Users() {
         fetchUsers();
     }, []);
 
-    // Apply Filter logic whenever users or query param changes
+    // Apply all filters whenever any filter or users change
     useEffect(() => {
-        if (!users.length) return;
+        if (!users.length) { setFilteredUsers([]); return; }
 
+        let result = [...users];
+
+        // Search by name or email
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            result = result.filter(u =>
+                u.name?.toLowerCase().includes(q) ||
+                u.email?.toLowerCase().includes(q) ||
+                u.emp_id?.toLowerCase().includes(q)
+            );
+        }
+
+        // Role filter
+        if (roleFilter !== 'all') {
+            result = result.filter(u => u.role === roleFilter);
+        }
+
+        // Account status filter (active/suspended)
+        if (accountFilter === 'active') {
+            result = result.filter(u => u.status === 'active');
+        } else if (accountFilter === 'suspended') {
+            result = result.filter(u => u.status === 'suspended');
+        }
+
+        // Online/Offline filter from URL params
         if (filterStatus === 'offline') {
             const now = Date.now();
-            setFilteredUsers(users.filter(u => {
+            result = result.filter(u => {
                 if (!u.last_heartbeat) return true;
-                const lastHeartbeat = new Date(u.last_heartbeat).getTime();
-                return (now - lastHeartbeat) > 2 * 60 * 1000; // Older than 2 mins
-            }));
+                return (now - new Date(u.last_heartbeat).getTime()) > 2 * 60 * 1000;
+            });
         } else if (filterStatus === 'online') {
             const now = Date.now();
-            setFilteredUsers(users.filter(u => {
+            result = result.filter(u => {
                 if (!u.last_heartbeat) return false;
-                const lastHeartbeat = new Date(u.last_heartbeat).getTime();
-                return (now - lastHeartbeat) < 2 * 60 * 1000; // Recent < 2 mins
-            }));
-        } else {
-            setFilteredUsers(users);
+                return (now - new Date(u.last_heartbeat).getTime()) < 2 * 60 * 1000;
+            });
         }
-    }, [users, filterStatus]);
+
+        setFilteredUsers(result);
+    }, [users, searchQuery, roleFilter, accountFilter, filterStatus]);
 
     const handleCreate = () => {
         setEditingUser(null);
@@ -169,20 +197,65 @@ export default function Users() {
                     <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
                     <p className="text-muted-foreground">Manage employees and view activity.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    {filterStatus && (
-                        <Badge variant="secondary" className="px-3 py-1 flex items-center gap-1">
-                            Filter: {filterStatus}
-                            <a href="/users" className="ml-1 hover:text-primary"><X className="w-3 h-3" /></a>
-                        </Badge>
-                    )}
-                    {isAdmin && (
-                        <Button onClick={handleCreate}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add New User
-                        </Button>
+                {isAdmin && (
+                    <Button onClick={handleCreate}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add New User
+                    </Button>
+                )}
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by name, email..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 h-9"
+                    />
+                    {searchQuery && (
+                        <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground">
+                            <X className="h-4 w-4" />
+                        </button>
                     )}
                 </div>
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger className="w-[140px] h-9">
+                        <SelectValue placeholder="All Roles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Roles</SelectItem>
+                        <SelectItem value="orgadmin">Admin</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="user">User</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Select value={accountFilter} onValueChange={setAccountFilter}>
+                    <SelectTrigger className="w-[150px] h-9">
+                        <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="suspended">Suspended</SelectItem>
+                    </SelectContent>
+                </Select>
+                {filterStatus && (
+                    <Badge variant="secondary" className="px-3 py-1.5 flex items-center gap-1">
+                        {filterStatus}
+                        <a href="/users" className="ml-1 hover:text-primary"><X className="w-3 h-3" /></a>
+                    </Badge>
+                )}
+                {(searchQuery || roleFilter !== 'all' || accountFilter !== 'all') && (
+                    <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setRoleFilter('all'); setAccountFilter('all'); }} className="h-9 gap-1 text-muted-foreground">
+                        <X className="h-3 w-3" /> Clear
+                    </Button>
+                )}
+                <span className="text-xs text-muted-foreground ml-auto">
+                    {filteredUsers.length} of {users.length} users
+                </span>
             </div>
 
             <div className="border rounded-lg bg-card shadow-sm">

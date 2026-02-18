@@ -16,6 +16,7 @@ import reportRoutes from './routes/reports.js';
 import exportRoutes from './routes/exports.js';
 import notificationRoutes from './routes/notifications.js';
 import appTrackingRoutes from './routes/appTracking.js';
+import auditRoutes from './routes/audit.js';
 
 dotenv.config();
 
@@ -59,6 +60,7 @@ app.use('/reports', reportRoutes);
 app.use('/exports', exportRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/app-tracking', appTrackingRoutes);
+app.use('/audit-logs', auditRoutes);
 
 app.get('/', (req, res) => {
     res.send({ message: 'User Monitor API' });

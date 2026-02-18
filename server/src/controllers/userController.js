@@ -210,6 +210,38 @@ export const deleteUser = async (req, res) => {
     }
 };
 
+export const resetUserPassword = async (req, res) => {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    try {
+        const userResult = await query(
+            'SELECT id, manager_id FROM users WHERE id = $1 AND org_id = $2',
+            [id, req.user.org_id]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (req.user.role === 'manager' && userResult.rows[0].manager_id !== req.user.id) {
+            return res.status(403).json({ error: 'You can only reset passwords for your direct reports' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPassword, id]);
+
+        res.json({ message: 'Password reset successfully' });
+    } catch (error) {
+        console.error('resetUserPassword error:', error);
+        res.status(500).json({ error: 'Failed to reset password' });
+    }
+};
+
 export const forceLogoutUser = async (req, res) => {
     const { id } = req.params;
 

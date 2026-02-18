@@ -12,6 +12,9 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getBrowserTimezone } from '@/lib/dateUtils';
+import { toast } from 'sonner';
+import { KeyRound } from 'lucide-react';
+import UserSearchSelect from '@/components/UserSearchSelect';
 
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -35,7 +38,7 @@ const updateSchema = z.object({
     role: z.enum(['orgadmin', 'manager', 'user']),
     status: z.enum(['active', 'suspended']),
     manager_id: z.string(),
-    timezone: z.string().min(1, "Timezone is required"),
+    timezone: z.string().optional(),
     emp_id: z.string().min(1, "Employee ID is required"),
     payroll_id: z.string().optional(),
     site: z.string().optional(),
@@ -52,6 +55,8 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
     const [managers, setManagers] = useState([]);
     const [features, setFeatures] = useState(null);
     const [defaults, setDefaults] = useState(null);
+    const [showPasswordField, setShowPasswordField] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
     const [overrides, setOverrides] = useState({
         is_screenshots_enabled: false,
         is_afk_tracking_enabled: false,
@@ -189,6 +194,18 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
 
         // Pass both user data and features to the parent onSubmit
         await onSubmit(finalData, finalFeatures);
+
+        // If a new password was entered, also reset the password
+        if (isEdit && newPassword && newPassword.length >= 6) {
+            try {
+                await api.post(`/users/${user.id}/reset-password`, { newPassword });
+                toast.success('Password changed successfully');
+                setNewPassword('');
+                setShowPasswordField(false);
+            } catch (err) {
+                toast.error(err.response?.data?.error || 'Failed to reset password');
+            }
+        }
     };
 
     const toggleShiftOverride = (key) => {
@@ -291,17 +308,15 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                 {roleWatch !== 'orgadmin' && (
                     <div className="space-y-2">
                         <Label>Manager (Optional)</Label>
-                        <Select onValueChange={(val) => setValue('manager_id', val)} value={watch('manager_id')}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select manager" />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-[300px]">
-                                <SelectItem value="none">No Manager</SelectItem>
-                                {managers.map(m => (
-                                    <SelectItem key={m.id} value={String(m.id)}>{m.name} ({m.role})</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <UserSearchSelect
+                            users={managers.map(m => ({ ...m, id: String(m.id) }))}
+                            value={watch('manager_id')}
+                            onChange={(val) => setValue('manager_id', val)}
+                            placeholder="Select manager..."
+                            showAllOption
+                            allOptionLabel="No Manager"
+                            allOptionValue="none"
+                        />
                     </div>
                 )}
 
@@ -351,6 +366,39 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                             onCheckedChange={(val) => setValue('force_logout', val)}
                         />
                     </div>
+                )}
+
+                {isEdit && (
+                    <>
+                        <Separator className="my-6" />
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Password Management</h3>
+                        {!showPasswordField ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full gap-2"
+                                onClick={() => setShowPasswordField(true)}
+                            >
+                                <KeyRound className="h-4 w-4" />
+                                Change Password
+                            </Button>
+                        ) : (
+                            <div className="space-y-2">
+                                <Label htmlFor="new-password">New Password</Label>
+                                <Input
+                                    id="new-password"
+                                    type="password"
+                                    placeholder="Min 6 characters"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    autoFocus
+                                />
+                                {newPassword && newPassword.length < 6 && (
+                                    <span className="text-destructive text-sm">Password must be at least 6 characters</span>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {/* Shift Configuration Section */}

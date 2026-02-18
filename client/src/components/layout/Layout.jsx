@@ -25,6 +25,7 @@ import {
     FileInput,
     Activity,
     CalendarDays,
+    ClipboardList,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -43,6 +44,7 @@ const Sidebar = ({ className, onLinkClick }) => {
         { href: '/settings', label: 'Organization Settings', icon: Settings, roles: ['orgadmin'] },
         { href: '/breaks', label: 'Break Management', icon: Coffee, roles: ['orgadmin'] },
         // App Categories & Mapping moved to App Management
+        { href: '/activity-logs', label: 'Activity Logs', icon: ClipboardList, roles: ['orgadmin', 'manager'] },
         { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
     ];
 

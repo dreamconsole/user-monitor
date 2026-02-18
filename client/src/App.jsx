@@ -19,6 +19,7 @@ import AppManagement from '@/pages/AppManagement';
 import Timeline from '@/pages/Timeline';
 import Profile from '@/pages/Profile';
 import TeamComparison from '@/pages/TeamComparison';
+import ActivityLogs from '@/pages/ActivityLogs';
 import Layout from './components/layout/Layout';
 
 const AppLayout = () => (
@@ -63,6 +64,7 @@ function App() {
               <Route element={<RoleGuard allowedRoles={['orgadmin', 'manager']} />}>
                 <Route path="/users" element={<Users />} />
                 <Route path="/team-comparison" element={<TeamComparison />} />
+                <Route path="/activity-logs" element={<ActivityLogs />} />
               </Route>
 
               <Route path="/reports" element={<Reports />} />
