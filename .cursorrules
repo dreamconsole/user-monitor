@@ -1,0 +1,21 @@
+# AI Logging Rules
+
+As an AI agent (Antigravity/Cursor), you MUST follow these rules when making updates to the `user-monitor` project.
+
+## 🚫 Root Directory Protection
+1. **NO NEW ROOT FILES**: DO NOT create new files in the project root unless they are project-standard configuration files (e.g., `.env.example`, `package.json`).
+2. **NO REPORTS IN ROOT**: Markdown reports, test summaries, and analysis MUST be placed in `docs/reports/`.
+
+## 📝 Log Management
+1. **Mandatory Logging**: For every update that modifies logic, UI, or configuration, you MUST append a log entry to the relevant component's `LOGS.md` file.
+2. **Component Separation**:
+   - Updates to `/client/**` -> [client/LOGS.md](file:///var/www/html/user-monitor/client/LOGS.md)
+   - Updates to `/server/**` -> [server/LOGS.md](file:///var/www/html/user-monitor/server/LOGS.md)
+   - Updates to `/electron-agent/**` -> [electron-agent/LOGS.md](file:///var/www/html/user-monitor/electron-agent/LOGS.md)
+3. **Log Format**:
+   ```markdown
+   ## [Version/Update] - YYYY-MM-DD
+   ### Changes
+   - [Type] Description of change
+   ```
+   *Types: Feature, Bugfix, Refactor, Cleanup, Config*
