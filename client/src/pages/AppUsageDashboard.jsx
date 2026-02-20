@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Calendar, TrendingUp, Clock, PieChart as PieChartIcon, Users as UsersIcon } from 'lucide-react';
+import { Calendar, TrendingUp, Clock, PieChart as PieChartIcon, Users as UsersIcon, Globe, ChevronDown, ChevronRight, Loader2, Eye } from 'lucide-react';
 import UserSearchSelect from '@/components/UserSearchSelect';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import useAuthStore from '@/lib/useAuthStore';
@@ -11,6 +11,43 @@ const COLORS = {
     non_productive: '#ef4444',
     neutral: '#6b7280'
 };
+
+const BROWSER_MAP = {
+    chrome: ['chrome.exe', 'chrome', 'google-chrome', 'google-chrome-stable', 'google chrome'],
+    edge: ['msedge.exe', 'msedge', 'microsoft-edge', 'microsoft edge'],
+    brave: ['brave.exe', 'brave', 'brave-browser', 'brave browser'],
+    opera: ['opera.exe', 'opera', 'opera internet browser', 'opera browser', 'opera gx'],
+    firefox: ['firefox.exe', 'firefox', 'mozilla firefox'],
+    vivaldi: ['vivaldi.exe', 'vivaldi'],
+    arc: ['arc.exe', 'arc'],
+    chromium: ['chromium.exe', 'chromium', 'chromium-browser'],
+    waterfox: ['waterfox.exe', 'waterfox'],
+    librewolf: ['librewolf.exe', 'librewolf'],
+    duckduckgo: ['duckduckgo.exe', 'duckduckgo'],
+    whale: ['whale.exe', 'whale'],
+    yandex: ['yandex.exe', 'browser.exe', 'yandex browser'],
+    maxthon: ['maxthon.exe', 'maxthon'],
+    tor: ['tor browser', 'tor'],
+    floorp: ['floorp.exe', 'floorp'],
+    samsung: ['samsung internet'],
+};
+
+function isBrowserApp(executableName) {
+    if (!executableName) return false;
+    const lower = executableName.toLowerCase().trim();
+    return Object.values(BROWSER_MAP).some(patterns =>
+        patterns.some(b => lower === b || lower.includes(b))
+    );
+}
+
+function getBrowserKey(executableName) {
+    if (!executableName) return null;
+    const lower = executableName.toLowerCase().trim();
+    for (const [key, patterns] of Object.entries(BROWSER_MAP)) {
+        if (patterns.some(b => lower === b || lower.includes(b))) return key;
+    }
+    return null;
+}
 
 export default function AppUsageDashboard() {
     const { user, isAuthenticated } = useAuthStore();
@@ -26,6 +63,11 @@ export default function AppUsageDashboard() {
     // For Manager/Admin: user selection
     const [availableUsers, setAvailableUsers] = useState([]);
     const [selectedUserId, setSelectedUserId] = useState(null);
+
+    // Browser activity drill-down
+    const [expandedBrowser, setExpandedBrowser] = useState(null);
+    const [browserDomains, setBrowserDomains] = useState([]);
+    const [browserDomainsLoading, setBrowserDomainsLoading] = useState(false);
 
     useEffect(() => {
         if (!isAuthenticated || !user) {
@@ -73,6 +115,8 @@ export default function AppUsageDashboard() {
     const fetchDashboardData = async (userId) => {
         setLoading(true);
         setError(null);
+        setExpandedBrowser(null);
+        setBrowserDomains([]);
 
         try {
             const [dashboardRes, productivityRes] = await Promise.all([
@@ -93,6 +137,32 @@ export default function AppUsageDashboard() {
             toast.error(errorMessage);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchBrowserDomains = async (appIndex, executableName) => {
+        if (expandedBrowser === appIndex) {
+            setExpandedBrowser(null);
+            setBrowserDomains([]);
+            return;
+        }
+
+        setBrowserDomainsLoading(true);
+        setExpandedBrowser(appIndex);
+
+        try {
+            const browserKey = getBrowserKey(executableName);
+            let url = `/app-tracking/reports/browser-activity/${selectedUserId}?start_date=${dateRange.start_date}&end_date=${dateRange.end_date}`;
+            if (browserKey) url += `&browser=${browserKey}`;
+
+            const res = await api.get(url);
+            setBrowserDomains(res.data.domains || []);
+        } catch (err) {
+            console.error('Failed to fetch browser domains:', err);
+            setBrowserDomains([]);
+            toast.error('Failed to load browser activity details');
+        } finally {
+            setBrowserDomainsLoading(false);
         }
     };
 
@@ -291,6 +361,7 @@ export default function AppUsageDashboard() {
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-200">
                     <h2 className="text-lg font-semibold">Top Applications</h2>
+                    <p className="text-xs text-gray-400 mt-1">Click on a browser app to see domain-level breakdown</p>
                 </div>
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -310,28 +381,119 @@ export default function AppUsageDashboard() {
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {dashboardData?.top_apps?.map((app, index) => (
-                            <tr key={index} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-medium text-gray-900">{app.display_name}</div>
-                                    <div className="text-xs text-gray-500">{app.executable_name}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {app.category_name || 'Uncategorized'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${app.productivity_type === 'productive' ? 'bg-green-100 text-green-800' :
-                                            app.productivity_type === 'non_productive' ? 'bg-red-100 text-red-800' :
-                                                'bg-gray-100 text-gray-800'
-                                        }`}>
-                                        {app.productivity_type?.replace('_', ' ') || 'neutral'}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                                    {formatTime(app.total_seconds)}
-                                </td>
-                            </tr>
-                        ))}
+                        {dashboardData?.top_apps?.map((app, index) => {
+                            const isBrowser = isBrowserApp(app.executable_name);
+                            const isExpanded = expandedBrowser === index;
+
+                            return (
+                                <React.Fragment key={index}>
+                                    <tr
+                                        className={`hover:bg-gray-50 ${isBrowser ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-blue-50' : ''}`}
+                                        onClick={() => isBrowser && fetchBrowserDomains(index, app.executable_name)}
+                                    >
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                {isBrowser && (
+                                                    isExpanded
+                                                        ? <ChevronDown size={16} className="text-blue-500 flex-shrink-0" />
+                                                        : <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
+                                                )}
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
+                                                        {app.display_name}
+                                                        {isBrowser && <Globe size={14} className="text-blue-400" />}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">{app.executable_name}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {app.category_name || 'Uncategorized'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${app.productivity_type === 'productive' ? 'bg-green-100 text-green-800' :
+                                                    app.productivity_type === 'non_productive' ? 'bg-red-100 text-red-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                {app.productivity_type?.replace('_', ' ') || 'neutral'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                                            {formatTime(app.total_seconds)}
+                                        </td>
+                                    </tr>
+
+                                    {/* Expanded browser domain rows */}
+                                    {isBrowser && isExpanded && (
+                                        <tr>
+                                            <td colSpan={4} className="p-0">
+                                                <div className="bg-blue-50/50 border-t border-b border-blue-100">
+                                                    {browserDomainsLoading ? (
+                                                        <div className="flex items-center justify-center py-6 gap-2 text-gray-500">
+                                                            <Loader2 size={16} className="animate-spin" />
+                                                            <span className="text-sm">Loading domain details...</span>
+                                                        </div>
+                                                    ) : browserDomains.length === 0 ? (
+                                                        <div className="text-center py-6 text-gray-500 text-sm">
+                                                            No browser activity data for this date range
+                                                        </div>
+                                                    ) : (
+                                                        <table className="min-w-full">
+                                                            <thead>
+                                                                <tr className="bg-blue-100/50">
+                                                                    <th className="px-10 py-2 text-left text-xs font-medium text-blue-700 uppercase">Domain / Title</th>
+                                                                    <th className="px-6 py-2 text-left text-xs font-medium text-blue-700 uppercase">Source</th>
+                                                                    <th className="px-6 py-2 text-center text-xs font-medium text-blue-700 uppercase">Visits</th>
+                                                                    <th className="px-6 py-2 text-right text-xs font-medium text-blue-700 uppercase">Time Spent</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {browserDomains.map((domain, dIdx) => {
+                                                                    const isWindowTitle = domain.source === 'window_title';
+                                                                    return (
+                                                                        <tr key={dIdx} className="border-t border-blue-100/50 hover:bg-blue-100/30">
+                                                                            <td className="px-10 py-2.5">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    {isWindowTitle
+                                                                                        ? <Eye size={14} className="text-amber-500 flex-shrink-0" />
+                                                                                        : <Globe size={14} className="text-blue-400 flex-shrink-0" />
+                                                                                    }
+                                                                                    <div>
+                                                                                        <div className="text-sm font-medium text-gray-800">{domain.domain}</div>
+                                                                                        {domain.last_title && !isWindowTitle && (
+                                                                                            <div className="text-xs text-gray-500 truncate max-w-xs">{domain.last_title}</div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="px-6 py-2.5">
+                                                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                                                    isWindowTitle
+                                                                                        ? 'bg-amber-100 text-amber-700'
+                                                                                        : 'bg-blue-100 text-blue-700'
+                                                                                }`}>
+                                                                                    {isWindowTitle ? 'Window Title' : 'Extension'}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className="px-6 py-2.5 text-center text-sm text-gray-600">
+                                                                                {domain.visit_count}
+                                                                            </td>
+                                                                            <td className="px-6 py-2.5 text-right text-sm font-medium text-gray-800">
+                                                                                {formatTime(domain.total_seconds)}
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
                     </tbody>
                 </table>
                 {(!dashboardData?.top_apps || dashboardData.top_apps.length === 0) && (

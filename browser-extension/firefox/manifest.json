@@ -1,0 +1,32 @@
+{
+  "manifest_version": 2,
+  "name": "User Monitor - Activity Tracker",
+  "version": "1.0.0",
+  "description": "Enterprise browser activity tracking for productivity monitoring",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "idle",
+    "storage",
+    "nativeMessaging",
+    "alarms"
+  ],
+  "background": {
+    "scripts": [
+      "tab-tracker.js",
+      "native-messaging.js",
+      "background.js"
+    ]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "usermonitor@activity-tracker",
+      "strict_min_version": "109.0"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

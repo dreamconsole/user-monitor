@@ -49,6 +49,7 @@ class SyncService {
             await this.syncBreakLogs();
             await this.syncScreenshots();
             await this.syncAppUsageLogs();
+            await this.syncBrowserActivityLogs();
             await this.sendHeartbeat();
         } catch (error) {
             console.error('Sync failed:', error.message);
@@ -248,6 +249,38 @@ class SyncService {
             }
         } catch (error) {
             console.error('Failed to sync app usage logs:', error.message);
+            this.checkForForcedLogout(error.response);
+        }
+    }
+
+    async syncBrowserActivityLogs() {
+        const logs = db.getUnsyncedBrowserActivityLogs();
+        if (logs.length === 0) return;
+
+        try {
+            const response = await axios.post(`${API_URL}/agent/browser-activity`, {
+                logs: logs.map(log => ({
+                    browser: log.browser,
+                    domain: log.domain || null,
+                    title: log.title,
+                    start_time: log.start_time,
+                    end_time: log.end_time,
+                    duration_seconds: log.duration_seconds,
+                    source: log.source || 'extension'
+                }))
+            }, {
+                headers: { Authorization: `Bearer ${authService.getToken()}` }
+            });
+
+            this.checkForForcedLogout(response);
+
+            if (response.data) {
+                const ids = logs.map(log => log.id);
+                db.markBrowserActivityLogsSynced(ids);
+                console.log(`Synced ${logs.length} browser activity logs`);
+            }
+        } catch (error) {
+            console.error('Failed to sync browser activity logs:', error.message);
             this.checkForForcedLogout(error.response);
         }
     }

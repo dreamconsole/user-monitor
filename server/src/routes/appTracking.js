@@ -23,7 +23,8 @@ import {
     getAdminDashboard,
     getManagerDashboard,
     getUserDashboard,
-    getProductivitySummary
+    getProductivitySummary,
+    getBrowserActivityDetails
 } from '../controllers/appReportsController.js';
 
 const router = express.Router();
@@ -66,5 +67,6 @@ router.get('/reports/admin', authorizeRoles('orgadmin'), getAdminDashboard);
 router.get('/reports/manager', authorizeRoles('manager'), getManagerDashboard);
 router.get('/reports/user/:userId', authorizeRoles('orgadmin', 'manager', 'user'), getUserDashboard);
 router.get('/reports/productivity/:userId', authorizeRoles('orgadmin', 'manager', 'user'), getProductivitySummary);
+router.get('/reports/browser-activity/:userId', authorizeRoles('orgadmin', 'manager', 'user'), getBrowserActivityDetails);
 
 export default router;

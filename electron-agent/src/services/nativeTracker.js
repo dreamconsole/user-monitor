@@ -89,9 +89,10 @@ $pid = 0
 
 try {
     $process = Get-Process -Id $pid -ErrorAction Stop
+    $exeName = if ($process.Path) { [System.IO.Path]::GetFileName($process.Path) } else { $process.Name + '.exe' }
     $obj = [PSCustomObject]@{
         owner = @{
-            name = $process.Name
+            name = $exeName
             processId = $process.Id
             path = $process.Path
         }

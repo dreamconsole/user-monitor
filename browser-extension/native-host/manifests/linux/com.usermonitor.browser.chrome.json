@@ -1,0 +1,9 @@
+{
+  "name": "com.usermonitor.browser",
+  "description": "User Monitor Browser Activity Native Messaging Host",
+  "path": "/opt/usermonitor-agent/native-host/native-host",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://EXTENSION_ID_PLACEHOLDER/"
+  ]
+}

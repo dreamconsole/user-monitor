@@ -134,6 +134,70 @@ export const getUserDashboard = async (req, res) => {
     }
 };
 
+// Browser activity details -- domain breakdown for a user
+export const getBrowserActivityDetails = async (req, res) => {
+    const orgId = req.user.org_id;
+    const { userId } = req.params;
+    const { start_date, end_date, browser } = req.query;
+
+    if (req.user.role === 'user' && String(req.user.id) !== String(userId)) {
+        return res.status(403).json({ error: 'Unauthorized: You can only view your own data' });
+    }
+
+    if (!start_date || !end_date) {
+        return res.status(400).json({ error: 'start_date and end_date are required' });
+    }
+
+    try {
+        const params = [userId, orgId, start_date, end_date];
+        let browserFilter = '';
+        if (browser) {
+            browserFilter = ' AND LOWER(bal.browser) = LOWER($5)';
+            params.push(browser);
+        }
+
+        const domainBreakdown = await query(
+            `SELECT 
+                COALESCE(bal.domain, bal.title) as domain,
+                bal.browser,
+                bal.source,
+                COUNT(*) as visit_count,
+                SUM(bal.duration_seconds) as total_seconds,
+                MAX(bal.title) as last_title
+             FROM browser_activity_logs bal
+             WHERE bal.user_id = $1 AND bal.org_id = $2
+             AND bal.start_time::date >= $3::date AND bal.start_time::date <= $4::date
+             ${browserFilter}
+             GROUP BY COALESCE(bal.domain, bal.title), bal.browser, bal.source
+             ORDER BY total_seconds DESC
+             LIMIT 50`,
+            params
+        );
+
+        const browserSummary = await query(
+            `SELECT 
+                bal.browser,
+                COUNT(DISTINCT COALESCE(bal.domain, bal.title)) as unique_domains,
+                SUM(bal.duration_seconds) as total_seconds,
+                MAX(bal.source) as source
+             FROM browser_activity_logs bal
+             WHERE bal.user_id = $1 AND bal.org_id = $2
+             AND bal.start_time::date >= $3::date AND bal.start_time::date <= $4::date
+             GROUP BY bal.browser
+             ORDER BY total_seconds DESC`,
+            [userId, orgId, start_date, end_date]
+        );
+
+        res.json({
+            domains: domainBreakdown.rows,
+            browsers: browserSummary.rows
+        });
+    } catch (error) {
+        console.error('getBrowserActivityDetails error:', error);
+        res.status(500).json({ error: 'Failed to fetch browser activity details' });
+    }
+};
+
 // Productivity summary with category breakdown
 export const getProductivitySummary = async (req, res) => {
     const orgId = req.user.org_id;

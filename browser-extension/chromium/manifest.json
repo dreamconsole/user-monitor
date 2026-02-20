@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "User Monitor - Activity Tracker",
+  "version": "1.0.0",
+  "description": "Enterprise browser activity tracking for productivity monitoring",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "idle",
+    "storage",
+    "nativeMessaging",
+    "alarms"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "minimum_chrome_version": "110"
+}

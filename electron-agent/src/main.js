@@ -127,24 +127,72 @@ function handleLoginSuccess(user, token) {
         authService.setToken(token);
 
         currentUser = user;
-        // Initialize DB
         console.log('Initializing DB...');
         db.initDB(user.org_id, user.id);
         console.log('DB Initialized.');
 
-        // Don't start tracking automatically anymore
-        // Start Syncing (heartbeats)
         console.log('Requiring Sync Service...');
         const syncService = require('./services/sync');
         console.log('Starting Sync Service...');
         syncService.start();
         console.log('Sync Service Started.');
 
-        // mainWindow.hide(); // Don't hide yet, show tracking UI
+        // Start browser activity tracking infrastructure
+        initBrowserTracking();
     } catch (error) {
         console.error('CRITICAL ERROR in handleLoginSuccess:', error);
     }
     console.log('--- handleLoginSuccess END ---');
+}
+
+let knownBrowserKeys = new Set();
+let browserRescanInterval = null;
+const BROWSER_RESCAN_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+function initBrowserTracking() {
+    try {
+        const browserActivityService = require('./services/browserActivityService');
+
+        scanAndInstallBrowserExtensions();
+
+        browserActivityService.start();
+
+        // Periodic re-scan for newly installed browsers
+        if (!browserRescanInterval) {
+            browserRescanInterval = setInterval(() => {
+                console.log('[BrowserTracking] Periodic re-scan...');
+                scanAndInstallBrowserExtensions();
+            }, BROWSER_RESCAN_MS);
+        }
+
+        console.log('[BrowserTracking] Initialized successfully (re-scan every 6h)');
+    } catch (error) {
+        console.error('[BrowserTracking] Init failed (non-fatal):', error.message);
+    }
+}
+
+function scanAndInstallBrowserExtensions() {
+    try {
+        const browserDetector = require('./services/browserDetector');
+        const extensionInstaller = require('./services/extensionInstaller');
+
+        const browsers = browserDetector.detect();
+        const newBrowsers = browsers.filter(b => !knownBrowserKeys.has(b.key));
+
+        if (newBrowsers.length > 0) {
+            const isFirstRun = knownBrowserKeys.size === 0;
+            console.log(`[BrowserTracking] ${isFirstRun ? 'Initial scan' : 'New browser(s) detected'}: ${newBrowsers.map(b => b.name).join(', ')}`);
+
+            const results = extensionInstaller.installAll(newBrowsers);
+            console.log('[BrowserTracking] Install results:', JSON.stringify(results));
+
+            newBrowsers.forEach(b => knownBrowserKeys.add(b.key));
+        } else {
+            console.log('[BrowserTracking] No new browsers found');
+        }
+    } catch (error) {
+        console.error('[BrowserTracking] Scan/install failed (non-fatal):', error.message);
+    }
 }
 
 ipcMain.on('start-tracking', () => {
@@ -182,13 +230,21 @@ ipcMain.on('logout', () => {
 function performLogout() {
     console.log('Logging out...');
 
-    // Stop services
     try {
         const monitorService = require('./services/monitor');
         monitorService.stop();
 
         const syncService = require('./services/sync');
         syncService.stop();
+
+        const browserActivityService = require('./services/browserActivityService');
+        browserActivityService.stop();
+
+        if (browserRescanInterval) {
+            clearInterval(browserRescanInterval);
+            browserRescanInterval = null;
+        }
+        knownBrowserKeys.clear();
 
         const authService = require('./services/auth');
         authService.logout();

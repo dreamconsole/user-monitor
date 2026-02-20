@@ -356,6 +356,44 @@ export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
     }
 }
 
+export const logBrowserActivity = async (req, res) => {
+    const { logs } = req.body;
+    const user_id = req.user.id;
+    const org_id = req.user.org_id;
+
+    if (!logs || !Array.isArray(logs) || logs.length === 0) {
+        return res.status(400).json({ success: false, error: 'No activity logs provided' });
+    }
+
+    try {
+        let inserted = 0;
+        for (const log of logs) {
+            await query(
+                `INSERT INTO browser_activity_logs (org_id, user_id, browser, domain, title, start_time, end_time, duration_seconds, source)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                [
+                    org_id,
+                    user_id,
+                    log.browser || 'unknown',
+                    log.domain || null,
+                    (log.title || '').substring(0, 500),
+                    log.start_time,
+                    log.end_time,
+                    log.duration_seconds || 0,
+                    log.source || 'extension'
+                ]
+            );
+            inserted++;
+        }
+
+        console.log(`[BrowserActivity] Synced ${inserted} logs for user ${user_id}`);
+        res.status(200).json({ success: true, inserted });
+    } catch (error) {
+        console.error('[BrowserActivity] Sync failed:', error);
+        res.status(500).json({ success: false, error: 'Failed to log browser activity' });
+    }
+};
+
 export const getBreaks = async (req, res) => {
     // For GET requests, parameters are in req.query, but we primarily use req.user from token
     const org_id = req.body?.org_id || req.query?.org_id;

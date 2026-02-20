@@ -111,12 +111,30 @@ function initDB(orgId, userId) {
         )
     `;
 
+    const createBrowserActivityTable = `
+        CREATE TABLE IF NOT EXISTS browser_activity_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            org_id INTEGER,
+            browser TEXT NOT NULL,
+            domain TEXT,
+            title TEXT,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            duration_seconds INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'extension',
+            synced INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    `;
+
     db.exec(createWorkSessionsTable);
     db.exec(createActivityLogsTable);
     db.exec(createScreenshotsTable);
     db.exec(createHeartbeatTable);
     db.exec(createBreakLogsTable);
     db.exec(createAppUsageLogsTable);
+    db.exec(createBrowserActivityTable);
 
     // Migration: Add total_break_seconds to work_sessions if missing
     const columns = db.prepare("PRAGMA table_info(work_sessions)").all();
@@ -132,6 +150,42 @@ function initDB(orgId, userId) {
     if (!hasSessionId) {
         console.log('Migrating: Adding session_id to screenshots');
         db.exec('ALTER TABLE screenshots ADD COLUMN session_id TEXT');
+    }
+
+    // Migration: Add source column + make domain nullable in browser_activity_logs
+    const browserCols = db.prepare("PRAGMA table_info(browser_activity_logs)").all();
+    const hasSource = browserCols.some(col => col.name === 'source');
+    if (!hasSource) {
+        console.log('Migrating: Adding source to browser_activity_logs');
+        db.exec("ALTER TABLE browser_activity_logs ADD COLUMN source TEXT DEFAULT 'extension'");
+    }
+
+    const domainCol = browserCols.find(col => col.name === 'domain');
+    if (domainCol && domainCol.notnull === 1) {
+        console.log('Migrating: Recreating browser_activity_logs with nullable domain');
+        db.exec(`
+            ALTER TABLE browser_activity_logs RENAME TO browser_activity_logs_old;
+            CREATE TABLE browser_activity_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                org_id INTEGER,
+                browser TEXT NOT NULL,
+                domain TEXT,
+                title TEXT,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                duration_seconds INTEGER DEFAULT 0,
+                source TEXT DEFAULT 'extension',
+                synced INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+            INSERT INTO browser_activity_logs (id, user_id, org_id, browser, domain, title, start_time, end_time, duration_seconds, source, synced, created_at)
+                SELECT id, user_id, org_id, browser, domain, title, start_time, end_time, duration_seconds,
+                       COALESCE(source, 'extension'), synced, created_at
+                FROM browser_activity_logs_old;
+            DROP TABLE browser_activity_logs_old;
+        `);
+        console.log('Migration complete: browser_activity_logs.domain is now nullable');
     }
 
     return db;
@@ -176,6 +230,27 @@ function markAppUsageLogsSynced(ids) {
     stmt.run(...ids);
 }
 
+// Browser activity log helpers
+function insertBrowserActivityLog(log) {
+    const stmt = db.prepare(`
+        INSERT INTO browser_activity_logs (user_id, org_id, browser, domain, title, start_time, end_time, duration_seconds, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(log.user_id, log.org_id, log.browser, log.domain || null, log.title, log.start_time, log.end_time, log.duration_seconds, log.source || 'extension');
+}
+
+function getUnsyncedBrowserActivityLogs() {
+    const stmt = db.prepare('SELECT * FROM browser_activity_logs WHERE synced = 0 ORDER BY start_time LIMIT 200');
+    return stmt.all();
+}
+
+function markBrowserActivityLogsSynced(ids) {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    const stmt = db.prepare(`UPDATE browser_activity_logs SET synced = 1 WHERE id IN (${placeholders})`);
+    stmt.run(...ids);
+}
+
 module.exports = {
     initDB,
     getDB,
@@ -184,5 +259,8 @@ module.exports = {
     getAgentDataPath,
     insertAppUsageLog,
     getUnsyncedAppUsageLogs,
-    markAppUsageLogsSynced
+    markAppUsageLogsSynced,
+    insertBrowserActivityLog,
+    getUnsyncedBrowserActivityLogs,
+    markBrowserActivityLogsSynced
 };

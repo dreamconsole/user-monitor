@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { logHeartbeat, syncActivitySession, uploadScreenshot, logActivity, logBreak, getBreaks } from '../controllers/agentController.js';
+import { logHeartbeat, syncActivitySession, uploadScreenshot, logActivity, logBreak, getBreaks, logBrowserActivity } from '../controllers/agentController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -44,5 +44,6 @@ router.post('/activity-log', logActivity);
 router.post('/break-log', logBreak);
 router.get('/breaks', getBreaks);
 router.post('/screenshot', upload.single('screenshot'), uploadScreenshot);
+router.post('/browser-activity', logBrowserActivity);
 
 export default router;
