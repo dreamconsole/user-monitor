@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardContent, CardDescription, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { GoogleLogin } from '@react-oauth/google';
+import { FaApple, FaMicrosoft } from 'react-icons/fa';
 
 const schema = z.object({
     email: z.string().email(),
@@ -15,9 +18,22 @@ const schema = z.object({
 });
 
 export default function Login() {
-    const { login } = useAuthStore();
+    const { login, getSSOStatus, verifySSO } = useAuthStore();
     const navigate = useNavigate();
     const [error, setError] = useState('');
+    const [ssoStatus, setSsoStatus] = useState({ google: false, microsoft: false, apple: false });
+
+    useEffect(() => {
+        const fetchStatus = async () => {
+            try {
+                const status = await getSSOStatus();
+                setSsoStatus(status);
+            } catch (err) {
+                console.error("Failed to fetch SSO status", err);
+            }
+        };
+        fetchStatus();
+    }, [getSSOStatus]);
 
     const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
         resolver: zodResolver(schema),
@@ -26,9 +42,28 @@ export default function Login() {
     const onSubmit = async (data) => {
         try {
             await login(data.email, data.password);
-            navigate('/');
+            const currentUser = useAuthStore.getState().user;
+            if (currentUser?.role === 'superadmin') {
+                navigate('/superadmin');
+            } else {
+                navigate('/');
+            }
         } catch (e) {
             setError(e.response?.data?.error || 'Login failed');
+        }
+    };
+
+    const handleGoogleSuccess = async (credentialResponse) => {
+        try {
+            await verifySSO('google', credentialResponse.credential);
+            const currentUser = useAuthStore.getState().user;
+            if (currentUser?.role === 'superadmin') {
+                navigate('/superadmin');
+            } else {
+                navigate('/');
+            }
+        } catch (e) {
+            setError(e.response?.data?.error || 'Google Login failed');
         }
     };
 
@@ -61,6 +96,62 @@ export default function Login() {
                             </Link>
                         </div>
                     </form>
+
+                    {Object.values(ssoStatus).some(Boolean) && (
+                        <div className="mt-6 flex flex-col items-center">
+                            <div className="relative w-full mb-4">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t border-muted-foreground/20" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                                </div>
+                            </div>
+
+                            {ssoStatus.google && (
+                                <div className="w-full flex justify-center mb-3">
+                                    <GoogleLogin
+                                        onSuccess={handleGoogleSuccess}
+                                        onError={() => setError('Google Login Failed')}
+                                        useOneTap
+                                        width="340"
+                                    />
+                                </div>
+                            )}
+
+                            {ssoStatus.microsoft && (
+                                <div className="w-full flex justify-center mb-3">
+                                    <Button
+                                        variant="outline"
+                                        type="button"
+                                        className="w-[340px] max-w-full relative flex items-center justify-center font-normal text-[14px] text-gray-600 bg-white hover:bg-gray-50 h-[40px] shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] border-[#dadce0]"
+                                        onClick={() => toast.info('Microsoft SSO is enabled but requires backend configuration.')}
+                                    >
+                                        <div className="absolute left-3 flex items-center justify-center">
+                                            <FaMicrosoft className="text-[#00a4ef] w-4 h-4" />
+                                        </div>
+                                        Sign in with Microsoft
+                                    </Button>
+                                </div>
+                            )}
+
+                            {ssoStatus.apple && (
+                                <div className="w-full flex justify-center mb-3">
+                                    <Button
+                                        variant="outline"
+                                        type="button"
+                                        className="w-[340px] max-w-full relative flex items-center justify-center font-medium text-[14px] text-black bg-white hover:bg-gray-50 h-[40px] shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] border-black"
+                                        onClick={() => toast.info('Apple SSO is enabled but requires backend configuration.')}
+                                    >
+                                        <div className="absolute left-3 flex items-center justify-center">
+                                            <FaApple className="w-[18px] h-[18px]" />
+                                        </div>
+                                        Sign in with Apple
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
                 <CardFooter className="flex justify-center">
                     <p className="text-sm text-gray-500">

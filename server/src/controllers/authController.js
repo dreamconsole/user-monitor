@@ -1,7 +1,11 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { query, getClient } from '../db.js';
+
+const googleClient = new OAuth2Client(process.env.VITE_GOOGLE_CLIENT_ID);
+
 
 export const registerOrg = async (req, res) => {
     const {
@@ -254,5 +258,102 @@ export const getMe = async (req, res) => {
     } catch (error) {
         console.error('getMe error:', error);
         res.status(500).json({ error: 'Failed to fetch user profile' });
+    }
+};
+
+export const getSSOStatus = async (req, res) => {
+    try {
+        const result = await query("SELECT setting_key, setting_value FROM global_settings WHERE setting_key IN ('sso_google_enabled', 'sso_microsoft_enabled', 'sso_apple_enabled')");
+        const status = {
+            google: false,
+            microsoft: false,
+            apple: false
+        };
+        for (const row of result.rows) {
+            if (row.setting_key === 'sso_google_enabled') status.google = row.setting_value === true;
+            if (row.setting_key === 'sso_microsoft_enabled') status.microsoft = row.setting_value === true;
+            if (row.setting_key === 'sso_apple_enabled') status.apple = row.setting_value === true;
+        }
+        res.json(status);
+    } catch (error) {
+        console.error('getSSOStatus error:', error);
+        res.status(500).json({ error: 'Failed to fetch SSO status' });
+    }
+};
+
+export const verifySSO = async (req, res) => {
+    const { provider, credential } = req.body; // 'google', 'microsoft', or 'apple'
+
+    if (!provider || !credential) {
+        return res.status(400).json({ error: 'Provider and credential are required' });
+    }
+
+    try {
+        // First check if the provider is globally enabled
+        const settingKey = `sso_${provider}_enabled`;
+        const settingResult = await query("SELECT setting_value FROM global_settings WHERE setting_key = $1", [settingKey]);
+        if (settingResult.rows.length === 0 || settingResult.rows[0].setting_value !== true) {
+            return res.status(403).json({ error: `SSO login with ${provider} is disabled by the administrator` });
+        }
+
+        let email = null;
+        let ssoId = null;
+
+        if (provider === 'google') {
+            const ticket = await googleClient.verifyIdToken({
+                idToken: credential,
+                audience: process.env.VITE_GOOGLE_CLIENT_ID, // Ensure env var matches frontend
+            });
+            const payload = ticket.getPayload();
+            email = payload.email;
+            ssoId = payload.sub;
+
+            if (!payload.email_verified) {
+                return res.status(401).json({ error: 'Google email is not verified' });
+            }
+        } else if (provider === 'microsoft' || provider === 'apple') {
+            // For Microsoft and Apple, decoding the JWT can provide the email, 
+            // but strict verification requires calling their respective JWKS endpoints.
+            // Placeholder for MS/Apple specific verification.
+            return res.status(501).json({ error: `${provider} SSO verification not fully implemented yet on backend.` });
+        } else {
+            return res.status(400).json({ error: 'Unsupported provider' });
+        }
+
+        if (!email) {
+            return res.status(400).json({ error: 'Could not extract email from SSO provider' });
+        }
+
+        // Login user if they exist
+        const result = await query('SELECT * FROM users WHERE email = $1', [email]);
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'User not found for this email. Contact your organization administrator.' });
+        }
+
+        const user = result.rows[0];
+
+        const isActive = user.is_active !== undefined ? user.is_active : user.status !== 'suspended';
+        if (!isActive) {
+            return res.status(403).json({ error: 'Account suspended' });
+        }
+
+        if (user.password_hash != null) {
+            try {
+                await query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
+            } catch (_) { }
+        }
+
+        const token = jwt.sign(
+            { id: user.id, org_id: user.org_id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' }
+        );
+
+        const userName = user.full_name ?? user.name;
+        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, timezone: user.timezone } });
+
+    } catch (error) {
+        console.error('verifySSO error:', error);
+        res.status(500).json({ error: 'SSO verification failed' });
     }
 };

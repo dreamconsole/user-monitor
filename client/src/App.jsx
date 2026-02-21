@@ -20,7 +20,11 @@ import Timeline from '@/pages/Timeline';
 import Profile from '@/pages/Profile';
 import TeamComparison from '@/pages/TeamComparison';
 import ActivityLogs from '@/pages/ActivityLogs';
+import SuperAdminOverview from '@/pages/SuperAdminOverview';
+import SuperAdminOrgs from '@/pages/SuperAdminOrgs';
+import SuperAdminSettings from '@/pages/SuperAdminSettings';
 import Layout from './components/layout/Layout';
+import SuperAdminLayout from './components/layout/SuperAdminLayout';
 
 const AppLayout = () => (
   <Layout>
@@ -55,8 +59,19 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* Protected Routes */}
+          {/* Protected Routes - Standard User/Manager/Admin Layout */}
           <Route element={<ProtectedRoute />}>
+
+            {/* SUPERADMIN SPECIFIC ROUTING (NO STANDARD LAYOUT) */}
+            <Route element={<RoleGuard allowedRoles={['superadmin']} />}>
+              <Route element={<SuperAdminLayout><Outlet /></SuperAdminLayout>}>
+                <Route path="/superadmin" element={<SuperAdminOverview />} />
+                <Route path="/superadmin/orgs" element={<SuperAdminOrgs />} />
+                <Route path="/superadmin/settings" element={<SuperAdminSettings />} />
+              </Route>
+            </Route>
+
+            {/* STANDARD LAYOUT - Non-SuperAdmin */}
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
 
@@ -72,20 +87,18 @@ function App() {
               {/* App Management (Consolidated) */}
               <Route path="/app-management" element={<AppManagement />} />
 
-              {/* Legacy Redirects or Keep accessible if needed, but sidebar will link to /app-management */}
+              {/* Legacy Redirects */}
               <Route path="/app-usage" element={<Navigate to="/app-management" replace />} />
 
               {/* Admin Only */}
               <Route element={<RoleGuard allowedRoles={['orgadmin']} />}>
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/breaks" element={<Breaks />} />
-                {/* App Cat/Map are now in AppManagement, accessible by admin */}
               </Route>
 
               {/* All authenticated users */}
               <Route path="/timeline" element={<Timeline />} />
               <Route path="/profile" element={<Profile />} />
-
             </Route>
           </Route>
 

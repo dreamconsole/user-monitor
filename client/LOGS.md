@@ -2,6 +2,12 @@
 
 All updates to the client application are tracked here.
 
+## 1.1.0 - 2026-02-21
+### Changes
+- [Feature] Implemented dedicated SuperAdmin layout and overview dashboard.
+- [Feature] Added SuperAdmin Organization management and Global Settings UI.
+- [Feature] Integrated Google, Microsoft, and Apple SSO login flows into the authentication UI.
+
 ## 1.0.0 - 2026-02-20
 ### Changes
 - [Feature] Implementation of tabbed interface for `/app-usage`, `/app-categories`, and `/app-mapping`.

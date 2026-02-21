@@ -19,6 +19,23 @@ const useAuthStore = create((set, get) => ({
         return data;
     },
 
+    getSSOStatus: async () => {
+        const { data } = await api.get('/auth/sso/status');
+        return data; // { google: true, microsoft: false, apple: false }
+    },
+
+    verifySSO: async (provider, credential) => {
+        const { data } = await api.post('/auth/sso/verify', { provider, credential });
+        localStorage.setItem('token', data.token);
+        set({
+            user: data.user,
+            token: data.token,
+            isAuthenticated: true,
+            loading: false,
+        });
+        return data;
+    },
+
     registerOrg: async (registerData) => {
         const { data } = await api.post('/auth/register-org', registerData);
         localStorage.setItem('token', data.token);
