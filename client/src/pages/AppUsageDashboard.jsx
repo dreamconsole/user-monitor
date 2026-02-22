@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Calendar, TrendingUp, Clock, PieChart as PieChartIcon, Users as UsersIcon, Globe, ChevronDown, ChevronRight, Loader2, Eye } from 'lucide-react';
+import { TrendingUp, Clock, PieChart as PieChartIcon, Users as UsersIcon, Globe, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import UserSearchSelect from '@/components/UserSearchSelect';
+import DateRangeFilter from '@/components/DateRangeFilter';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import useAuthStore from '@/lib/useAuthStore';
 
@@ -251,23 +252,11 @@ export default function AppUsageDashboard() {
                         </div>
                     )}
 
-                    {/* Date Range Selector */}
-                    <div className="flex gap-2 items-center">
-                        <Calendar size={20} className="text-gray-400" />
-                        <input
-                            type="date"
-                            value={dateRange.start_date}
-                            onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
-                            className="px-3 py-2 border border-gray-300 rounded-lg"
-                        />
-                        <span className="text-gray-500">to</span>
-                        <input
-                            type="date"
-                            value={dateRange.end_date}
-                            onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
-                            className="px-3 py-2 border border-gray-300 rounded-lg"
-                        />
-                    </div>
+                    <DateRangeFilter
+                        startDate={dateRange.start_date}
+                        endDate={dateRange.end_date}
+                        onChange={(start, end) => setDateRange({ start_date: start, end_date: end })}
+                    />
                 </div>
             </div>
 
@@ -441,49 +430,34 @@ export default function AppUsageDashboard() {
                                                         <table className="min-w-full">
                                                             <thead>
                                                                 <tr className="bg-blue-100/50">
-                                                                    <th className="px-10 py-2 text-left text-xs font-medium text-blue-700 uppercase">Domain / Title</th>
-                                                                    <th className="px-6 py-2 text-left text-xs font-medium text-blue-700 uppercase">Source</th>
+                                                                    <th className="px-10 py-2 text-left text-xs font-medium text-blue-700 uppercase">Page Title</th>
+                                                                    <th className="px-6 py-2 text-left text-xs font-medium text-blue-700 uppercase">Browser</th>
                                                                     <th className="px-6 py-2 text-center text-xs font-medium text-blue-700 uppercase">Visits</th>
                                                                     <th className="px-6 py-2 text-right text-xs font-medium text-blue-700 uppercase">Time Spent</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {browserDomains.map((domain, dIdx) => {
-                                                                    const isWindowTitle = domain.source === 'window_title';
-                                                                    return (
-                                                                        <tr key={dIdx} className="border-t border-blue-100/50 hover:bg-blue-100/30">
-                                                                            <td className="px-10 py-2.5">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    {isWindowTitle
-                                                                                        ? <Eye size={14} className="text-amber-500 flex-shrink-0" />
-                                                                                        : <Globe size={14} className="text-blue-400 flex-shrink-0" />
-                                                                                    }
-                                                                                    <div>
-                                                                                        <div className="text-sm font-medium text-gray-800">{domain.domain}</div>
-                                                                                        {domain.last_title && !isWindowTitle && (
-                                                                                            <div className="text-xs text-gray-500 truncate max-w-xs">{domain.last_title}</div>
-                                                                                        )}
-                                                                                    </div>
+                                                                {browserDomains.map((domain, dIdx) => (
+                                                                    <tr key={dIdx} className="border-t border-blue-100/50 hover:bg-blue-100/30">
+                                                                        <td className="px-10 py-2.5">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Globe size={14} className="text-blue-400 flex-shrink-0" />
+                                                                                <div className="text-sm font-medium text-gray-800 truncate max-w-md">
+                                                                                    {domain.domain}
                                                                                 </div>
-                                                                            </td>
-                                                                            <td className="px-6 py-2.5">
-                                                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                                                    isWindowTitle
-                                                                                        ? 'bg-amber-100 text-amber-700'
-                                                                                        : 'bg-blue-100 text-blue-700'
-                                                                                }`}>
-                                                                                    {isWindowTitle ? 'Window Title' : 'Extension'}
-                                                                                </span>
-                                                                            </td>
-                                                                            <td className="px-6 py-2.5 text-center text-sm text-gray-600">
-                                                                                {domain.visit_count}
-                                                                            </td>
-                                                                            <td className="px-6 py-2.5 text-right text-sm font-medium text-gray-800">
-                                                                                {formatTime(domain.total_seconds)}
-                                                                            </td>
-                                                                        </tr>
-                                                                    );
-                                                                })}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-6 py-2.5 text-sm text-gray-600 capitalize">
+                                                                            {domain.browser}
+                                                                        </td>
+                                                                        <td className="px-6 py-2.5 text-center text-sm text-gray-600">
+                                                                            {domain.visit_count}
+                                                                        </td>
+                                                                        <td className="px-6 py-2.5 text-right text-sm font-medium text-gray-800">
+                                                                            {formatTime(domain.total_seconds)}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
                                                             </tbody>
                                                         </table>
                                                     )}

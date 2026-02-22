@@ -5,7 +5,8 @@ import useAuthStore from '@/lib/useAuthStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { Users, TrendingUp, TrendingDown, Minus, Calendar } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import DateRangeFilter from '@/components/DateRangeFilter';
 
 const SCORE_COLORS = {
     excellent: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', label: 'Excellent' },
@@ -94,22 +95,11 @@ export default function TeamComparison() {
                     <h1 className="text-3xl font-bold tracking-tight">Team Comparison</h1>
                     <p className="text-muted-foreground">Compare productivity across your team members.</p>
                 </div>
-                <div className="flex gap-2 items-center">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <input
-                        type="date"
-                        value={dateRange.startDate}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                        className="px-3 py-2 border rounded-lg bg-background text-sm"
-                    />
-                    <span className="text-muted-foreground">to</span>
-                    <input
-                        type="date"
-                        value={dateRange.endDate}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                        className="px-3 py-2 border rounded-lg bg-background text-sm"
-                    />
-                </div>
+                <DateRangeFilter
+                    startDate={dateRange.startDate}
+                    endDate={dateRange.endDate}
+                    onChange={(start, end) => setDateRange({ startDate: start, endDate: end })}
+                />
             </div>
 
             {/* Summary Cards */}

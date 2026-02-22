@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import UserSearchSelect from '@/components/UserSearchSelect';
 import { Download, Search, Filter, FileText, Coffee, Monitor, Image as ImageIcon } from 'lucide-react';
+import DateRangeFilter from '@/components/DateRangeFilter';
 import { Badge } from '@/components/ui/badge';
 import { utcToLocal } from '@/lib/dateUtils';
 
@@ -159,25 +160,13 @@ export default function Reports() {
             {/* Filter Bar */}
             <Card className="bg-muted/30 border-none">
                 <CardContent className="p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                        <div className="space-y-2">
-                            <Label className="text-xs uppercase font-bold text-muted-foreground">Start Date</Label>
-                            <Input
-                                type="date"
-                                value={filters.startDate}
-                                onChange={(e) => setFilters(f => ({ ...f, startDate: e.target.value }))}
-                                className="h-9"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs uppercase font-bold text-muted-foreground">End Date</Label>
-                            <Input
-                                type="date"
-                                value={filters.endDate}
-                                onChange={(e) => setFilters(f => ({ ...f, endDate: e.target.value }))}
-                                className="h-9"
-                            />
-                        </div>
+                    <div className="space-y-4">
+                        <DateRangeFilter
+                            startDate={filters.startDate}
+                            endDate={filters.endDate}
+                            onChange={(start, end) => setFilters(f => ({ ...f, startDate: start, endDate: end }))}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         {user.role !== 'user' && (
                             <div className="space-y-2">
                                 <Label className="text-xs uppercase font-bold text-muted-foreground">Team Member</Label>
@@ -195,6 +184,7 @@ export default function Reports() {
                             <Filter className="w-4 h-4 mr-2" />
                             Apply Filters
                         </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

@@ -14,6 +14,7 @@ import {
     ClipboardList, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
     Search, Filter, X, User, Settings, Coffee, Layers, AppWindow
 } from 'lucide-react';
+import DateRangeFilter from '@/components/DateRangeFilter';
 
 const ACTION_LABELS = {
     USER_CREATED: 'User Created',
@@ -215,14 +216,11 @@ export default function ActivityLogs() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="min-w-[150px]">
-                                <label className="text-xs font-medium text-muted-foreground mb-1 block">From</label>
-                                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                            </div>
-                            <div className="min-w-[150px]">
-                                <label className="text-xs font-medium text-muted-foreground mb-1 block">To</label>
-                                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-                            </div>
+                            <DateRangeFilter
+                                startDate={dateFrom}
+                                endDate={dateTo}
+                                onChange={(start, end) => { setDateFrom(start); setDateTo(end); }}
+                            />
                             {hasActiveFilters && (
                                 <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
                                     <X className="h-3 w-3" /> Clear
