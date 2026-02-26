@@ -38,14 +38,15 @@ export const getAuditLogs = async (req, res) => {
         const params = [orgId];
         let paramCount = 1;
 
-        // Role-based access: managers can only see their own logs + logs targeting their reports
+        // Role-based access: managers can only see their own logs + logs targeting their team members
         if (req.user.role === 'manager') {
             paramCount++;
             sql += ` AND (
                 al.actor_id = $${paramCount}
-                OR al.target_id IN (SELECT id FROM users WHERE manager_id = $${paramCount} AND org_id = $1)
+                OR al.target_id IN (SELECT id FROM users WHERE team_id = $${paramCount + 1} AND org_id = $1)
             )`;
-            params.push(req.user.id);
+            params.push(req.user.id, req.user.team_id);
+            paramCount++;
         }
 
         // Filters

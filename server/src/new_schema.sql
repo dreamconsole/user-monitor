@@ -34,13 +34,25 @@ CREATE TABLE org_features (
 
 COMMENT ON TABLE org_features IS 'Feature toggles per organization, typically mapped to pricing plans';
 
--- 3. Users
+-- 3. Teams
+CREATE TABLE teams (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE teams IS 'Teams for user grouping';
+
+-- 4. Users
 CREATE TYPE user_role AS ENUM ('orgadmin', 'manager', 'user');
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     manager_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     password_hash TEXT NOT NULL,

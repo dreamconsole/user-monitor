@@ -15,6 +15,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import {
     LayoutDashboard,
     Users,
+    User,
+    GitCompare,
     Menu,
     LogOut,
     Building2,
@@ -26,6 +28,8 @@ import {
     Activity,
     CalendarDays,
     ClipboardList,
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -33,46 +37,127 @@ import ThemeToggle from '../ThemeToggle';
 const Sidebar = ({ className, onLinkClick }) => {
     const location = useLocation();
     const { user } = useAuthStore();
+    const [collapsed, setCollapsed] = useState(false);
 
-    const links = [
-        { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['orgadmin', 'manager', 'user'] },
-        { href: '/users', label: 'Users', icon: Users, roles: ['orgadmin', 'manager'] },
-        { href: '/team-comparison', label: 'Team Comparison', icon: Users, roles: ['orgadmin', 'manager'] },
-        // Timeline removed as requested
-        // { href: '/timeline', label: 'Timeline', icon: CalendarDays, roles: ['orgadmin', 'manager', 'user'] },
-        { href: '/app-management', label: 'App Management', icon: Activity, roles: ['orgadmin', 'manager', 'user'] },
-        { href: '/settings', label: 'Organization Settings', icon: Settings, roles: ['orgadmin'] },
-        { href: '/breaks', label: 'Break Management', icon: Coffee, roles: ['orgadmin'] },
-        // App Categories & Mapping moved to App Management
-        { href: '/activity-logs', label: 'Activity Logs', icon: ClipboardList, roles: ['orgadmin', 'manager'] },
-        { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
+    const menuGroups = [
+        {
+            label: 'MAIN',
+            links: [
+                { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['orgadmin', 'manager', 'user'] },
+            ]
+        },
+        {
+            label: 'WORKFORCE',
+            links: [
+                { href: '/users', label: 'Users', icon: User, roles: ['orgadmin', 'manager'] },
+                { href: '/teams', label: 'Teams', icon: Users, roles: ['orgadmin'] },
+                { href: '/team-comparison', label: 'Team Comparison', icon: GitCompare, roles: ['orgadmin', 'manager'] },
+            ]
+        },
+        {
+            label: 'OPERATIONS',
+            links: [
+                { href: '/app-management', label: 'App Management', icon: Activity, roles: ['orgadmin', 'manager', 'user'] },
+                { href: '/breaks', label: 'Break Management', icon: Coffee, roles: ['orgadmin'] },
+                { href: '/activity-logs', label: 'Activity Logs', icon: ClipboardList, roles: ['orgadmin', 'manager'] },
+                { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
+            ]
+        },
+        {
+            label: 'SYSTEM',
+            links: [
+                { href: '/settings', label: 'Organization Settings', icon: Settings, roles: ['orgadmin'] },
+            ]
+        }
     ];
 
-    const filteredLinks = links.filter(link => link.roles.includes(user?.role));
-
     return (
-        <div className={`w-64 bg-background border-r h-full flex flex-col ${className}`}>
-            <div className="h-16 flex items-center px-6 border-b">
-                <Building2 className="w-6 h-6 mr-3 text-primary" />
-                <span className="font-bold text-lg truncate">{user?.org_name || 'User Monitor'}</span>
+        <div className={`${collapsed ? 'w-20' : 'w-64'} bg-background border-r h-full flex flex-col transition-all duration-300 ${className}`}>
+            <div className="h-16 flex items-center justify-between px-4 border-b shrink-0">
+                <div className={`flex items-center overflow-hidden transition-all duration-300 ${collapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}`}>
+                    <div className="flex bg-primary/10 p-2 rounded-lg mr-3">
+                        <Building2 className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-sm truncate leading-tight">{user?.org_name || 'Organization'}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Organization</span>
+                    </div>
+                </div>
+                {collapsed && (
+                    <div className="mx-auto flex bg-primary/10 p-2 rounded-lg" title={user?.org_name || 'Organization'}>
+                        <Building2 className="w-5 h-5 text-primary" />
+                    </div>
+                )}
             </div>
-            <nav className="flex-1 p-4 space-y-2">
-                {filteredLinks.map((link) => {
-                    const Icon = link.icon;
-                    const active = location.pathname === link.href;
+
+            <nav className="flex-1 overflow-y-auto px-3 py-6 space-y-8">
+                {menuGroups.map((group, groupIdx) => {
+                    const filteredLinks = group.links.filter(link => link.roles.includes(user?.role));
+                    if (filteredLinks.length === 0) return null;
+
                     return (
-                        <Link to={link.href} key={link.href} onClick={onLinkClick}>
-                            <Button
-                                variant={active ? "secondary" : "ghost"}
-                                className={`w-full justify-start transition-all ${active ? 'bg-secondary font-medium' : ''}`}
-                            >
-                                <Icon className={`w-5 h-5 mr-3 ${active ? 'text-primary' : 'text-muted-foreground'}`} />
-                                {link.label}
-                            </Button>
-                        </Link>
+                        <div key={groupIdx} className="space-y-2">
+                            {/* Section Label */}
+                            {!collapsed && (
+                                <div className="px-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                                    {group.label}
+                                </div>
+                            )}
+                            {collapsed && (
+                                <div className="px-3 border-b border-border/50 mx-2 mb-2" />
+                            )}
+
+                            <div className="space-y-1">
+                                {filteredLinks.map((link) => {
+                                    const Icon = link.icon;
+                                    const active = location.pathname === link.href;
+
+                                    return (
+                                        <Link to={link.href} key={link.href} onClick={onLinkClick} title={collapsed ? link.label : ""}>
+                                            <div
+                                                className={`flex items-center relative group px-3 py-2.5 rounded-md transition-all duration-200
+                                                    ${active
+                                                        ? 'bg-primary/5 text-primary font-semibold'
+                                                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                                    }
+                                                `}
+                                            >
+                                                {/* Left Indicator for Active State */}
+                                                {active && (
+                                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3/4 bg-primary rounded-r-md" />
+                                                )}
+
+                                                <Icon className={`w-4 h-4 flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'} ${active ? 'text-primary' : ''}`} />
+
+                                                {!collapsed && (
+                                                    <span className="truncate text-sm">{link.label}</span>
+                                                )}
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     );
                 })}
             </nav>
+
+            <div className="p-4 border-t shrink-0">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`w-full text-muted-foreground hover:bg-muted ${collapsed ? 'justify-center px-0' : 'justify-start'}`}
+                    onClick={() => setCollapsed(!collapsed)}
+                    title={collapsed ? "Expand Sidebar" : ""}
+                >
+                    {collapsed ? <ChevronRight className="w-4 h-4" /> : (
+                        <>
+                            <ChevronLeft className="w-4 h-4 mr-2" />
+                            Collapse Sidebar
+                        </>
+                    )}
+                </Button>
+            </div>
         </div>
     );
 };

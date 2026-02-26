@@ -38,7 +38,7 @@ export const getAdminDashboard = async (req, res) => {
 // Manager dashboard - team members only
 export const getManagerDashboard = async (req, res) => {
     const orgId = req.user.org_id;
-    const managerId = req.user.id;
+    const teamId = req.user.team_id;
     const { start_date, end_date } = req.query;
 
     if (!start_date || !end_date) {
@@ -58,11 +58,11 @@ export const getManagerDashboard = async (req, res) => {
              FROM user_app_summary uas
              JOIN users u ON uas.user_id = u.id
              WHERE uas.org_id = $1 
-             AND u.manager_id = $2
+             AND u.team_id = $2
              AND uas.summary_date >= $3 AND uas.summary_date <= $4
              GROUP BY uas.user_id, u.full_name, u.email
              ORDER BY total_working_seconds DESC`,
-            [orgId, managerId, start_date, end_date]
+            [orgId, teamId, start_date, end_date]
         );
 
         res.json(result.rows);
@@ -211,10 +211,10 @@ export const getProductivitySummary = async (req, res) => {
 
     if (req.user.role === 'manager') {
         const userCheck = await query(
-            `SELECT manager_id FROM users WHERE id = $1 AND org_id = $2`,
+            `SELECT team_id FROM users WHERE id = $1 AND org_id = $2`,
             [userId, orgId]
         );
-        if (userCheck.rows.length === 0 || userCheck.rows[0].manager_id !== req.user.id) {
+        if (userCheck.rows.length === 0 || userCheck.rows[0].team_id !== req.user.team_id) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
     }

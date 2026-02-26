@@ -16,10 +16,19 @@ CREATE TABLE IF NOT EXISTS roles (
 
 INSERT INTO roles (name) VALUES ('orgadmin'), ('manager'), ('user') ON CONFLICT DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS teams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
     manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
     emp_id VARCHAR(50),
     payroll_id VARCHAR(50),
     name VARCHAR(255) NOT NULL,

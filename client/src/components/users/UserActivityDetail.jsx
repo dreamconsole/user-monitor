@@ -7,7 +7,6 @@ import { utcToLocal } from '@/lib/dateUtils';
 import api from '@/lib/api';
 import CalendarView from '@/components/timeline/CalendarView';
 import DailyTimeline from '@/components/timeline/DailyTimeline';
-import ProductivityChart from '@/components/timeline/ProductivityChart';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -147,10 +146,6 @@ export default function UserActivityDetail({ user, onClose }) {
                                 loading={loadingMonth}
                             />
                         </div>
-                        {/* Productivity Chart (only shows if day data is loaded) */}
-                        {dayData && (
-                            <ProductivityChart apps={dayData.apps} />
-                        )}
                     </div>
 
                     {/* Right Column: Daily Details (8 cols) */}

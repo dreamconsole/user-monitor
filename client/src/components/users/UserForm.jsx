@@ -23,7 +23,7 @@ const createSchema = z.object({
     email: z.string().email("Invalid email"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     role: z.enum(['orgadmin', 'manager', 'user']),
-    manager_id: z.string(),
+    team_id: z.string().optional(),
     timezone: z.string().min(1, "Timezone is required"),
     emp_id: z.string().min(1, "Employee ID is required"),
     payroll_id: z.string().optional(),
@@ -37,7 +37,7 @@ const updateSchema = z.object({
     name: z.string().min(2, "Full name is required"),
     role: z.enum(['orgadmin', 'manager', 'user']),
     status: z.enum(['active', 'suspended']),
-    manager_id: z.string(),
+    team_id: z.string().optional(),
     timezone: z.string().optional(),
     emp_id: z.string().min(1, "Employee ID is required"),
     payroll_id: z.string().optional(),
@@ -52,17 +52,13 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
     const isEdit = !!user;
     const schema = isEdit ? updateSchema : createSchema;
 
-    const [managers, setManagers] = useState([]);
+    const [teams, setTeams] = useState([]);
     const [features, setFeatures] = useState(null);
     const [defaults, setDefaults] = useState(null);
     const [showPasswordField, setShowPasswordField] = useState(false);
     const [newPassword, setNewPassword] = useState('');
+    const [masterFeatureOverride, setMasterFeatureOverride] = useState(false);
     const [overrides, setOverrides] = useState({
-        is_screenshots_enabled: false,
-        is_afk_tracking_enabled: false,
-        is_breaks_enabled: false,
-        screenshot_interval_seconds: false,
-        afk_threshold_seconds: false,
         shift_start_time: false,
         work_days: false
     });
@@ -70,9 +66,8 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const { data: usersData } = await api.get('/users');
-                const eligible = usersData.filter(u => u.id !== user?.id && (u.role === 'orgadmin' || u.role === 'manager'));
-                setManagers(eligible);
+                const { data: teamsData } = await api.get('/teams');
+                setTeams(teamsData);
 
                 if (isEdit) {
                     const { data: featureData } = await api.get(`/users/${user.id}/features`);
@@ -80,13 +75,9 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
 
                     if (featureData.overrides) {
                         setFeatures(featureData.overrides);
-                        setOverrides({
-                            is_screenshots_enabled: featureData.overrides.is_screenshots_enabled !== null,
-                            is_afk_tracking_enabled: featureData.overrides.is_afk_tracking_enabled !== null,
-                            is_breaks_enabled: featureData.overrides.is_breaks_enabled !== null,
-                            screenshot_interval_seconds: featureData.overrides.screenshot_interval_seconds !== null,
-                            afk_threshold_seconds: featureData.overrides.afk_threshold_seconds !== null,
-                        });
+                        const hasFeatureOverrides = ['is_screenshots_enabled', 'is_afk_tracking_enabled', 'is_breaks_enabled', 'screenshot_interval_seconds', 'afk_threshold_seconds']
+                            .some(key => featureData.overrides[key] !== null);
+                        setMasterFeatureOverride(hasFeatureOverrides);
                     } else {
                         // Initialize with nulls but show defaults
                         setFeatures({
@@ -96,6 +87,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                             screenshot_interval_seconds: null,
                             afk_threshold_seconds: null,
                         });
+                        setMasterFeatureOverride(false);
                     }
                 }
             } catch (error) {
@@ -113,7 +105,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
             password: '',
             role: 'user',
             status: 'active',
-            manager_id: 'none',
+            team_id: '',
             timezone: getBrowserTimezone(),
             emp_id: '',
             payroll_id: '',
@@ -133,7 +125,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
             setValue('name', user.name);
             setValue('role', user.role);
             setValue('status', user.status);
-            setValue('manager_id', user.manager_id ? String(user.manager_id) : 'none');
+            setValue('team_id', user.team_id ? String(user.team_id) : '');
             setValue('timezone', user.timezone || getBrowserTimezone());
             setValue('emp_id', user.emp_id || '');
             setValue('payroll_id', user.payroll_id || '');
@@ -145,11 +137,10 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
             setValue('shift_end_time', user.shift_end_time || null);
             setValue('work_days', user.work_days || null);
 
-            setOverrides(prev => ({
-                ...prev,
+            setOverrides({
                 shift_start_time: !!user.shift_start_time,
                 work_days: !!user.work_days
-            }));
+            });
         } else {
             reset({
                 name: '',
@@ -157,7 +148,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                 password: '',
                 role: 'user',
                 status: 'active',
-                manager_id: 'none',
+                team_id: '',
                 timezone: getBrowserTimezone(),
                 emp_id: '',
                 payroll_id: '',
@@ -174,18 +165,28 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
         // Prepare features data if edited
         let finalFeatures = null;
         if (isEdit && features) {
-            finalFeatures = {
-                is_screenshots_enabled: overrides.is_screenshots_enabled ? features.is_screenshots_enabled : null,
-                is_afk_tracking_enabled: overrides.is_afk_tracking_enabled ? features.is_afk_tracking_enabled : null,
-                is_breaks_enabled: overrides.is_breaks_enabled ? features.is_breaks_enabled : null,
-                screenshot_interval_seconds: overrides.screenshot_interval_seconds ? features.screenshot_interval_seconds : null,
-                afk_threshold_seconds: overrides.afk_threshold_seconds ? features.afk_threshold_seconds : null,
-            };
+            if (masterFeatureOverride) {
+                finalFeatures = {
+                    is_screenshots_enabled: features.is_screenshots_enabled,
+                    is_afk_tracking_enabled: features.is_afk_tracking_enabled,
+                    is_breaks_enabled: features.is_breaks_enabled,
+                    screenshot_interval_seconds: features.screenshot_interval_seconds,
+                    afk_threshold_seconds: features.afk_threshold_seconds,
+                };
+            } else {
+                finalFeatures = {
+                    is_screenshots_enabled: null,
+                    is_afk_tracking_enabled: null,
+                    is_breaks_enabled: null,
+                    screenshot_interval_seconds: null,
+                    afk_threshold_seconds: null,
+                };
+            }
         }
 
         const finalData = {
             ...data,
-            manager_id: data.manager_id === 'none' ? null : data.manager_id,
+            team_id: data.team_id || null,
             // Explicitly set shift settings to null if overrides are off
             shift_start_time: overrides.shift_start_time ? data.shift_start_time : null,
             shift_end_time: overrides.shift_start_time ? data.shift_end_time : null,
@@ -233,14 +234,17 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
         }
     };
 
-    const toggleOverride = (key) => {
-        setOverrides(prev => ({ ...prev, [key]: !prev[key] }));
-        if (!overrides[key]) {
-            // Enabling override: initialize with current default or a sensible value
-            setFeatures(prev => ({
-                ...prev,
-                [key]: prev[key] === null ? defaults[key] : prev[key]
-            }));
+    const toggleMasterFeatureOverride = (checked) => {
+        setMasterFeatureOverride(checked);
+        if (checked && features && Object.values(features).every(v => v === null)) {
+            // Populate features with defaults so they have something to edit
+            setFeatures({
+                is_screenshots_enabled: defaults?.is_screenshots_enabled ?? false,
+                is_afk_tracking_enabled: defaults?.is_afk_tracking_enabled ?? false,
+                is_breaks_enabled: defaults?.is_breaks_enabled ?? false,
+                screenshot_interval_seconds: defaults?.screenshot_interval_seconds ?? 600,
+                afk_threshold_seconds: defaults?.afk_threshold_seconds ?? 600,
+            });
         }
     };
 
@@ -307,16 +311,18 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
 
                 {roleWatch !== 'orgadmin' && (
                     <div className="space-y-2">
-                        <Label>Manager (Optional)</Label>
-                        <UserSearchSelect
-                            users={managers.map(m => ({ ...m, id: String(m.id) }))}
-                            value={watch('manager_id')}
-                            onChange={(val) => setValue('manager_id', val)}
-                            placeholder="Select manager..."
-                            showAllOption
-                            allOptionLabel="No Manager"
-                            allOptionValue="none"
-                        />
+                        <Label>Team (Required)</Label>
+                        <Select onValueChange={(val) => setValue('team_id', val)} value={watch('team_id')}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select team" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {teams.map(t => (
+                                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {errors.team_id && <span className="text-destructive text-sm">{errors.team_id.message}</span>}
                     </div>
                 )}
 
@@ -511,162 +517,103 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                 {isEdit && defaults && (
                     <>
                         <Separator className="my-6" />
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Feature Overrides</h3>
-                        <p className="text-xs text-muted-foreground italic mb-4">Leave "Override" off to use organization defaults.</p>
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Feature Overrides</h3>
+                                <p className="text-xs text-muted-foreground italic">Use custom settings for this user.</p>
+                            </div>
+                            <Switch
+                                checked={masterFeatureOverride}
+                                onCheckedChange={toggleMasterFeatureOverride}
+                            />
+                        </div>
 
-                        <div className="space-y-4">
-                            {/* Screenshots Override */}
-                            <Card className="border-none bg-muted/30">
-                                <CardContent className="pt-4 space-y-3 font-normal">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex flex-col gap-0.5">
-                                            <Label className="text-sm">Enable Screenshots</Label>
-                                            <span className="text-[10px] text-muted-foreground">Org Default: {defaults.is_screenshots_enabled ? 'ON' : 'OFF'}</span>
-                                        </div>
-                                        <div className="flex items-center mt-2 gap-4">
-                                            <div className="flex items-center gap-2">
-                                                <Switch
-                                                    id="override-screenshots"
-                                                    checked={overrides.is_screenshots_enabled}
-                                                    onCheckedChange={() => toggleOverride('is_screenshots_enabled')}
-                                                />
-                                                <Label htmlFor="override-screenshots" className="text-xs text-muted-foreground">Override</Label>
+                        {masterFeatureOverride && (
+                            <div className="space-y-4">
+                                {/* Screenshots Override */}
+                                <Card className="border-none bg-muted/30">
+                                    <CardContent className="pt-4 space-y-3 font-normal">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex flex-col gap-0.5">
+                                                <Label className="text-sm">Enable Screenshots</Label>
                                             </div>
-                                            {overrides.is_screenshots_enabled && (
-                                                <Switch
-                                                    checked={features.is_screenshots_enabled}
-                                                    onCheckedChange={(val) => updateFeature('is_screenshots_enabled', val)}
-                                                />
-                                            )}
+                                            <Switch
+                                                checked={features.is_screenshots_enabled ?? false}
+                                                onCheckedChange={(val) => updateFeature('is_screenshots_enabled', val)}
+                                            />
                                         </div>
-                                    </div>
 
-                                    {overrides.is_screenshots_enabled && (
                                         <div className="flex items-center justify-between pt-2 border-t border-muted-foreground/10">
                                             <div className="flex flex-col gap-0.5">
                                                 <Label className="text-sm">Screenshot Interval</Label>
-                                                <span className="text-[10px] text-muted-foreground">Org Default: {defaults.screenshot_interval_seconds / 60}m</span>
                                             </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Switch
-                                                        id="override-interval"
-                                                        checked={overrides.screenshot_interval_seconds}
-                                                        onCheckedChange={() => toggleOverride('screenshot_interval_seconds')}
-                                                    />
-                                                    <Label htmlFor="override-interval" className="text-xs text-muted-foreground">Override</Label>
-                                                </div>
-                                                {overrides.screenshot_interval_seconds && (
-                                                    <Select
-                                                        value={String(features.screenshot_interval_seconds || defaults.screenshot_interval_seconds)}
-                                                        onValueChange={(v) => updateFeature('screenshot_interval_seconds', parseInt(v))}
-                                                    >
-                                                        <SelectTrigger className="w-[120px] h-8 text-xs">
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="60">1m</SelectItem>
-                                                            <SelectItem value="300">5m</SelectItem>
-                                                            <SelectItem value="600">10m</SelectItem>
-                                                            <SelectItem value="900">15m</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                )}
-                                            </div>
+                                            <Select
+                                                value={String(features.screenshot_interval_seconds || defaults.screenshot_interval_seconds)}
+                                                onValueChange={(v) => updateFeature('screenshot_interval_seconds', parseInt(v))}
+                                            >
+                                                <SelectTrigger className="w-[120px] h-8 text-xs">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="60">1m</SelectItem>
+                                                    <SelectItem value="300">5m</SelectItem>
+                                                    <SelectItem value="600">10m</SelectItem>
+                                                    <SelectItem value="900">15m</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                    </CardContent>
+                                </Card>
 
-                            {/* AFK Override */}
-                            <Card className="border-none bg-muted/30">
-                                <CardContent className="pt-4 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex flex-col gap-0.5">
-                                            <Label className="text-sm">AFK Tracking</Label>
-                                            <span className="text-[10px] text-muted-foreground">Org Default: {defaults.is_afk_tracking_enabled ? 'ON' : 'OFF'}</span>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex items-center gap-2">
-                                                <Switch
-                                                    id="override-afk"
-                                                    checked={overrides.is_afk_tracking_enabled}
-                                                    onCheckedChange={() => toggleOverride('is_afk_tracking_enabled')}
-                                                />
-                                                <Label htmlFor="override-afk" className="text-xs text-muted-foreground">Override</Label>
+                                {/* AFK Override */}
+                                <Card className="border-none bg-muted/30">
+                                    <CardContent className="pt-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex flex-col gap-0.5">
+                                                <Label className="text-sm">AFK Tracking</Label>
                                             </div>
-                                            {overrides.is_afk_tracking_enabled && (
-                                                <Switch
-                                                    checked={features.is_afk_tracking_enabled}
-                                                    onCheckedChange={(val) => updateFeature('is_afk_tracking_enabled', val)}
-                                                />
-                                            )}
+                                            <Switch
+                                                checked={features.is_afk_tracking_enabled ?? false}
+                                                onCheckedChange={(val) => updateFeature('is_afk_tracking_enabled', val)}
+                                            />
                                         </div>
-                                    </div>
 
-                                    {overrides.is_afk_tracking_enabled && (
                                         <div className="flex items-center justify-between pt-2 border-t border-muted-foreground/10">
                                             <div className="flex flex-col gap-0.5">
                                                 <Label className="text-sm">Idle Threshold</Label>
-                                                <span className="text-[10px] text-muted-foreground">Org Default: {defaults.afk_threshold_seconds / 60}m</span>
                                             </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Switch
-                                                        id="override-threshold"
-                                                        checked={overrides.afk_threshold_seconds}
-                                                        onCheckedChange={() => toggleOverride('afk_threshold_seconds')}
-                                                    />
-                                                    <Label htmlFor="override-threshold" className="text-xs text-muted-foreground">Override</Label>
-                                                </div>
-                                                {overrides.afk_threshold_seconds && (
-                                                    <Select
-                                                        value={String(features.afk_threshold_seconds || defaults.afk_threshold_seconds)}
-                                                        onValueChange={(v) => updateFeature('afk_threshold_seconds', parseInt(v))}
-                                                    >
-                                                        <SelectTrigger className="w-[120px] h-8 text-xs">
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="60">1m</SelectItem>
-                                                            <SelectItem value="300">5m</SelectItem>
-                                                            <SelectItem value="600">10m</SelectItem>
-                                                            <SelectItem value="1800">30m</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                )}
-                                            </div>
+                                            <Select
+                                                value={String(features.afk_threshold_seconds || defaults.afk_threshold_seconds)}
+                                                onValueChange={(v) => updateFeature('afk_threshold_seconds', parseInt(v))}
+                                            >
+                                                <SelectTrigger className="w-[120px] h-8 text-xs">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="60">1m</SelectItem>
+                                                    <SelectItem value="300">5m</SelectItem>
+                                                    <SelectItem value="600">10m</SelectItem>
+                                                    <SelectItem value="1800">30m</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                    </CardContent>
+                                </Card>
 
-                            {/* Breaks Override */}
-                            <Card className="border-none bg-muted/30">
-                                <CardContent className="pt-4 flex items-center justify-between font-normal">
-                                    <div className="flex flex-col gap-0.5">
-                                        <Label className="text-sm">Enable Breaks</Label>
-                                        <span className="text-[10px] text-muted-foreground">Org Default: {defaults.is_breaks_enabled ? 'ON' : 'OFF'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex items-center gap-2">
-                                            <Switch
-                                                id="override-breaks"
-                                                checked={overrides.is_breaks_enabled}
-                                                onCheckedChange={() => toggleOverride('is_breaks_enabled')}
-                                            />
-                                            <Label htmlFor="override-breaks" className="text-xs text-muted-foreground">Override</Label>
+                                {/* Breaks Override */}
+                                <Card className="border-none bg-muted/30">
+                                    <CardContent className="pt-4 flex items-center justify-between font-normal">
+                                        <div className="flex flex-col gap-0.5">
+                                            <Label className="text-sm">Enable Breaks</Label>
                                         </div>
-                                        {overrides.is_breaks_enabled && (
-                                            <Switch
-                                                checked={features.is_breaks_enabled}
-                                                onCheckedChange={(val) => updateFeature('is_breaks_enabled', val)}
-                                            />
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                                        <Switch
+                                            checked={features.is_breaks_enabled ?? false}
+                                            onCheckedChange={(val) => updateFeature('is_breaks_enabled', val)}
+                                        />
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        )}
                     </>
                 )}
             </div>

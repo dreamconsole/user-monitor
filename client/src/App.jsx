@@ -12,6 +12,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Users from '@/pages/Users';
+import Teams from '@/pages/Teams';
 import Settings from '@/pages/Settings';
 import Breaks from '@/pages/Breaks';
 import Reports from '@/pages/Reports';
@@ -92,6 +93,7 @@ function App() {
 
               {/* Admin Only */}
               <Route element={<RoleGuard allowedRoles={['orgadmin']} />}>
+                <Route path="/teams" element={<Teams />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/breaks" element={<Breaks />} />
               </Route>

@@ -266,7 +266,7 @@ export default function Users() {
                             <TableHead>Email</TableHead>
                             <TableHead>Role</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead>Platform</TableHead>
+                            <TableHead>Team</TableHead>
                             {canManage && <TableHead className="text-right">Actions</TableHead>}
                         </TableRow>
                     </TableHeader>
@@ -325,8 +325,7 @@ export default function Users() {
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-xs text-muted-foreground">
-                                        {/* Placeholder for OS/Platform if we had it */}
-                                        ---
+                                        {user.team_name || '—'}
                                     </TableCell>
                                     {canManage && (
                                         <TableCell className="text-right">

@@ -287,7 +287,7 @@ export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
             bm.name as break_name, 
             bm.max_duration_seconds,
             u.full_name as user_name,
-            u.manager_id,
+            u.team_id,
             u.org_id
          FROM break_master bm
          JOIN users u ON u.id = $1
@@ -296,10 +296,10 @@ export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
     );
 
     if (metadataRes.rows.length === 0) return;
-    const { break_name, max_duration_seconds, user_name, manager_id, org_id: userOrgId } = metadataRes.rows[0];
+    const { break_name, max_duration_seconds, user_name, team_id, org_id: userOrgId } = metadataRes.rows[0];
 
-    // If no limit or no manager, nothing to do
-    if (!max_duration_seconds || !manager_id) return;
+    // If no limit or no team, nothing to do
+    if (!max_duration_seconds || !team_id) return;
 
     // Use passed orgId or fall back to user's org_id
     const finalOrgId = orgId || userOrgId;
@@ -327,31 +327,40 @@ export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
         const excess = totalUsed - max_duration_seconds;
         const excessMinutes = Math.ceil(excess / 60);
 
-        // 4. Check if already notified TODAY for this break type
-        const existingNotif = await query(
-            `SELECT id FROM notifications 
-             WHERE recipient_id = $1 
-               AND actor_id = $2 
-               AND type = 'BREAK_VIOLATION'
-               AND title LIKE $3
-               AND created_at::DATE = CURRENT_DATE`,
-            [manager_id, userId, `%${break_name}%`]
+        // Find managers of the team
+        const managersRes = await query(
+            'SELECT id FROM users WHERE team_id = $1 AND role = \'manager\' AND org_id = $2',
+            [team_id, finalOrgId]
         );
 
-        if (existingNotif.rows.length === 0) {
-            // 5. Insert Notification
-            await query(
-                `INSERT INTO notifications (org_id, recipient_id, actor_id, type, title, message)
-                 VALUES ($1, $2, $3, 'BREAK_VIOLATION', $4, $5)`,
-                [
-                    finalOrgId,
-                    manager_id,
-                    userId,
-                    `Break Limit Exceeded: ${break_name}`,
-                    `${user_name} has exceeded the ${break_name} limit by ${excessMinutes} minutes.`
-                ]
+        for (const managerRow of managersRes.rows) {
+            const manager_id = managerRow.id;
+            // 4. Check if already notified TODAY for this break type
+            const existingNotif = await query(
+                `SELECT id FROM notifications 
+                 WHERE recipient_id = $1 
+                   AND actor_id = $2 
+                   AND type = 'BREAK_VIOLATION'
+                   AND title LIKE $3
+                   AND created_at::DATE = CURRENT_DATE`,
+                [manager_id, userId, `%${break_name}%`]
             );
-            console.log(`[Notification] Sent BREAK_VIOLATION for User ${userId} to Manager ${manager_id}`);
+
+            if (existingNotif.rows.length === 0) {
+                // 5. Insert Notification
+                await query(
+                    `INSERT INTO notifications (org_id, recipient_id, actor_id, type, title, message)
+                     VALUES ($1, $2, $3, 'BREAK_VIOLATION', $4, $5)`,
+                    [
+                        finalOrgId,
+                        manager_id,
+                        userId,
+                        `Break Limit Exceeded: ${break_name}`,
+                        `${user_name} has exceeded the ${break_name} limit by ${excessMinutes} minutes.`
+                    ]
+                );
+                console.log(`[Notification] Sent BREAK_VIOLATION for User ${userId} to Manager ${manager_id}`);
+            }
         }
     }
 }

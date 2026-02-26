@@ -9,12 +9,13 @@ export const getUsers = async (req, res) => {
         let sql = `
             SELECT 
                 u.id, u.full_name as name, u.email, u.role, u.is_active, 
-                u.manager_id, u.timezone, u.emp_id, u.payroll_id, u.site, 
+                u.team_id, t.name as team_name, u.timezone, u.emp_id, u.payroll_id, u.site, 
                 u.device_id, u.agent_version, u.token, u.last_heartbeat, 
                 u.force_logout, u.created_at,
                 u.shift_start_time, u.shift_end_time, u.shift_duration, u.work_days, u.start_of_day,
                 EXISTS(SELECT 1 FROM break_logs bl WHERE bl.user_id = u.id AND bl.end_time IS NULL) as is_on_break
             FROM users u 
+            LEFT JOIN teams t ON u.team_id = t.id
             WHERE u.org_id = $1
         `;
         const params = [req.user.org_id];
@@ -22,8 +23,8 @@ export const getUsers = async (req, res) => {
 
         if (req.user.role === 'manager') {
             paramCount++;
-            sql += ` AND u.manager_id = $${paramCount}`;
-            params.push(req.user.id);
+            sql += ` AND u.team_id = $${paramCount}`;
+            params.push(req.user.team_id);
         }
 
         if (search) {
@@ -58,7 +59,7 @@ export const getUsers = async (req, res) => {
 export const createUser = async (req, res) => {
     const {
         name, email, password, role,
-        manager_id, timezone, emp_id, payroll_id, site,
+        team_id, timezone, emp_id, payroll_id, site,
         shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
     } = req.body;
 
@@ -68,11 +69,11 @@ export const createUser = async (req, res) => {
     }
 
     try {
-        // Validate Manager (if provided)
-        if (manager_id) {
-            const managerCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [manager_id, req.user.org_id]);
-            if (managerCheck.rows.length === 0) {
-                return res.status(400).json({ error: 'Invalid manager selection' });
+        // Validate Team (if provided)
+        if (team_id) {
+            const teamCheck = await query('SELECT id FROM teams WHERE id = $1 AND org_id = $2', [team_id, req.user.org_id]);
+            if (teamCheck.rows.length === 0) {
+                return res.status(400).json({ error: 'Invalid team selection' });
             }
         }
 
@@ -81,13 +82,13 @@ export const createUser = async (req, res) => {
         const result = await query(
             `INSERT INTO users (
                 org_id, full_name, email, password_hash, role, 
-                manager_id, timezone, emp_id, payroll_id, site,
+                team_id, timezone, emp_id, payroll_id, site,
                 shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
             RETURNING id, full_name as name, email, role, is_active, timezone, emp_id, created_at`,
             [
                 req.user.org_id, name, email, hashedPassword, role,
-                manager_id || null, timezone || 'UTC', emp_id || null, payroll_id || null, site || null,
+                team_id || null, timezone || 'UTC', emp_id || null, payroll_id || null, site || null,
                 shift_start_time || null, shift_end_time || null, shift_duration || null, work_days || null, start_of_day || null
             ]
         );
@@ -109,31 +110,31 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
     const { id } = req.params;
     const {
-        name, role, status, manager_id, timezone, emp_id, payroll_id, site, force_logout,
+        name, role, status, team_id, timezone, emp_id, payroll_id, site, force_logout,
         shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
     } = req.body;
 
     try {
-        // PERMISSION CHECK: If Manager, ensure they own this user
+        // PERMISSION CHECK: If Manager, ensure they are editing someone on their team
         if (req.user.role === 'manager') {
-            const userCheck = await query('SELECT manager_id FROM users WHERE id = $1 AND org_id = $2', [id, req.user.org_id]);
+            const userCheck = await query('SELECT team_id FROM users WHERE id = $1 AND org_id = $2', [id, req.user.org_id]);
             if (userCheck.rows.length === 0) {
                 return res.status(404).json({ error: 'User not found' });
             }
-            if (userCheck.rows[0].manager_id !== req.user.id) {
-                return res.status(403).json({ error: 'Unauthorized: You can only manage your direct reports.' });
+            if (userCheck.rows[0].team_id !== req.user.team_id) {
+                return res.status(403).json({ error: 'Unauthorized: You can only manage your team members.' });
             }
-            // Prevent managers from changing roles or assigning new managers
-            if (role || manager_id) {
-                return res.status(403).json({ error: 'Managers cannot change user roles or reassign managers.' });
+            // Prevent managers from changing roles or assigning new teams
+            if (role || team_id) {
+                return res.status(403).json({ error: 'Managers cannot change user roles or reassign teams.' });
             }
         }
 
-        // Validate Manager (if changing)
-        if (manager_id) {
-            const managerCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [manager_id, req.user.org_id]);
-            if (managerCheck.rows.length === 0) {
-                return res.status(400).json({ error: 'Invalid manager selection' });
+        // Validate Team (if changing)
+        if (team_id) {
+            const teamCheck = await query('SELECT id FROM teams WHERE id = $1 AND org_id = $2', [team_id, req.user.org_id]);
+            if (teamCheck.rows.length === 0) {
+                return res.status(400).json({ error: 'Invalid team selection' });
             }
         }
 
@@ -144,7 +145,7 @@ export const updateUser = async (req, res) => {
                 full_name = COALESCE($1, full_name), 
                 role = COALESCE($2, role), 
                 is_active = COALESCE($3, is_active),
-                manager_id = $4,
+                team_id = $4,
                 timezone = COALESCE($5, timezone),
                 emp_id = COALESCE($6, emp_id),
                 payroll_id = COALESCE($7, payroll_id),
@@ -156,10 +157,10 @@ export const updateUser = async (req, res) => {
                 work_days = $13,
                 start_of_day = $14
             WHERE id = $15 AND org_id = $16 
-            RETURNING id, full_name as name, email, role, is_active, manager_id, timezone, emp_id, payroll_id, site, force_logout,
+            RETURNING id, full_name as name, email, role, is_active, team_id, timezone, emp_id, payroll_id, site, force_logout,
                 shift_start_time, shift_end_time, shift_duration, work_days, start_of_day`,
             [
-                name, role, isActive, manager_id || null, timezone,
+                name, role, isActive, team_id || null, timezone,
                 emp_id, payroll_id, site, force_logout,
                 shift_start_time, shift_end_time, shift_duration, work_days, start_of_day,
                 id, req.user.org_id
@@ -220,7 +221,7 @@ export const resetUserPassword = async (req, res) => {
 
     try {
         const userResult = await query(
-            'SELECT id, manager_id FROM users WHERE id = $1 AND org_id = $2',
+            'SELECT id, team_id FROM users WHERE id = $1 AND org_id = $2',
             [id, req.user.org_id]
         );
 
@@ -228,8 +229,8 @@ export const resetUserPassword = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        if (req.user.role === 'manager' && userResult.rows[0].manager_id !== req.user.id) {
-            return res.status(403).json({ error: 'You can only reset passwords for your direct reports' });
+        if (req.user.role === 'manager' && userResult.rows[0].team_id !== req.user.team_id) {
+            return res.status(403).json({ error: 'You can only reset passwords for your team members' });
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);

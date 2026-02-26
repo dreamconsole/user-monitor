@@ -44,8 +44,9 @@ export async function fetchDailySummaryData(req) {
 
     if (role === 'manager') {
         paramCount++;
-        sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
-        params.push(currentUserId);
+        sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
+        params.push(req.user.team_id, currentUserId);
+        paramCount++;
     } else if (role === 'user') {
         paramCount++;
         sql += ` AND u.id = $${paramCount}`;
@@ -115,8 +116,9 @@ export async function fetchBreakUsageData(req) {
 
     if (role === 'manager') {
         paramCount++;
-        sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
-        params.push(currentUserId);
+        sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
+        params.push(req.user.team_id, currentUserId);
+        paramCount++;
     } else if (role === 'user') {
         paramCount++;
         sql += ` AND u.id = $${paramCount}`;
@@ -247,8 +249,9 @@ export const getIdleEvents = async (req, res) => {
 
         if (role === 'manager') {
             paramCount++;
-            sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
-            params.push(currentUserId);
+            sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
+            params.push(req.user.team_id, currentUserId);
+            paramCount++;
         } else if (role === 'user') {
             paramCount++;
             sql += ` AND u.id = $${paramCount}`;

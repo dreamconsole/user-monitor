@@ -33,11 +33,11 @@ async function resolveTargetUser(req, orgId) {
             return { targetUserId: currentUserId };
         }
         const userCheck = await query(
-            'SELECT manager_id FROM users WHERE id = $1 AND org_id = $2',
+            'SELECT team_id FROM users WHERE id = $1 AND org_id = $2',
             [requestedUserId, orgId]
         );
-        if (userCheck.rows.length === 0 || userCheck.rows[0].manager_id !== currentUserId) {
-            return { error: 'Unauthorized: not your direct report' };
+        if (userCheck.rows.length === 0 || userCheck.rows[0].team_id !== req.user.team_id) {
+            return { error: 'Unauthorized: not on your team' };
         }
         return { targetUserId: requestedUserId };
     }
@@ -241,8 +241,8 @@ export const getTeamProductivity = async (req, res) => {
         if (role === 'manager') {
             usersResult = await query(
                 `SELECT id, full_name FROM users
-                 WHERE org_id = $1 AND manager_id = $2 AND is_active = true`,
-                [orgId, req.user.id]
+                 WHERE org_id = $1 AND team_id = $2 AND is_active = true`,
+                [orgId, req.user.team_id]
             );
         } else {
             usersResult = await query(
