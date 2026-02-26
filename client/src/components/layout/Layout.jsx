@@ -30,14 +30,25 @@ import {
     ClipboardList,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from '../ThemeToggle';
+import useThemeStore from '@/lib/useThemeStore';
+import { hexToHSL } from '@/lib/colorUtils';
 
 const Sidebar = ({ className, onLinkClick }) => {
     const location = useLocation();
     const { user } = useAuthStore();
     const [collapsed, setCollapsed] = useState(false);
+    const [openSubmenus, setOpenSubmenus] = useState({});
+
+    const toggleSubmenu = (label) => {
+        setOpenSubmenus(prev => ({
+            ...prev,
+            [label]: !prev[label]
+        }));
+    };
 
     const menuGroups = [
         {
@@ -57,7 +68,16 @@ const Sidebar = ({ className, onLinkClick }) => {
         {
             label: 'OPERATIONS',
             links: [
-                { href: '/app-management', label: 'App Management', icon: Activity, roles: ['orgadmin', 'manager', 'user'] },
+                {
+                    label: 'App Usage Analytics',
+                    icon: Activity,
+                    roles: ['orgadmin', 'manager', 'user'],
+                    sublinks: [
+                        { href: '/app-usage', label: 'App Usage Dashboard' },
+                        { href: '/app-categories', label: 'App Categories' },
+                        { href: '/app-mapping', label: 'App Mapping' }
+                    ]
+                },
                 { href: '/breaks', label: 'Break Management', icon: Coffee, roles: ['orgadmin'] },
                 { href: '/activity-logs', label: 'Activity Logs', icon: ClipboardList, roles: ['orgadmin', 'manager'] },
                 { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
@@ -110,7 +130,47 @@ const Sidebar = ({ className, onLinkClick }) => {
                             <div className="space-y-1">
                                 {filteredLinks.map((link) => {
                                     const Icon = link.icon;
-                                    const active = location.pathname === link.href;
+                                    const isActiveChild = link.sublinks?.some(sub => location.pathname === sub.href);
+                                    const active = location.pathname === link.href || isActiveChild;
+
+                                    if (link.sublinks) {
+                                        return (
+                                            <div key={link.label} className="space-y-1">
+                                                <div
+                                                    onClick={() => !collapsed && toggleSubmenu(link.label)}
+                                                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md transition-all duration-200 ${!collapsed ? 'cursor-pointer' : ''}
+                                                        ${active ? 'bg-primary/5 text-primary font-semibold' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
+                                                    `}
+                                                    title={collapsed ? link.label : ""}
+                                                >
+                                                    <div className="flex items-center">
+                                                        {active && (
+                                                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3/4 bg-primary rounded-r-md" />
+                                                        )}
+                                                        <Icon className={`w-4 h-4 flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'} ${active ? 'text-primary' : ''}`} />
+                                                        {!collapsed && <span className="truncate text-sm">{link.label}</span>}
+                                                    </div>
+                                                    {!collapsed && (
+                                                        openSubmenus[link.label] || isActiveChild ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
+                                                    )}
+                                                </div>
+                                                {(openSubmenus[link.label] || isActiveChild) && !collapsed && (
+                                                    <div className="ml-7 space-y-1 mt-1">
+                                                        {link.sublinks.map(sublink => {
+                                                            const subActive = location.pathname === sublink.href;
+                                                            return (
+                                                                <Link to={sublink.href} key={sublink.href} onClick={onLinkClick}>
+                                                                    <div className={`px-3 py-2 rounded-md text-sm transition-colors ${subActive ? 'text-primary font-medium bg-primary/5' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
+                                                                        {sublink.label}
+                                                                    </div>
+                                                                </Link>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    }
 
                                     return (
                                         <Link to={link.href} key={link.href} onClick={onLinkClick} title={collapsed ? link.label : ""}>
@@ -164,10 +224,18 @@ const Sidebar = ({ className, onLinkClick }) => {
 
 export default function Layout({ children }) {
     const { user, logout } = useAuthStore();
+    const { theme } = useThemeStore();
     const [mobileOpen, setMobileOpen] = useState(false);
 
+    // Dynamic primary color injection
+    const orgPrimaryLight = user?.org_primary_color_light || '#0f172a'; // Default slate-900
+    const orgPrimaryDark = user?.org_primary_color_dark || '#f8fafc'; // Default slate-50
+
+    const activeHexColor = theme === 'dark' ? orgPrimaryDark : orgPrimaryLight;
+    const activeHslColor = hexToHSL(activeHexColor);
+
     return (
-        <div className="h-screen flex bg-muted/20">
+        <div className="h-screen flex bg-muted/20" style={{ '--primary': activeHslColor }}>
             {/* Desktop Sidebar */}
             <div className="hidden lg:block h-full">
                 <Sidebar />

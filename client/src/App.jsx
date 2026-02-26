@@ -16,7 +16,9 @@ import Teams from '@/pages/Teams';
 import Settings from '@/pages/Settings';
 import Breaks from '@/pages/Breaks';
 import Reports from '@/pages/Reports';
-import AppManagement from '@/pages/AppManagement';
+import AppUsageDashboard from '@/pages/AppUsageDashboard';
+import AppCategories from '@/pages/AppCategories';
+import AppMapping from '@/pages/AppMapping';
 import Timeline from '@/pages/Timeline';
 import Profile from '@/pages/Profile';
 import TeamComparison from '@/pages/TeamComparison';
@@ -85,11 +87,12 @@ function App() {
 
               <Route path="/reports" element={<Reports />} />
 
-              {/* App Management (Consolidated) */}
-              <Route path="/app-management" element={<AppManagement />} />
+              {/* App Usage Analytics Sub-menus */}
+              <Route path="/app-usage" element={<AppUsageDashboard />} />
+              <Route path="/app-categories" element={<AppCategories />} />
+              <Route path="/app-mapping" element={<AppMapping />} />
 
-              {/* Legacy Redirects */}
-              <Route path="/app-usage" element={<Navigate to="/app-management" replace />} />
+              <Route path="/app-management" element={<Navigate to="/app-usage" replace />} />
 
               {/* Admin Only */}
               <Route element={<RoleGuard allowedRoles={['orgadmin']} />}>

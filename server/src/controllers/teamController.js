@@ -3,7 +3,7 @@ import { query } from '../db.js';
 export const getTeams = async (req, res) => {
     try {
         let sql = `
-            SELECT t.id, t.name, t.description, t.created_at,
+            SELECT t.id, t.name, t.description, t.max_members, t.created_at,
                    COUNT(u.id) as total_members,
                    (
                        SELECT json_agg(json_build_object('id', m.id, 'name', m.full_name, 'email', m.email, 'role', m.role))
@@ -42,13 +42,13 @@ export const createTeam = async (req, res) => {
         return res.status(403).json({ error: 'Only administrators can create teams' });
     }
 
-    const { name, description } = req.body;
+    const { name, description, max_members } = req.body;
     if (!name) return res.status(400).json({ error: 'Team name is required' });
 
     try {
         const result = await query(
-            'INSERT INTO teams (org_id, name, description) VALUES ($1, $2, $3) RETURNING *',
-            [req.user.org_id, name, description || null]
+            'INSERT INTO teams (org_id, name, description, max_members) VALUES ($1, $2, $3, $4) RETURNING *',
+            [req.user.org_id, name, description || null, max_members || null]
         );
         res.status(201).json({ ...result.rows[0], total_members: 0, managers: [] });
     } catch (error) {
@@ -63,12 +63,12 @@ export const updateTeam = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { name, description } = req.body;
+    const { name, description, max_members } = req.body;
 
     try {
         const result = await query(
-            'UPDATE teams SET name = COALESCE($1, name), description = COALESCE($2, description) WHERE id = $3 AND org_id = $4 RETURNING *',
-            [name, description, id, req.user.org_id]
+            'UPDATE teams SET name = COALESCE($1, name), description = COALESCE($2, description), max_members = $3 WHERE id = $4 AND org_id = $5 RETURNING *',
+            [name, description, max_members || null, id, req.user.org_id]
         );
 
         if (result.rows.length === 0) return res.status(404).json({ error: 'Team not found' });
@@ -131,6 +131,21 @@ export const addMembers = async (req, res) => {
     }
 
     try {
+        // Enforce max members rule
+        const teamCheck = await query('SELECT max_members FROM teams WHERE id = $1 AND org_id = $2', [id, req.user.org_id]);
+        if (teamCheck.rows.length === 0) return res.status(404).json({ error: 'Team not found' });
+
+        const maxMembers = teamCheck.rows[0].max_members;
+
+        if (maxMembers) {
+            const currentMembersCount = await query('SELECT COUNT(*) FROM users WHERE team_id = $1 AND org_id = $2 AND role != $3', [id, req.user.org_id, 'manager']);
+            const newMembersLength = userIds.length;
+            const totalEst = parseInt(currentMembersCount.rows[0].count) + newMembersLength;
+            if (totalEst > maxMembers) {
+                return res.status(400).json({ error: `This team has a limit of ${maxMembers} members. Adding these users would exceed the limit.` });
+            }
+        }
+
         // Enforce max 2 managers rule
         // 1. Get current managers on the team
         const currentManagersRes = await query(

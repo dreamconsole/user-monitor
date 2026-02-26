@@ -39,7 +39,19 @@ export default function TeamMembersForm({ team, onMembersUpdated }) {
         if (!selectedUserId) return;
         setIsAdding(true);
         try {
-            await api.post(`/teams/${team.id}/members`, { userIds: [selectedUserId] });
+            const user = unassignedUsers.find(u => u.id === selectedUserId);
+            if (user && user.team_id && user.team_id !== team.id) {
+                const confirmed = window.confirm(`This user currently belongs to another team. Are you sure you want to move them to ${team.name}?`);
+                if (!confirmed) {
+                    setIsAdding(false);
+                    return;
+                }
+            }
+
+            await api.post(`/teams/${team.id}/members`, {
+                user_ids: [selectedUserId],
+                role: 'employee'
+            });
             toast.success('Member added successfully');
             setSelectedUserId('');
             await fetchData();

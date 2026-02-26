@@ -204,13 +204,13 @@ export default function AppUsageDashboard() {
 
     if (error) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                    <div className="text-red-500 text-lg font-semibold mb-2">{error}</div>
-                    <p className="text-gray-600 mb-4">Check the browser console (F12) for more details</p>
+            <div className="flex items-center justify-center h-64 border rounded-lg bg-card mt-6">
+                <div className="text-center p-6">
+                    <div className="text-destructive text-lg font-semibold mb-2">{error}</div>
+                    <p className="text-muted-foreground mb-6">Check the browser console (F12) for more details</p>
                     <button
                         onClick={() => window.location.href = '/login'}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                     >
                         Go to Login
                     </button>
@@ -221,8 +221,11 @@ export default function AppUsageDashboard() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="text-gray-500">Loading dashboard...</div>
+            <div className="flex items-center justify-center h-64 border rounded-lg bg-card mt-6">
+                <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                    <Loader2 className="w-8 h-8 animate-spin" />
+                    <span>Loading dashboard...</span>
+                </div>
             </div>
         );
     }
@@ -234,8 +237,8 @@ export default function AppUsageDashboard() {
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">App Usage Dashboard</h1>
-                    <p className="text-gray-600 mt-1">Track your application usage and productivity</p>
+                    <h1 className="text-2xl font-bold text-foreground">App Usage Dashboard</h1>
+                    <p className="text-muted-foreground mt-1">Track your application usage and productivity</p>
                 </div>
                 <div className="flex gap-4 items-center">
                     {/* User Selector for Manager/Admin */}
@@ -262,37 +265,37 @@ export default function AppUsageDashboard() {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-card text-card-foreground border rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600">Total Time</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">
+                            <p className="text-sm font-medium text-muted-foreground">Total Time</p>
+                            <p className="text-2xl font-bold mt-1">
                                 {formatTime(getTotalSeconds())}
                             </p>
                         </div>
-                        <Clock className="text-blue-500" size={40} />
+                        <Clock className="text-blue-500 text-primary" size={32} />
                     </div>
                 </div>
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-card text-card-foreground border rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600">Top App</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">
+                            <p className="text-sm font-medium text-muted-foreground">Top App</p>
+                            <p className="text-2xl font-bold mt-1 max-w-[150px] truncate" title={dashboardData?.top_apps?.[0]?.display_name || 'N/A'}>
                                 {dashboardData?.top_apps?.[0]?.display_name || 'N/A'}
                             </p>
                         </div>
-                        <TrendingUp className="text-green-500" size={40} />
+                        <TrendingUp className="text-green-500" size={32} />
                     </div>
                 </div>
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-card text-card-foreground border rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600">Categories</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">
+                            <p className="text-sm font-medium text-muted-foreground">Categories</p>
+                            <p className="text-2xl font-bold mt-1">
                                 {productivityData.length}
                             </p>
                         </div>
-                        <PieChartIcon className="text-purple-500" size={40} />
+                        <PieChartIcon className="text-purple-500" size={32} />
                     </div>
                 </div>
             </div>
@@ -300,8 +303,8 @@ export default function AppUsageDashboard() {
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Productivity Pie Chart */}
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <h2 className="text-lg font-semibold mb-4">Productivity Breakdown</h2>
+                <div className="bg-card border text-card-foreground rounded-lg shadow-sm p-6">
+                    <h2 className="text-lg font-semibold mb-4 text-foreground">Productivity Breakdown</h2>
                     {pieData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
                             <PieChart>
@@ -323,13 +326,13 @@ export default function AppUsageDashboard() {
                             </PieChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="text-center text-gray-500 py-12">No data available</div>
+                        <div className="text-center text-muted-foreground py-12">No data available</div>
                     )}
                 </div>
 
                 {/* Category Bar Chart */}
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <h2 className="text-lg font-semibold mb-4">Time by Category</h2>
+                <div className="bg-card border text-card-foreground rounded-lg shadow-sm p-6">
+                    <h2 className="text-lg font-semibold mb-4 text-foreground">Time by Category</h2>
                     {barData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
                             <BarChart data={barData}>
@@ -341,35 +344,35 @@ export default function AppUsageDashboard() {
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="text-center text-gray-500 py-12">No data available</div>
+                        <div className="text-center text-muted-foreground py-12">No data available</div>
                     )}
                 </div>
             </div>
 
             {/* Top Apps Table */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
+            <div className="bg-card text-card-foreground border rounded-lg shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b">
                     <h2 className="text-lg font-semibold">Top Applications</h2>
-                    <p className="text-xs text-gray-400 mt-1">Click on a browser app to see domain-level breakdown</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click on a browser app to see domain-level breakdown</p>
                 </div>
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-border">
+                    <thead className="bg-muted/50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                 Application
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                 Category
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                 Type
                             </th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                 Time Spent
                             </th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                         {dashboardData?.top_apps?.map((app, index) => {
                             const isBrowser = isBrowserApp(app.executable_name);
                             const isExpanded = expandedBrowser === index;
@@ -377,37 +380,37 @@ export default function AppUsageDashboard() {
                             return (
                                 <React.Fragment key={index}>
                                     <tr
-                                        className={`hover:bg-gray-50 ${isBrowser ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-blue-50' : ''}`}
+                                        className={`hover:bg-muted/30 ${isBrowser ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-primary/5' : ''}`}
                                         onClick={() => isBrowser && fetchBrowserDomains(index, app.executable_name)}
                                     >
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center gap-2">
                                                 {isBrowser && (
                                                     isExpanded
-                                                        ? <ChevronDown size={16} className="text-blue-500 flex-shrink-0" />
-                                                        : <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
+                                                        ? <ChevronDown size={16} className="text-primary flex-shrink-0" />
+                                                        : <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
                                                 )}
                                                 <div>
-                                                    <div className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
+                                                    <div className="text-sm font-medium text-foreground flex items-center gap-1.5">
                                                         {app.display_name}
-                                                        {isBrowser && <Globe size={14} className="text-blue-400" />}
+                                                        {isBrowser && <Globe size={14} className="text-blue-500" />}
                                                     </div>
-                                                    <div className="text-xs text-gray-500">{app.executable_name}</div>
+                                                    <div className="text-xs text-muted-foreground">{app.executable_name}</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                             {app.category_name || 'Uncategorized'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${app.productivity_type === 'productive' ? 'bg-green-100 text-green-800' :
-                                                    app.productivity_type === 'non_productive' ? 'bg-red-100 text-red-800' :
-                                                        'bg-gray-100 text-gray-800'
+                                                app.productivity_type === 'non_productive' ? 'bg-red-100 text-red-800' :
+                                                    'bg-gray-100 text-gray-800'
                                                 }`}>
                                                 {app.productivity_type?.replace('_', ' ') || 'neutral'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-foreground">
                                             {formatTime(app.total_seconds)}
                                         </td>
                                     </tr>
@@ -416,44 +419,44 @@ export default function AppUsageDashboard() {
                                     {isBrowser && isExpanded && (
                                         <tr>
                                             <td colSpan={4} className="p-0">
-                                                <div className="bg-blue-50/50 border-t border-b border-blue-100">
+                                                <div className="bg-primary/5 border-t border-b">
                                                     {browserDomainsLoading ? (
-                                                        <div className="flex items-center justify-center py-6 gap-2 text-gray-500">
+                                                        <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
                                                             <Loader2 size={16} className="animate-spin" />
                                                             <span className="text-sm">Loading domain details...</span>
                                                         </div>
                                                     ) : browserDomains.length === 0 ? (
-                                                        <div className="text-center py-6 text-gray-500 text-sm">
+                                                        <div className="text-center py-6 text-muted-foreground text-sm">
                                                             No browser activity data for this date range
                                                         </div>
                                                     ) : (
                                                         <table className="min-w-full">
                                                             <thead>
-                                                                <tr className="bg-blue-100/50">
-                                                                    <th className="px-10 py-2 text-left text-xs font-medium text-blue-700 uppercase">Page Title</th>
-                                                                    <th className="px-6 py-2 text-left text-xs font-medium text-blue-700 uppercase">Browser</th>
-                                                                    <th className="px-6 py-2 text-center text-xs font-medium text-blue-700 uppercase">Visits</th>
-                                                                    <th className="px-6 py-2 text-right text-xs font-medium text-blue-700 uppercase">Time Spent</th>
+                                                                <tr className="bg-primary/10">
+                                                                    <th className="px-10 py-2 text-left text-xs font-medium text-primary uppercase">Page Title</th>
+                                                                    <th className="px-6 py-2 text-left text-xs font-medium text-primary uppercase">Browser</th>
+                                                                    <th className="px-6 py-2 text-center text-xs font-medium text-primary uppercase">Visits</th>
+                                                                    <th className="px-6 py-2 text-right text-xs font-medium text-primary uppercase">Time Spent</th>
                                                                 </tr>
                                                             </thead>
-                                                            <tbody>
+                                                            <tbody className="divide-y divide-border">
                                                                 {browserDomains.map((domain, dIdx) => (
-                                                                    <tr key={dIdx} className="border-t border-blue-100/50 hover:bg-blue-100/30">
+                                                                    <tr key={dIdx} className="hover:bg-primary/5 transition-colors">
                                                                         <td className="px-10 py-2.5">
                                                                             <div className="flex items-center gap-2">
-                                                                                <Globe size={14} className="text-blue-400 flex-shrink-0" />
-                                                                                <div className="text-sm font-medium text-gray-800 truncate max-w-md">
+                                                                                <Globe size={14} className="text-primary flex-shrink-0" />
+                                                                                <div className="text-sm font-medium text-foreground truncate max-w-md">
                                                                                     {domain.domain}
                                                                                 </div>
                                                                             </div>
                                                                         </td>
-                                                                        <td className="px-6 py-2.5 text-sm text-gray-600 capitalize">
+                                                                        <td className="px-6 py-2.5 text-sm text-muted-foreground capitalize">
                                                                             {domain.browser}
                                                                         </td>
-                                                                        <td className="px-6 py-2.5 text-center text-sm text-gray-600">
+                                                                        <td className="px-6 py-2.5 text-center text-sm text-muted-foreground">
                                                                             {domain.visit_count}
                                                                         </td>
-                                                                        <td className="px-6 py-2.5 text-right text-sm font-medium text-gray-800">
+                                                                        <td className="px-6 py-2.5 text-right text-sm font-medium text-foreground">
                                                                             {formatTime(domain.total_seconds)}
                                                                         </td>
                                                                     </tr>
@@ -471,7 +474,7 @@ export default function AppUsageDashboard() {
                     </tbody>
                 </table>
                 {(!dashboardData?.top_apps || dashboardData.top_apps.length === 0) && (
-                    <div className="text-center py-12 text-gray-500">
+                    <div className="text-center py-12 text-muted-foreground">
                         No application usage data for the selected date range
                     </div>
                 )}

@@ -8,7 +8,8 @@ export const getOrgSettings = async (req, res) => {
         const orgResult = await query(
             `SELECT 
                 name, max_users_limit, timezone,
-                shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
+                shift_start_time, shift_end_time, shift_duration, work_days, start_of_day,
+                primary_color_light, primary_color_dark
             FROM organizations WHERE id = $1`,
             [orgId]
         );
@@ -37,7 +38,8 @@ export const getOrgSettings = async (req, res) => {
 export const updateOrgSettings = async (req, res) => {
     const {
         features, timezone,
-        shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
+        shift_start_time, shift_end_time, shift_duration, work_days, start_of_day,
+        primary_color_light, primary_color_dark
     } = req.body;
     const orgId = req.user.org_id;
 
@@ -51,8 +53,10 @@ export const updateOrgSettings = async (req, res) => {
                 shift_duration = COALESCE($4, shift_duration),
                 work_days = COALESCE($5, work_days),
                 start_of_day = COALESCE($6, start_of_day),
+                primary_color_light = COALESCE($7, primary_color_light),
+                primary_color_dark = COALESCE($8, primary_color_dark),
                 updated_at = CURRENT_TIMESTAMP 
-            WHERE id = $7`,
+            WHERE id = $9`,
             [
                 timezone,
                 shift_start_time,
@@ -60,6 +64,8 @@ export const updateOrgSettings = async (req, res) => {
                 shift_duration,
                 work_days,
                 start_of_day,
+                primary_color_light,
+                primary_color_dark,
                 orgId
             ]
         );
@@ -120,7 +126,8 @@ export const updateOrgSettings = async (req, res) => {
         const orgResult = await query(
             `SELECT 
                 name, max_users_limit, timezone,
-                shift_start_time, shift_end_time, shift_duration, work_days, start_of_day
+                shift_start_time, shift_end_time, shift_duration, work_days, start_of_day,
+                primary_color_light, primary_color_dark
             FROM organizations WHERE id = $1`,
             [orgId]
         );

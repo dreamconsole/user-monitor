@@ -10,7 +10,8 @@ import { Loader2 } from 'lucide-react';
 
 const teamSchema = z.object({
     name: z.string().min(2, 'Name must be at least 2 characters'),
-    description: z.string().optional()
+    description: z.string().optional(),
+    max_members: z.coerce.number().min(1, 'Must be at least 1').optional().or(z.literal(''))
 });
 
 export default function TeamForm({ team, onSubmit, isSubmitting }) {
@@ -23,7 +24,8 @@ export default function TeamForm({ team, onSubmit, isSubmitting }) {
         resolver: zodResolver(teamSchema),
         defaultValues: {
             name: team?.name || '',
-            description: team?.description || ''
+            description: team?.description || '',
+            max_members: team?.max_members || ''
         }
     });
 
@@ -31,10 +33,11 @@ export default function TeamForm({ team, onSubmit, isSubmitting }) {
         if (team) {
             reset({
                 name: team.name,
-                description: team.description || ''
+                description: team.description || '',
+                max_members: team.max_members || ''
             });
         } else {
-            reset({ name: '', description: '' });
+            reset({ name: '', description: '', max_members: '' });
         }
     }, [team, reset]);
 
@@ -55,12 +58,24 @@ export default function TeamForm({ team, onSubmit, isSubmitting }) {
             </div>
 
             <div className="space-y-2">
+                <Label htmlFor="max_members">Max Members Capacity (Optional)</Label>
+                <Input
+                    id="max_members"
+                    type="number"
+                    min="1"
+                    {...register('max_members')}
+                    placeholder="Leave blank for unlimited"
+                />
+                {errors.max_members && <p className="text-sm text-destructive">{errors.max_members.message}</p>}
+            </div>
+
+            <div className="space-y-2">
                 <Label htmlFor="description">Description (Optional)</Label>
                 <Textarea
                     id="description"
                     {...register('description')}
                     placeholder="Briefly describe this team's purpose"
-                    rows={4}
+                    rows={3}
                 />
             </div>
 

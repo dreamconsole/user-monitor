@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS organizations (
     country VARCHAR(100),
     industry VARCHAR(100),
     timezone VARCHAR(100),
+    primary_color_light VARCHAR(7),
+    primary_color_dark VARCHAR(7),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -21,6 +23,7 @@ CREATE TABLE IF NOT EXISTS teams (
     org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
+    max_members INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

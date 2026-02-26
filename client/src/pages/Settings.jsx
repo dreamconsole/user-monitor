@@ -24,6 +24,8 @@ export default function Settings() {
         shift_duration: 9.00,
         work_days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
         start_of_day: '00:00',
+        primary_color_light: '#0f172a',
+        primary_color_dark: '#f8fafc',
         features: {
             is_activity_tracking_enabled: true,
             is_screenshots_enabled: true,
@@ -49,7 +51,9 @@ export default function Settings() {
                 shift_end_time: data.shift_end_time || '18:00',
                 shift_duration: data.shift_duration || 9.00,
                 work_days: data.work_days || ["Mon", "Tue", "Wed", "Thu", "Fri"],
-                start_of_day: data.start_of_day || '00:00'
+                start_of_day: data.start_of_day || '00:00',
+                primary_color_light: data.primary_color_light || '#0f172a',
+                primary_color_dark: data.primary_color_dark || '#f8fafc'
             });
         } catch (error) {
             console.error('Failed to fetch settings:', error);
@@ -122,7 +126,9 @@ export default function Settings() {
                 shift_end_time: settings.shift_end_time,
                 shift_duration: settings.shift_duration,
                 work_days: JSON.stringify(settings.work_days),
-                start_of_day: settings.start_of_day
+                start_of_day: settings.start_of_day,
+                primary_color_light: settings.primary_color_light,
+                primary_color_dark: settings.primary_color_dark
             });
             toast.success('Settings saved successfully!');
         } catch (error) {
@@ -197,6 +203,40 @@ export default function Settings() {
                         </Select>
                         <p className="text-xs text-muted-foreground">Default timezone for users and organization reporting.</p>
                     </div>
+
+                    <Separator className="my-4" />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label>Light Mode Primary Color</Label>
+                            <div className="flex items-center gap-3">
+                                <Input
+                                    type="color"
+                                    className="w-14 h-10 p-1 rounded-sm"
+                                    value={settings.primary_color_light}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, primary_color_light: e.target.value }))}
+                                />
+                                <Badge style={{ backgroundColor: settings.primary_color_light, color: '#ffffff' }} variant="outline">
+                                    Preview
+                                </Badge>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Dark Mode Primary Color</Label>
+                            <div className="flex items-center gap-3">
+                                <Input
+                                    type="color"
+                                    className="w-14 h-10 p-1 rounded-sm"
+                                    value={settings.primary_color_dark}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, primary_color_dark: e.target.value }))}
+                                />
+                                <Badge style={{ backgroundColor: settings.primary_color_dark, color: '#0f172a' }} variant="outline">
+                                    Preview
+                                </Badge>
+                            </div>
+                        </div>
+                    </div>
+
                 </CardContent>
             </Card>
 
