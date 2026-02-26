@@ -109,8 +109,10 @@ export default function Breaks() {
                     <TableHeader>
                         <TableRow className="bg-muted/50">
                             <TableHead>Break Name</TableHead>
-                            <TableHead>Max Duration</TableHead>
+                            <TableHead>Assigned Group</TableHead>
                             <TableHead>Type</TableHead>
+                            <TableHead>Rules</TableHead>
+                            <TableHead>Compensation</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -120,7 +122,24 @@ export default function Breaks() {
                             <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="font-medium">{item.name}</TableCell>
                                 <TableCell>
-                                    {item.max_duration_seconds ? `${item.max_duration_seconds / 60} minutes` : 'No limit'}
+                                    {item.group_name ? (
+                                        <Badge variant="outline">{item.group_name}</Badge>
+                                    ) : (
+                                        <span className="text-muted-foreground italic text-sm">Unassigned</span>
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant="secondary" className="capitalize">{item.break_type || 'flexible'}</Badge>
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {item.break_type === 'fixed' ? (
+                                        <span>{item.fixed_start_time} - {item.fixed_end_time}</span>
+                                    ) : (
+                                        <div className="flex flex-col gap-0.5">
+                                            <span>{item.max_duration_seconds ? `${item.max_duration_seconds / 60} minutes` : 'No limit'}</span>
+                                            {item.daily_limit && <span className="text-xs text-muted-foreground">Max {item.daily_limit}x/day</span>}
+                                        </div>
+                                    )}
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant={item.is_paid ? 'default' : 'secondary'}>
@@ -164,6 +183,6 @@ export default function Breaks() {
                     <BreakForm breakItem={editingBreak} onSubmit={onSubmit} isSubmitting={isSubmitting} />
                 </SheetContent>
             </Sheet>
-        </div>
+        </div >
     );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import useAuthStore from '@/lib/useAuthStore';
 import { Button } from '@/components/ui/button';
@@ -78,7 +78,15 @@ const Sidebar = ({ className, onLinkClick }) => {
                         { href: '/app-mapping', label: 'App Mapping' }
                     ]
                 },
-                { href: '/breaks', label: 'Break Management', icon: Coffee, roles: ['orgadmin'] },
+                {
+                    label: 'Break Management',
+                    icon: Coffee,
+                    roles: ['orgadmin'],
+                    sublinks: [
+                        { href: '/break-groups', label: 'Break Groups' },
+                        { href: '/breaks', label: 'Break Policies' }
+                    ]
+                },
                 { href: '/activity-logs', label: 'Activity Logs', icon: ClipboardList, roles: ['orgadmin', 'manager'] },
                 { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
             ]
@@ -234,8 +242,12 @@ export default function Layout({ children }) {
     const activeHexColor = theme === 'dark' ? orgPrimaryDark : orgPrimaryLight;
     const activeHslColor = hexToHSL(activeHexColor);
 
+    useEffect(() => {
+        document.documentElement.style.setProperty('--primary', activeHslColor);
+    }, [activeHslColor]);
+
     return (
-        <div className="h-screen flex bg-muted/20" style={{ '--primary': activeHslColor }}>
+        <div className="h-screen flex bg-muted/20">
             {/* Desktop Sidebar */}
             <div className="hidden lg:block h-full">
                 <Sidebar />

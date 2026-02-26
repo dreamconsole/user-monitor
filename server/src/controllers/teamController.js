@@ -3,7 +3,8 @@ import { query } from '../db.js';
 export const getTeams = async (req, res) => {
     try {
         let sql = `
-            SELECT t.id, t.name, t.description, t.max_members, t.created_at,
+            SELECT t.id, t.name, t.description, t.max_members, t.break_group_id, t.created_at,
+                   bg.name as break_group_name,
                    COUNT(u.id) as total_members,
                    (
                        SELECT json_agg(json_build_object('id', m.id, 'name', m.full_name, 'email', m.email, 'role', m.role))
@@ -11,6 +12,7 @@ export const getTeams = async (req, res) => {
                    ) as managers
             FROM teams t
             LEFT JOIN users u ON u.team_id = t.id
+            LEFT JOIN break_groups bg ON t.break_group_id = bg.id
             WHERE t.org_id = $1
         `;
         const params = [req.user.org_id];
@@ -20,7 +22,7 @@ export const getTeams = async (req, res) => {
             params.push(req.user.team_id);
         }
 
-        sql += ` GROUP BY t.id ORDER BY t.name ASC`;
+        sql += ` GROUP BY t.id, bg.name ORDER BY t.name ASC`;
 
         const result = await query(sql, params);
 
@@ -42,13 +44,13 @@ export const createTeam = async (req, res) => {
         return res.status(403).json({ error: 'Only administrators can create teams' });
     }
 
-    const { name, description, max_members } = req.body;
+    const { name, description, max_members, break_group_id } = req.body;
     if (!name) return res.status(400).json({ error: 'Team name is required' });
 
     try {
         const result = await query(
-            'INSERT INTO teams (org_id, name, description, max_members) VALUES ($1, $2, $3, $4) RETURNING *',
-            [req.user.org_id, name, description || null, max_members || null]
+            'INSERT INTO teams (org_id, name, description, max_members, break_group_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [req.user.org_id, name, description || null, max_members || null, break_group_id || null]
         );
         res.status(201).json({ ...result.rows[0], total_members: 0, managers: [] });
     } catch (error) {
@@ -63,12 +65,12 @@ export const updateTeam = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { name, description, max_members } = req.body;
+    const { name, description, max_members, break_group_id } = req.body;
 
     try {
         const result = await query(
-            'UPDATE teams SET name = COALESCE($1, name), description = COALESCE($2, description), max_members = $3 WHERE id = $4 AND org_id = $5 RETURNING *',
-            [name, description, max_members || null, id, req.user.org_id]
+            'UPDATE teams SET name = COALESCE($1, name), description = COALESCE($2, description), max_members = $3, break_group_id = $4 WHERE id = $5 AND org_id = $6 RETURNING *',
+            [name, description, max_members || null, break_group_id || null, id, req.user.org_id]
         );
 
         if (result.rows.length === 0) return res.status(404).json({ error: 'Team not found' });

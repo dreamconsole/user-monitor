@@ -16,7 +16,14 @@ CREATE TABLE IF NOT EXISTS roles (
     name VARCHAR(50) PRIMARY KEY
 );
 
-INSERT INTO roles (name) VALUES ('orgadmin'), ('manager'), ('user') ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS break_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    is_default BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE IF NOT EXISTS teams (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,6 +31,7 @@ CREATE TABLE IF NOT EXISTS teams (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     max_members INTEGER,
+    break_group_id UUID REFERENCES break_groups(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -79,4 +87,19 @@ CREATE TABLE IF NOT EXISTS heartbeats (
     status VARCHAR(50),
     last_seen_at VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS break_master (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    break_group_id UUID REFERENCES break_groups(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    break_type VARCHAR(20) DEFAULT 'flexible',
+    fixed_start_time TIME,
+    fixed_end_time TIME,
+    max_duration_seconds INTEGER,
+    daily_limit INTEGER,
+    is_paid BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

@@ -414,16 +414,39 @@ export const getBreaks = async (req, res) => {
     const targetOrgId = org_id || req.user.org_id;
 
     try {
-        // 1. Get all active break types
-        const breaksResult = await query(
-            'SELECT id, name, max_duration_seconds, is_paid FROM break_master WHERE org_id = $1 AND is_active = true ORDER BY name ASC',
-            [targetOrgId]
-        );
-
-        // 2. Calculate used time for each break type for the current day
         const userId = req.user.id;
+
+        // 1. Resolve User's Break Group
+        // Priority: Team's Break Group -> Org Default Break Group
+        const groupRes = await query(`
+            SELECT 
+                COALESCE(
+                    (SELECT break_group_id FROM teams t JOIN users u ON u.team_id = t.id WHERE u.id = $1 LIMIT 1),
+                    (SELECT id FROM break_groups WHERE org_id = $2 AND is_default = true LIMIT 1)
+                ) as active_group_id
+        `, [userId, targetOrgId]);
+
+        const activeGroupId = groupRes.rows[0]?.active_group_id;
+
+        // 2. Get active break types for this group
+        let breaksQuery;
+        let queryParams;
+
+        if (activeGroupId) {
+            breaksQuery = 'SELECT id, name, break_type, fixed_start_time, fixed_end_time, max_duration_seconds, daily_limit, is_paid FROM break_master WHERE org_id = $1 AND break_group_id = $2 AND is_active = true ORDER BY name ASC';
+            queryParams = [targetOrgId, activeGroupId];
+        } else {
+            // Fallback if no groups are defined (legacy support)
+            breaksQuery = 'SELECT id, name, break_type, fixed_start_time, fixed_end_time, max_duration_seconds, daily_limit, is_paid FROM break_master WHERE org_id = $1 AND break_group_id IS NULL AND is_active = true ORDER BY name ASC';
+            queryParams = [targetOrgId];
+        }
+
+        const breaksResult = await query(breaksQuery, queryParams);
+
+        // 3. Calculate used time and daily counts for the current day
         const usageResult = await query(
             `SELECT break_type_id, 
+                    COUNT(*) as daily_uses,
                     SUM(
                         CASE 
                             WHEN duration_seconds IS NOT NULL THEN duration_seconds
@@ -433,7 +456,7 @@ export const getBreaks = async (req, res) => {
                     ) as total_used_seconds
              FROM break_logs 
              WHERE user_id = $1 
-               AND start_time::DATE = CURRENT_DATE
+               AND start_time::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::DATE
              GROUP BY break_type_id`,
             [userId]
         );
@@ -441,16 +464,22 @@ export const getBreaks = async (req, res) => {
         // Map usage to a lookup object
         const usageMap = {};
         usageResult.rows.forEach(row => {
-            usageMap[row.break_type_id] = Math.floor(parseFloat(row.total_used_seconds) || 0);
+            usageMap[row.break_type_id] = {
+                used_seconds: Math.floor(parseFloat(row.total_used_seconds) || 0),
+                daily_uses: parseInt(row.daily_uses) || 0
+            };
         });
 
-        // 3. Merge usage into break types
+        // 4. Merge usage and evaluate limits
         const breaksWithUsage = breaksResult.rows.map(b => {
-            const used = usageMap[b.id] || 0;
+            const usage = usageMap[b.id] || { used_seconds: 0, daily_uses: 0 };
+
             return {
                 ...b,
-                used_seconds: used,
-                remaining_seconds: b.max_duration_seconds ? Math.max(0, b.max_duration_seconds - used) : null
+                used_seconds: usage.used_seconds,
+                daily_uses: usage.daily_uses,
+                remaining_seconds: b.max_duration_seconds ? Math.max(0, b.max_duration_seconds - usage.used_seconds) : null,
+                is_limit_reached: (b.daily_limit && usage.daily_uses >= b.daily_limit) || false
             };
         });
 

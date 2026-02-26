@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, Users } from 'lucide-react';
 import TeamForm from '@/components/teams/TeamForm';
 import TeamMembersForm from '@/components/teams/TeamMembersForm';
@@ -114,6 +115,7 @@ export default function Teams() {
                     <TableHeader>
                         <TableRow className="bg-muted/50">
                             <TableHead>Team Name</TableHead>
+                            <TableHead>Break Group</TableHead>
                             <TableHead>Description</TableHead>
                             <TableHead className="text-center">Members</TableHead>
                             <TableHead>Managers</TableHead>
@@ -134,6 +136,13 @@ export default function Teams() {
                         {teams.map((team) => (
                             <TableRow key={team.id} className="hover:bg-muted/30">
                                 <TableCell className="font-medium">{team.name}</TableCell>
+                                <TableCell>
+                                    {team.break_group_name ? (
+                                        <Badge variant="outline">{team.break_group_name}</Badge>
+                                    ) : (
+                                        <span className="text-muted-foreground italic text-xs">Org Default</span>
+                                    )}
+                                </TableCell>
                                 <TableCell className="text-muted-foreground">{team.description || '—'}</TableCell>
                                 <TableCell className="text-center">
                                     <span className="inline-flex items-center justify-center bg-primary/10 text-primary w-6 h-6 rounded-full text-xs font-medium">

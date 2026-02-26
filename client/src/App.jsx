@@ -14,6 +14,7 @@ import Dashboard from './pages/Dashboard';
 import Users from '@/pages/Users';
 import Teams from '@/pages/Teams';
 import Settings from '@/pages/Settings';
+import BreakGroups from '@/pages/BreakGroups';
 import Breaks from '@/pages/Breaks';
 import Reports from '@/pages/Reports';
 import AppUsageDashboard from '@/pages/AppUsageDashboard';
@@ -98,6 +99,7 @@ function App() {
               <Route element={<RoleGuard allowedRoles={['orgadmin']} />}>
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/break-groups" element={<BreakGroups />} />
                 <Route path="/breaks" element={<Breaks />} />
               </Route>
 

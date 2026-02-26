@@ -115,22 +115,20 @@ export default function DateRangeFilter({ startDate, endDate, onChange }) {
                 <button
                     key={preset.label}
                     onClick={() => handlePreset(preset)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                        activePreset === preset.label
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${activePreset === preset.label
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
                 >
                     {preset.label}
                 </button>
             ))}
             <button
                 onClick={() => setShowCustom(true)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                    showCustom || (!activePreset && (startDate || endDate))
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${showCustom || (!activePreset && (startDate || endDate))
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
             >
                 Custom
             </button>
