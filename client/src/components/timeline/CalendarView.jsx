@@ -52,17 +52,17 @@ export default function CalendarView({
             <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" onClick={onPrevMonth}>
-                            <ChevronLeft className="w-4 h-4" />
+                        <Button variant="outline" size="icon" className="h-10 w-10" onClick={onPrevMonth}>
+                            <ChevronLeft className="w-5 h-5" />
                         </Button>
-                        <h2 className="text-lg font-semibold min-w-[180px] text-center">
+                        <h2 className="text-xl font-semibold min-w-[220px] text-center">
                             {getMonthName(year, month)}
                         </h2>
-                        <Button variant="outline" size="icon" onClick={onNextMonth}>
-                            <ChevronRight className="w-4 h-4" />
+                        <Button variant="outline" size="icon" className="h-10 w-10" onClick={onNextMonth}>
+                            <ChevronRight className="w-5 h-5" />
                         </Button>
                     </div>
-                    <Button variant="outline" size="sm" onClick={onToday}>Today</Button>
+                    <Button variant="outline" className="h-10 px-4 text-sm" onClick={onToday}>Today</Button>
                 </div>
             </CardHeader>
             <CardContent>
@@ -74,7 +74,7 @@ export default function CalendarView({
                     <div className="grid grid-cols-7 gap-1">
                         {/* Weekday headers */}
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
-                            <div key={d} className="text-xs font-medium text-muted-foreground text-center py-2">{d}</div>
+                            <div key={d} className="text-sm font-medium text-muted-foreground text-center py-2.5">{d}</div>
                         ))}
                         {/* Day cells */}
                         {calendarDays.map(cell => (
@@ -93,7 +93,7 @@ export default function CalendarView({
 
 function CalendarCell({ cell, onClick }) {
     if (cell.empty) {
-        return <div className="h-24 rounded-md" />;
+        return <div className="h-28 rounded-md" />;
     }
 
     const { day, data, isToday, isSelected, isWeekend } = cell;
@@ -107,7 +107,7 @@ function CalendarCell({ cell, onClick }) {
         <div
             onClick={onClick}
             className={`
-                h-16 rounded-md border p-1.5 cursor-pointer transition-all text-xs
+                h-20 rounded-md border p-2 cursor-pointer transition-all text-sm
                 hover:border-primary/50 hover:shadow-sm
                 ${isSelected ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20' : 'border-border'}
                 ${isToday && !isSelected ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-950/20' : ''}
@@ -116,15 +116,15 @@ function CalendarCell({ cell, onClick }) {
             `}
         >
             <div className="flex items-center justify-between mb-1">
-                <span className={`font-medium ${isToday ? 'text-blue-600 dark:text-blue-400' : ''}`}>{day}</span>
+                <span className={`font-semibold ${isToday ? 'text-blue-600 dark:text-blue-400' : ''}`}>{day}</span>
                 {hasData && data.screenshot_count > 0 && (
-                    <Camera className="w-3 h-3 text-muted-foreground" />
+                    <Camera className="w-3.5 h-3.5 text-muted-foreground" />
                 )}
             </div>
             {hasData ? (
                 <>
                     {/* Mini stacked bar */}
-                    <div className="w-full h-2 rounded-full bg-muted overflow-hidden flex mb-1.5">
+                    <div className="w-full h-2.5 rounded-full bg-muted overflow-hidden flex mb-1.5">
                         <div className="h-full bg-green-500" style={{ width: `${workPct}%` }} />
                         <div className="h-full bg-gray-400" style={{ width: `${idlePct}%` }} />
                         <div className="h-full bg-orange-500" style={{ width: `${breakPct}%` }} />

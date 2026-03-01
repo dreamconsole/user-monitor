@@ -124,9 +124,24 @@ export const getUserDashboard = async (req, res) => {
             [userId, orgId, start_date, end_date]
         );
 
+        // Get live productivity breakdown from logs (for real-time pie chart)
+        const liveProductivity = await query(
+            `SELECT 
+                ac.productivity_type,
+            SUM(aul.duration_seconds) as total_seconds
+             FROM app_usage_logs aul
+             JOIN tracked_apps ta ON aul.app_id = ta.id
+             LEFT JOIN app_categories ac ON ta.category_id = ac.id
+             WHERE aul.user_id = $1 AND aul.org_id = $2
+             AND aul.log_date >= $3 AND aul.log_date <= $4
+             GROUP BY ac.productivity_type`,
+            [userId, orgId, start_date, end_date]
+        );
+
         res.json({
             summary: summary.rows,
-            top_apps: topApps.rows
+            top_apps: topApps.rows,
+            live_summary: liveProductivity.rows
         });
     } catch (error) {
         console.error('getUserDashboard error:', error);
@@ -149,6 +164,16 @@ export const getBrowserActivityDetails = async (req, res) => {
     }
 
     try {
+        const hasSourceColumnResult = await query(
+            `SELECT 1
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = 'browser_activity_logs'
+               AND column_name = 'source'
+             LIMIT 1`
+        );
+        const hasSourceColumn = hasSourceColumnResult.rows.length > 0;
+
         const params = [userId, orgId, start_date, end_date];
         let browserFilter = '';
         if (browser) {
@@ -156,11 +181,15 @@ export const getBrowserActivityDetails = async (req, res) => {
             params.push(browser);
         }
 
+        const sourceSelect = hasSourceColumn ? 'bal.source' : `'extension'::text as source`;
+        const sourceGroupBy = hasSourceColumn ? ', bal.source' : '';
+        const summarySourceSelect = hasSourceColumn ? 'MAX(bal.source) as source' : `'extension'::text as source`;
+
         const domainBreakdown = await query(
             `SELECT 
                 COALESCE(bal.domain, bal.title) as domain,
                 bal.browser,
-                bal.source,
+                ${sourceSelect},
                 COUNT(*) as visit_count,
                 SUM(bal.duration_seconds) as total_seconds,
                 MAX(bal.title) as last_title
@@ -168,7 +197,7 @@ export const getBrowserActivityDetails = async (req, res) => {
              WHERE bal.user_id = $1 AND bal.org_id = $2
              AND bal.start_time::date >= $3::date AND bal.start_time::date <= $4::date
              ${browserFilter}
-             GROUP BY COALESCE(bal.domain, bal.title), bal.browser, bal.source
+             GROUP BY COALESCE(bal.domain, bal.title), bal.browser${sourceGroupBy}
              ORDER BY total_seconds DESC
              LIMIT 50`,
             params
@@ -179,7 +208,7 @@ export const getBrowserActivityDetails = async (req, res) => {
                 bal.browser,
                 COUNT(DISTINCT COALESCE(bal.domain, bal.title)) as unique_domains,
                 SUM(bal.duration_seconds) as total_seconds,
-                MAX(bal.source) as source
+                ${summarySourceSelect}
              FROM browser_activity_logs bal
              WHERE bal.user_id = $1 AND bal.org_id = $2
              AND bal.start_time::date >= $3::date AND bal.start_time::date <= $4::date
@@ -193,6 +222,10 @@ export const getBrowserActivityDetails = async (req, res) => {
             browsers: browserSummary.rows
         });
     } catch (error) {
+        // Gracefully handle environments where browser activity table is not migrated yet.
+        if (error?.code === '42P01') {
+            return res.json({ domains: [], browsers: [] });
+        }
         console.error('getBrowserActivityDetails error:', error);
         res.status(500).json({ error: 'Failed to fetch browser activity details' });
     }
@@ -205,7 +238,7 @@ export const getProductivitySummary = async (req, res) => {
     const { start_date, end_date } = req.query;
 
     // Permission check
-    if (req.user.role === 'user' && req.user.id !== userId) {
+    if (req.user.role === 'user' && String(req.user.id) !== String(userId)) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -224,8 +257,8 @@ export const getProductivitySummary = async (req, res) => {
         const result = await query(
             `SELECT 
                 ac.name as category_name,
-                ac.productivity_type,
-                SUM(aul.duration_seconds) as total_seconds
+            ac.productivity_type,
+            SUM(aul.duration_seconds) as total_seconds
              FROM app_usage_logs aul
              JOIN tracked_apps ta ON aul.app_id = ta.id
              LEFT JOIN app_categories ac ON ta.category_id = ac.id

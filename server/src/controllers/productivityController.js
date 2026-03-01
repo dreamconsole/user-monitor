@@ -240,14 +240,18 @@ export const getTeamProductivity = async (req, res) => {
         let usersResult;
         if (role === 'manager') {
             usersResult = await query(
-                `SELECT id, full_name FROM users
-                 WHERE org_id = $1 AND team_id = $2 AND is_active = true`,
+                `SELECT u.id, u.full_name, u.team_id, t.name as team_name
+                 FROM users u
+                 LEFT JOIN teams t ON u.team_id = t.id
+                 WHERE u.org_id = $1 AND u.team_id = $2 AND u.is_active = true`,
                 [orgId, req.user.team_id]
             );
         } else {
             usersResult = await query(
-                `SELECT id, full_name FROM users
-                 WHERE org_id = $1 AND is_active = true`,
+                `SELECT u.id, u.full_name, u.team_id, t.name as team_name
+                 FROM users u
+                 LEFT JOIN teams t ON u.team_id = t.id
+                 WHERE u.org_id = $1 AND u.is_active = true`,
                 [orgId]
             );
         }
@@ -263,6 +267,8 @@ export const getTeamProductivity = async (req, res) => {
             team.push({
                 userId: row.id,
                 userName: row.full_name,
+                teamId: row.team_id,
+                teamName: row.team_name || 'Unassigned',
                 score: result.score,
                 breakdown: result.breakdown
             });
@@ -272,5 +278,72 @@ export const getTeamProductivity = async (req, res) => {
     } catch (error) {
         console.error('getTeamProductivity error:', error);
         res.status(500).json({ error: 'Failed to fetch team productivity' });
+    }
+};
+
+export const getTeamsProductivity = async (req, res) => {
+    const orgId = req.user.org_id;
+    const role = req.user.role;
+
+    if (role !== 'orgadmin') {
+        return res.status(403).json({ error: 'Access denied: only administrators can compare multiple teams' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const startDate = req.query.startDate || today;
+    const endDate = req.query.endDate || today;
+
+    try {
+        const teamsResult = await query(
+            'SELECT id, name FROM teams WHERE org_id = $1 ORDER BY name ASC',
+            [orgId]
+        );
+
+        const teamsSummary = [];
+        for (const team of teamsResult.rows) {
+            const usersResult = await query(
+                'SELECT id FROM users WHERE team_id = $1 AND org_id = $2 AND is_active = true',
+                [team.id, orgId]
+            );
+
+            if (usersResult.rows.length === 0) continue;
+
+            let totalScore = 0;
+            let totalAttendance = 0;
+            let totalActivity = 0;
+            let totalBreaks = 0;
+            let totalAppProductivity = 0;
+            let userCount = 0;
+
+            for (const user of usersResult.rows) {
+                const stats = await calculateProductivityScore(user.id, orgId, startDate, endDate);
+                totalScore += stats.score;
+                totalAttendance += stats.breakdown.attendance;
+                totalActivity += stats.breakdown.activity;
+                totalBreaks += stats.breakdown.breaks;
+                totalAppProductivity += stats.breakdown.appProductivity;
+                userCount++;
+            }
+
+            if (userCount > 0) {
+                teamsSummary.push({
+                    teamId: team.id,
+                    teamName: team.name,
+                    score: Math.round(totalScore / userCount),
+                    memberCount: userCount,
+                    breakdown: {
+                        attendance: Math.round((totalAttendance / userCount) * 10) / 10,
+                        activity: Math.round((totalActivity / userCount) * 10) / 10,
+                        breaks: Math.round((totalBreaks / userCount) * 10) / 10,
+                        appProductivity: Math.round((totalAppProductivity / userCount) * 10) / 10
+                    }
+                });
+            }
+        }
+
+        res.json(teamsSummary);
+    } catch (error) {
+        console.error('getTeamsProductivity error:', error);
+        res.status(500).json({ error: 'Failed to fetch aggregate teams productivity' });
     }
 };

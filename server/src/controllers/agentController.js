@@ -129,8 +129,9 @@ export const syncActivitySession = async (req, res) => {
              SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, ($4::TIMESTAMPTZ AT TIME ZONE 
                 CASE 
                     WHEN u.timezone = 'Asia/Calcutta' THEN 'Asia/Kolkata'
-                    WHEN u.timezone IS NULL THEN 'UTC'
-                    ELSE u.timezone 
+                    WHEN u.timezone IS NULL OR BTRIM(u.timezone) = '' THEN 'UTC'
+                    WHEN EXISTS (SELECT 1 FROM pg_timezone_names ptn WHERE ptn.name = u.timezone) THEN u.timezone
+                    ELSE 'UTC'
                 END)::DATE
              FROM users u WHERE u.id = $3
              ON CONFLICT (id) DO UPDATE SET

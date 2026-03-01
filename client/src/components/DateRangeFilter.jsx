@@ -97,17 +97,17 @@ function MiniCalendar({ year, month, startSel, endSel, hovered, onDayClick, onDa
             {/* header */}
             <div className="flex items-center justify-between mb-3">
                 {showPrev
-                    ? <button onClick={onPrev} className="p-1 rounded hover:bg-muted transition-colors"><ChevronLeft size={14} /></button>
+                    ? <button onClick={onPrev} className="p-1.5 rounded hover:bg-muted transition-colors"><ChevronLeft size={16} /></button>
                     : <span className="w-6" />}
-                <span className="text-xs font-semibold">{MONTH_NAMES[month]} {year}</span>
+                <span className="text-sm font-semibold">{MONTH_NAMES[month]} {year}</span>
                 {showNext
-                    ? <button onClick={onNext} className="p-1 rounded hover:bg-muted transition-colors"><ChevronRight size={14} /></button>
+                    ? <button onClick={onNext} className="p-1.5 rounded hover:bg-muted transition-colors"><ChevronRight size={16} /></button>
                     : <span className="w-6" />}
             </div>
             {/* day labels */}
             <div className="grid grid-cols-7 mb-1">
                 {DAY_LABELS.map(l => (
-                    <div key={l} className="text-center text-[10px] font-medium text-muted-foreground py-0.5">{l}</div>
+                    <div key={l} className="text-center text-xs font-medium text-muted-foreground py-1">{l}</div>
                 ))}
             </div>
             {/* days */}
@@ -120,7 +120,7 @@ function MiniCalendar({ year, month, startSel, endSel, hovered, onDayClick, onDa
                     const inRng = inRange(d);
                     const today = sameDay(d, new Date());
 
-                    let cls = 'relative flex items-center justify-center text-[11px] h-7 w-full cursor-pointer transition-colors rounded-sm ';
+                    let cls = 'relative flex items-center justify-center text-sm h-9 w-full cursor-pointer transition-colors rounded-sm ';
                     if (isStart || isEnd) {
                         cls += 'bg-primary text-primary-foreground font-semibold z-10 rounded-full ';
                     } else if (inRng) {
@@ -247,26 +247,26 @@ export default function DateRangeFilter({ startDate, endDate, onChange }) {
             {/* ── trigger ── */}
             <button
                 onClick={() => setOpen(o => !o)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-background text-xs font-medium hover:bg-muted transition-colors shadow-sm"
+                className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-background text-sm font-medium hover:bg-muted transition-colors shadow-sm"
             >
-                <Calendar size={13} className="text-muted-foreground" />
+                <Calendar size={15} className="text-muted-foreground" />
                 <span>{triggerLabel}</span>
-                <ChevronRight size={12} className={`text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+                <ChevronRight size={14} className={`text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
             </button>
 
             {/* ── dropdown panel ── */}
             {open && (
                 <div className="absolute z-50 top-full mt-1 right-0 flex rounded-lg shadow-xl border border-border bg-background overflow-hidden"
-                    style={{ minWidth: 510 }}>
+                    style={{ minWidth: 620 }}>
 
                     {/* LEFT — presets */}
-                    <div className="flex flex-col gap-0.5 p-3 border-r border-border bg-muted/30" style={{ width: 148 }}>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 px-1">Quick Select</p>
+                    <div className="flex flex-col gap-1 p-3 border-r border-border bg-muted/30" style={{ width: 172 }}>
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1 px-1">Quick Select</p>
                         {PRESETS.map(preset => (
                             <button
                                 key={preset.label}
                                 onClick={() => handlePreset(preset)}
-                                className={`text-left px-3 py-1.5 rounded-md text-xs font-medium transition-colors w-full ${activePreset === preset.label
+                                className={`text-left px-3 py-2 rounded-md text-sm font-medium transition-colors w-full ${activePreset === preset.label
                                     ? 'bg-primary text-primary-foreground'
                                     : 'text-foreground hover:bg-muted'
                                     }`}
@@ -278,7 +278,7 @@ export default function DateRangeFilter({ startDate, endDate, onChange }) {
 
                     {/* RIGHT — calendars */}
                     <div className="flex flex-col p-4 gap-3">
-                        <div className="flex gap-6">
+                        <div className="flex gap-8">
                             {/* left calendar */}
                             <MiniCalendar
                                 year={leftYear} month={leftMonth}
@@ -303,7 +303,7 @@ export default function DateRangeFilter({ startDate, endDate, onChange }) {
 
                         {/* selected range display */}
                         {(selStart || selEnd) && (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-border pt-3">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground border-t border-border pt-3">
                                 <span className="font-medium text-foreground">{selStart || '—'}</span>
                                 <span>→</span>
                                 <span className="font-medium text-foreground">{selEnd || '—'}</span>
@@ -315,12 +315,12 @@ export default function DateRangeFilter({ startDate, endDate, onChange }) {
                             <div className="flex justify-end gap-2 border-t border-border pt-3">
                                 <button
                                     onClick={() => { setOpen(false); }}
-                                    className="px-3 py-1 text-xs rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                                    className="px-3 py-1.5 text-sm rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
                                 >Cancel</button>
                                 <button
                                     onClick={applyCustom}
                                     disabled={!selStart || !selEnd}
-                                    className="px-3 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
+                                    className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
                                 >Apply</button>
                             </div>
                         )}

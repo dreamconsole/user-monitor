@@ -33,8 +33,33 @@ const KpiCard = ({ label, value, icon: Icon, desc, color }) => (
 );
 
 const AdminDashboard = ({ stats }) => {
-    // Helper for trend chart
-    const maxHours = Math.max(...(stats.productivityTrend?.map(d => (Number(d.work_seconds) + Number(d.idle_seconds)) / 3600) || [12]));
+    // Normalize trend data to always render 7 bars.
+    const trendMap = new Map(
+        (stats.productivityTrend || []).map((item) => [
+            String(item.date).slice(0, 10),
+            {
+                date: String(item.date).slice(0, 10),
+                work_seconds: Number(item.work_seconds || 0),
+                idle_seconds: Number(item.idle_seconds || 0)
+            }
+        ])
+    );
+    const trendData = Array.from({ length: 7 }, (_, idx) => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() - (6 - idx));
+        const key = d.toISOString().slice(0, 10);
+        return trendMap.get(key) || { date: key, work_seconds: 0, idle_seconds: 0 };
+    });
+    const maxHours = Math.max(
+        12,
+        ...trendData.map((d) => (Number(d.work_seconds) + Number(d.idle_seconds)) / 3600)
+    );
+    const onlineCount = Number(stats.statusDistribution?.online || 0);
+    const offlineCount = Number(stats.statusDistribution?.offline || 0);
+    const totalUsers = onlineCount + offlineCount;
+    const onlinePct = totalUsers > 0 ? (onlineCount / totalUsers) * 100 : 0;
+    const offlinePct = totalUsers > 0 ? (offlineCount / totalUsers) * 100 : 0;
 
     return (
         <div className="space-y-6">
@@ -124,14 +149,15 @@ const AdminDashboard = ({ stats }) => {
                     </CardHeader>
                     <CardContent>
                         <div className="h-[240px] flex items-end justify-between gap-4 pt-4">
-                            {stats.productivityTrend?.map((day, i) => {
+                            {trendData.map((day, i) => {
                                 const workH = Number(day.work_seconds) / 3600;
                                 const idleH = Number(day.idle_seconds) / 3600;
                                 const totalH = workH + idleH;
-                                const heightPct = (totalH / (maxHours * 1.1)) * 100; // Scale to max + 10%
+                                const rawHeightPct = maxHours > 0 ? (totalH / (maxHours * 1.1)) * 100 : 0;
+                                const heightPct = totalH > 0 ? Math.max(rawHeightPct, 6) : 0;
 
                                 return (
-                                    <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                                    <div key={i} className="flex-1 h-full flex flex-col justify-end items-center gap-2 group">
                                         <div className="w-full bg-muted/30 rounded-t-md relative flex flex-col-reverse overflow-hidden hover:bg-muted/40 transition-colors" style={{ height: `${heightPct}%` }}>
                                             {/* Work Segment */}
                                             <div
@@ -139,13 +165,6 @@ const AdminDashboard = ({ stats }) => {
                                                 style={{ height: `${(workH / (totalH || 1)) * 100}%` }}
                                                 title={`Work: ${workH.toFixed(1)}h`}
                                             />
-                                            {/* Idle Segment (Top part of bar in column-reverse, essentially transparent or colored differently?) 
-                                                Wait, flex-col-reverse stack from bottom. 
-                                                If I want stacked bar:
-                                                Container h = total.
-                                                Item 1 (Active) h% of total.
-                                                Item 2 (Idle) h% of total.
-                                            */}
                                             <div
                                                 className="bg-orange-300 w-full transition-all"
                                                 style={{ height: `${(idleH / (totalH || 1)) * 100}%` }}
@@ -170,21 +189,31 @@ const AdminDashboard = ({ stats }) => {
                     <CardTitle className="text-sm font-medium">Real-time Workforce Status</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center gap-1 h-8 w-full rounded-md overflow-hidden bg-muted/20">
-                        {Array.from({ length: stats.statusDistribution?.online || 0 }).map((_, i) => (
-                            <div key={`on-${i}`} className="h-full flex-1 bg-green-500 hover:opacity-80 transition-opacity" title="Online User" />
-                        ))}
-                        {Array.from({ length: stats.statusDistribution?.offline || 0 }).map((_, i) => (
-                            <div key={`off-${i}`} className="h-full flex-1 bg-slate-300 hover:opacity-80 transition-opacity" title="Offline User" />
-                        ))}
-                        {/* Fallback if empty */}
-                        {(stats.statusDistribution?.online === 0 && stats.statusDistribution?.offline === 0) && (
+                    <div className="h-8 w-full rounded-md overflow-hidden bg-muted/20 border">
+                        {totalUsers === 0 ? (
                             <div className="text-xs text-muted-foreground w-full text-center py-1">No users found</div>
+                        ) : (
+                            <div className="h-full w-full flex">
+                                <div
+                                    className="h-full bg-green-500 hover:opacity-90 transition-opacity"
+                                    style={{ width: `${onlinePct}%` }}
+                                    title={`Online: ${onlineCount} (${onlinePct.toFixed(1)}%)`}
+                                />
+                                <div
+                                    className="h-full bg-slate-300 hover:opacity-90 transition-opacity"
+                                    style={{ width: `${offlinePct}%` }}
+                                    title={`Offline: ${offlineCount} (${offlinePct.toFixed(1)}%)`}
+                                />
+                            </div>
                         )}
                     </div>
                     <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                        <div className="font-medium text-green-600">{stats.statusDistribution?.online} Online</div>
-                        <div>{stats.statusDistribution?.offline} Offline</div>
+                        <div className="font-medium text-green-600">
+                            {onlineCount} Online ({onlinePct.toFixed(1)}%)
+                        </div>
+                        <div>
+                            {offlineCount} Offline ({offlinePct.toFixed(1)}%)
+                        </div>
                     </div>
                 </CardContent>
             </Card>

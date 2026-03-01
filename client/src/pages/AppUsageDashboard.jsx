@@ -174,11 +174,35 @@ export default function AppUsageDashboard() {
     };
 
     const getTotalSeconds = () => {
-        if (!dashboardData?.summary?.length) return 0;
-        return dashboardData.summary.reduce((sum, day) => sum + (day.total_working_seconds || 0), 0);
+        const summaryTotal = dashboardData?.summary?.length
+            ? dashboardData.summary.reduce((sum, day) => sum + (Number(day.total_working_seconds) || 0), 0)
+            : 0;
+
+        if (summaryTotal > 0) return summaryTotal;
+
+        // Fallback when user_app_summary is not populated yet.
+        const liveTotal = dashboardData?.live_summary?.length
+            ? dashboardData.live_summary.reduce((sum, item) => sum + (Number(item.total_seconds) || 0), 0)
+            : 0;
+        if (liveTotal > 0) return liveTotal;
+
+        // Last fallback: derive from top apps if available.
+        const topAppsTotal = dashboardData?.top_apps?.length
+            ? dashboardData.top_apps.reduce((sum, app) => sum + (Number(app.total_seconds) || 0), 0)
+            : 0;
+        return topAppsTotal;
     };
 
     const getProductivityPieData = () => {
+        // Use live_summary if available (calculated from logs), otherwise fallback to daily summary
+        if (dashboardData?.live_summary?.length > 0) {
+            return dashboardData.live_summary.map(item => ({
+                name: (item.productivity_type || 'neutral').split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+                value: parseInt(item.total_seconds),
+                color: COLORS[item.productivity_type] || COLORS.neutral
+            })).filter(item => item.value > 0);
+        }
+
         if (!dashboardData?.summary?.length) return [];
 
         const totals = dashboardData.summary.reduce((acc, day) => ({
