@@ -166,7 +166,7 @@ export const uploadScreenshot = async (req, res) => {
     }
 
     try {
-        const storagePath = screenshot.path;
+        const storagePath = screenshot.path.replace(/\\/g, '/');
 
         await query(
             'INSERT INTO screenshots (id, org_id, user_id, session_id, storage_path, captured_at, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7)',
