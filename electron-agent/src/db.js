@@ -160,6 +160,19 @@ function initDB(orgId, userId) {
         db.exec("ALTER TABLE browser_activity_logs ADD COLUMN source TEXT DEFAULT 'extension'");
     }
 
+    // Migration: Add left_clicks and right_clicks to activity_logs
+    const activityCols = db.prepare("PRAGMA table_info(activity_logs)").all();
+    const hasLeftClicks = activityCols.some(col => col.name === 'left_clicks');
+    const hasRightClicks = activityCols.some(col => col.name === 'right_clicks');
+    if (!hasLeftClicks) {
+        console.log('Migrating: Adding left_clicks to activity_logs');
+        db.exec('ALTER TABLE activity_logs ADD COLUMN left_clicks INTEGER DEFAULT 0');
+    }
+    if (!hasRightClicks) {
+        console.log('Migrating: Adding right_clicks to activity_logs');
+        db.exec('ALTER TABLE activity_logs ADD COLUMN right_clicks INTEGER DEFAULT 0');
+    }
+
     const domainCol = browserCols.find(col => col.name === 'domain');
     if (domainCol && domainCol.notnull === 1) {
         console.log('Migrating: Recreating browser_activity_logs with nullable domain');

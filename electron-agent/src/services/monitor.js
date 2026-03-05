@@ -27,6 +27,8 @@ class MonitorService {
 
         this.keyboardEvents = 0;
         this.mouseEvents = 0;
+        this.leftClickEvents = 0;
+        this.rightClickEvents = 0;
         this.lastCheckTime = 0;
 
         // Dynamic Config Values
@@ -43,7 +45,12 @@ class MonitorService {
         // Start uIOhook
         uIOhook.on('keydown', () => { this.keyboardEvents++; this.lastInputTime = Date.now(); });
         uIOhook.on('keyup', () => { this.keyboardEvents++; this.lastInputTime = Date.now(); });
-        uIOhook.on('mousedown', () => { this.mouseEvents++; this.lastInputTime = Date.now(); });
+        uIOhook.on('mousedown', (e) => {
+            this.mouseEvents++;
+            if (e.button === 1) this.leftClickEvents++;      // Left click (touchpad tap OR mouse left)
+            else if (e.button === 2) this.rightClickEvents++; // Right click (touchpad right-tap OR mouse right)
+            this.lastInputTime = Date.now();
+        });
         uIOhook.on('mouseup', () => { this.mouseEvents++; this.lastInputTime = Date.now(); });
         uIOhook.on('mousemove', () => { this.mouseEvents++; this.lastInputTime = Date.now(); });
         uIOhook.start();
@@ -301,16 +308,20 @@ class MonitorService {
         const stmt = db.getDB().prepare(`
             INSERT INTO activity_logs (
                 id, session_id, org_id, user_id, log_time, 
-                keyboard_events, mouse_events, state, sync_status
+                keyboard_events, mouse_events, left_clicks, right_clicks, state, sync_status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
         `);
 
         // Use captured events and reset
         const kEvents = this.keyboardEvents;
         const mEvents = this.mouseEvents;
+        const lClicks = this.leftClickEvents;
+        const rClicks = this.rightClickEvents;
         this.keyboardEvents = 0;
         this.mouseEvents = 0;
+        this.leftClickEvents = 0;
+        this.rightClickEvents = 0;
 
         stmt.run(
             logId,
@@ -320,6 +331,8 @@ class MonitorService {
             Date.now(),
             kEvents,
             mEvents,
+            lClicks,
+            rClicks,
             state
         );
     }

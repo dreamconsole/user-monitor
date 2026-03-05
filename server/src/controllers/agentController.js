@@ -180,8 +180,8 @@ export const uploadScreenshot = async (req, res) => {
 };
 
 export const logActivity = async (req, res) => {
-    const { org_id, user_id, session_id, log_time, keyboard_events, mouse_events, state, metadata } = req.body;
-    console.log('[logActivity] RECEIVED:', { org_id, user_id, session_id, log_time, keyboard_events, mouse_events, state });
+    const { org_id, user_id, session_id, log_time, keyboard_events, mouse_events, left_clicks, right_clicks, state, metadata } = req.body;
+    console.log('[logActivity] RECEIVED:', { org_id, user_id, session_id, log_time, keyboard_events, mouse_events, left_clicks, right_clicks, state });
 
     try {
         // Validate user and org existence
@@ -194,9 +194,9 @@ export const logActivity = async (req, res) => {
             });
         }
         const result = await query(
-            `INSERT INTO activity_logs (org_id, user_id, session_id, log_time, keyboard_events, mouse_events, state, metadata)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-            [org_id, user_id, session_id, log_time, keyboard_events || 0, mouse_events || 0, state, metadata || null]
+            `INSERT INTO activity_logs (org_id, user_id, session_id, log_time, keyboard_events, mouse_events, left_clicks, right_clicks, state, metadata)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+            [org_id, user_id, session_id, log_time, keyboard_events || 0, mouse_events || 0, left_clicks || 0, right_clicks || 0, state, metadata || null]
         );
         console.log('[logActivity] SUCCESS, inserted ID:', result.rows[0].id);
         res.status(200).json({ success: true });

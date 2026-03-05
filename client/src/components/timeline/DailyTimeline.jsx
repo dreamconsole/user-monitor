@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Timer, Pause, Coffee, Clock, Activity, Monitor, Camera } from 'lucide-react';
+import { Timer, Pause, Coffee, Clock, Activity, Monitor, Camera, MousePointerClick, MousePointer2, Moon, Mouse } from 'lucide-react';
 import { formatSeconds, formatTime, PRODUCTIVITY_COLORS } from './utils';
 import api from '@/lib/api';
 import AppUsageList from './AppUsageList';
@@ -27,7 +27,7 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
             {/* Date title */}
             <h3 className="text-lg font-semibold">{dateLabel}</h3>
 
-            {/* Summary Cards */}
+            {/* Summary Cards Row 1: Time */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <SummaryCard
                     icon={<Timer className="w-4 h-4 text-green-600" />}
@@ -52,6 +52,41 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
                     label="Clock In/Out"
                     value={`${formatTime(totals.first_clock_in)} - ${formatTime(totals.last_clock_out)}`}
                     color="blue"
+                />
+            </div>
+
+            {/* Summary Cards Row 2: Mouse & AFK */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <SummaryCard
+                    icon={<MousePointerClick className="w-4 h-4 text-blue-500" />}
+                    label="Left Clicks"
+                    value={(totals.total_left_clicks ?? 0).toLocaleString()}
+                    color="blue"
+                    subtitle="Touchpad + Mouse"
+                />
+                <SummaryCard
+                    icon={<MousePointer2 className="w-4 h-4 text-purple-500" />}
+                    label="Right Clicks"
+                    value={(totals.total_right_clicks ?? 0).toLocaleString()}
+                    color="purple"
+                    subtitle="Touchpad + Mouse"
+                />
+                <SummaryCard
+                    icon={<Mouse className="w-4 h-4 text-indigo-500" />}
+                    label="Mouse Events"
+                    value={(
+                        (totals.total_left_clicks ?? 0) +
+                        (totals.total_right_clicks ?? 0)
+                    ).toLocaleString()}
+                    color="indigo"
+                    subtitle="All clicks combined"
+                />
+                <SummaryCard
+                    icon={<Moon className="w-4 h-4 text-amber-500" />}
+                    label="AFK Time"
+                    value={`${totals.afk_minutes ?? Math.floor((totals.idle_seconds ?? 0) / 60)} min`}
+                    color="amber"
+                    subtitle="Away from keyboard"
                 />
             </div>
 
@@ -115,12 +150,15 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
     );
 }
 
-function SummaryCard({ icon, label, value, color }) {
+function SummaryCard({ icon, label, value, color, subtitle }) {
     const borderColors = {
         green: 'border-l-green-500',
         gray: 'border-l-gray-400',
         orange: 'border-l-orange-500',
         blue: 'border-l-blue-500',
+        purple: 'border-l-purple-500',
+        indigo: 'border-l-indigo-500',
+        amber: 'border-l-amber-500',
     };
     return (
         <Card className={`border-l-4 ${borderColors[color] || ''}`}>
@@ -130,6 +168,7 @@ function SummaryCard({ icon, label, value, color }) {
                     <span className="text-xs text-muted-foreground">{label}</span>
                 </div>
                 <div className="text-sm font-semibold">{value}</div>
+                {subtitle && <div className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</div>}
             </CardContent>
         </Card>
     );
@@ -382,7 +421,7 @@ function IntensityBar({ data }) {
                             key={i}
                             className="flex-1 h-6 rounded-sm cursor-default"
                             style={{ backgroundColor: `rgba(34, 197, 94, ${alpha})` }}
-                            title={`${bucket.time} - Keys: ${bucket.keyboard}, Mouse: ${bucket.mouse}`}
+                            title={`${bucket.time} — Keys: ${bucket.keyboard}, Mouse: ${bucket.mouse}, Left: ${bucket.left_clicks ?? 0}, Right: ${bucket.right_clicks ?? 0}`}
                         />
                     );
                 })}

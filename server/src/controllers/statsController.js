@@ -408,7 +408,9 @@ async function handleDayView(req, res, userId, orgId, date) {
 
     // 3. Activity State Changes (for intensity bar)
     const activityResult = await query(
-        `SELECT log_time, state, keyboard_events, mouse_events
+        `SELECT log_time, state, keyboard_events, mouse_events, 
+                COALESCE(left_clicks, 0) as left_clicks, 
+                COALESCE(right_clicks, 0) as right_clicks
          FROM activity_logs
          WHERE user_id = $1 AND org_id = $2 AND DATE(log_time) = $3
          ORDER BY log_time`,
@@ -449,17 +451,23 @@ async function handleDayView(req, res, userId, orgId, date) {
 
     // Build activity intensity buckets (10-minute intervals)
     const intensityBuckets = [];
+    let totalLeftClicks = 0;
+    let totalRightClicks = 0;
     if (activityResult.rows.length > 0) {
         // Group by 10-minute intervals
         const bucketMap = {};
         activityResult.rows.forEach(row => {
+            totalLeftClicks += parseInt(row.left_clicks || 0);
+            totalRightClicks += parseInt(row.right_clicks || 0);
             const t = new Date(row.log_time);
             const bucketKey = `${String(t.getUTCHours()).padStart(2, '0')}:${String(Math.floor(t.getUTCMinutes() / 10) * 10).padStart(2, '0')}`;
             if (!bucketMap[bucketKey]) {
-                bucketMap[bucketKey] = { time: bucketKey, keyboard: 0, mouse: 0, count: 0 };
+                bucketMap[bucketKey] = { time: bucketKey, keyboard: 0, mouse: 0, left_clicks: 0, right_clicks: 0, count: 0 };
             }
             bucketMap[bucketKey].keyboard += parseInt(row.keyboard_events || 0);
             bucketMap[bucketKey].mouse += parseInt(row.mouse_events || 0);
+            bucketMap[bucketKey].left_clicks += parseInt(row.left_clicks || 0);
+            bucketMap[bucketKey].right_clicks += parseInt(row.right_clicks || 0);
             bucketMap[bucketKey].count++;
         });
         Object.values(bucketMap).sort((a, b) => a.time.localeCompare(b.time)).forEach(b => intensityBuckets.push(b));
@@ -504,7 +512,10 @@ async function handleDayView(req, res, userId, orgId, date) {
             idle_seconds: totalIdle,
             break_seconds: totalBreak,
             first_clock_in: firstClockIn,
-            last_clock_out: lastClockOut
+            last_clock_out: lastClockOut,
+            total_left_clicks: totalLeftClicks,
+            total_right_clicks: totalRightClicks,
+            afk_minutes: Math.floor(totalIdle / 60)
         }
     });
 }

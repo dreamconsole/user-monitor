@@ -111,6 +111,8 @@ class SyncService {
                     log_time: new Date(row.log_time).toISOString(),
                     keyboard_events: row.keyboard_events,
                     mouse_events: row.mouse_events,
+                    left_clicks: row.left_clicks || 0,
+                    right_clicks: row.right_clicks || 0,
                     state: row.state,
                     metadata: row.metadata ? JSON.parse(row.metadata) : null
                 }, {

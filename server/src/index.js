@@ -32,6 +32,14 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 
+// Disable ETags + browser caching for all API responses
+// Without this, browsers cache responses and send 304 "Not Modified" — preventing live data updates
+app.disable('etag');
+app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    next();
+});
+
 // Rate limiting - general
 const generalLimiter = rateLimit({
     windowMs: 30 * 60 * 1000, // 30 min
