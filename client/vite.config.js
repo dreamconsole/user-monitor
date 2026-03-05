@@ -10,4 +10,13 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    allowedHosts: [
+      'sourcecodekart.com',
+      'www.sourcecodekart.com',
+      'app.sourcecodekart.com',
+      'api.sourcecodekart.com',
+      'usermonitor-demo.sourcecodekart.com'
+    ]
+  }
 })
