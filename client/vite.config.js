@@ -16,6 +16,7 @@ export default defineConfig({
       'www.sourcecodekart.com',
       'app.sourcecodekart.com',
       'api.sourcecodekart.com',
+      'usermonitor-project.sourcecodekart.com',
       'usermonitor-demo.sourcecodekart.com'
     ]
   }
