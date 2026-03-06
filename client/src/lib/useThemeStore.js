@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 const useThemeStore = create((set) => ({
-    theme: localStorage.getItem('theme') || 'system',
+    theme: localStorage.getItem('theme') || 'light',
 
     setTheme: (theme) => {
         localStorage.setItem('theme', theme);
@@ -20,7 +20,7 @@ const useThemeStore = create((set) => ({
     },
 
     initTheme: () => {
-        const theme = localStorage.getItem('theme') || 'system';
+        const theme = localStorage.getItem('theme') || 'light';
         const root = window.document.documentElement;
         root.classList.remove('light', 'dark');
 
