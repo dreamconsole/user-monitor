@@ -6,7 +6,7 @@ export const getAdminStats = async (req, res) => {
         const orgInfo = await query('SELECT timezone FROM organizations WHERE id = $1', [orgId]);
         const orgTimezone = orgInfo.rows[0]?.timezone || 'UTC';
 
-        const totalUsers = await query('SELECT COUNT(*) FROM users WHERE org_id = $1', [orgId]);
+        const totalUsers = await query('SELECT COUNT(*) FROM users WHERE org_id = $1 AND deleted_at IS NULL', [orgId]);
 
         const activeUsers = await query(
             `SELECT COUNT(DISTINCT user_id) FROM agent_sessions 
@@ -26,7 +26,7 @@ export const getAdminStats = async (req, res) => {
         const notLoggedIn = await query(
             `SELECT COUNT(*) FROM users u
              LEFT JOIN work_sessions ws ON u.id = ws.user_id AND DATE(ws.start_time) = CURRENT_DATE
-             WHERE u.org_id = $1 AND ws.id IS NULL AND u.is_active = true`,
+             WHERE u.org_id = $1 AND ws.id IS NULL AND u.is_active = true AND u.deleted_at IS NULL`,
             [orgId]
         );
 
@@ -52,7 +52,7 @@ export const getAdminStats = async (req, res) => {
                 COUNT(*) FILTER (WHERE last_heartbeat > NOW() - INTERVAL '2 minutes') as online,
                 COUNT(*) FILTER (WHERE last_heartbeat <= NOW() - INTERVAL '2 minutes' OR last_heartbeat IS NULL) as offline
              FROM users
-             WHERE org_id = $1 AND is_active = true`,
+             WHERE org_id = $1 AND is_active = true AND deleted_at IS NULL`,
             [orgId]
         );
 
@@ -89,7 +89,7 @@ export const getManagerStats = async (req, res) => {
                 u.last_heartbeat
              FROM users u
              LEFT JOIN work_sessions ws ON u.id = ws.user_id AND DATE(ws.start_time) = CURRENT_DATE
-             WHERE u.org_id = $1 AND (u.team_id = $2 OR u.id = $3)`,
+             WHERE u.org_id = $1 AND (u.team_id = $2 OR u.id = $3) AND u.deleted_at IS NULL`,
             [orgId, teamId, req.user.id]
         );
 
@@ -116,7 +116,7 @@ export const getManagerStats = async (req, res) => {
                 SUM(ws.total_idle_seconds) as idle_seconds
              FROM work_sessions ws
              JOIN users u ON u.id = ws.user_id
-             WHERE u.org_id = $1 
+             WHERE u.org_id = $1 AND u.deleted_at IS NULL
                AND (u.team_id = $2 OR u.id = $3)
                AND ws.start_time > CURRENT_DATE - INTERVAL '7 days'
              GROUP BY DATE(ws.start_time)
