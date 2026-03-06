@@ -167,23 +167,23 @@ export default function Reports() {
                             onChange={(start, end) => setFilters(f => ({ ...f, startDate: start, endDate: end }))}
                         />
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        {user.role !== 'user' && (
-                            <div className="space-y-2">
-                                <Label className="text-xs uppercase font-bold text-muted-foreground">Team Member</Label>
-                                <UserSearchSelect
-                                    users={users}
-                                    value={filters.userId}
-                                    onChange={(v) => setFilters(f => ({ ...f, userId: v }))}
-                                    placeholder="All Users"
-                                    showAllOption
-                                    allOptionLabel="All Users"
-                                />
-                            </div>
-                        )}
-                        <Button variant="secondary" className="h-9" onClick={fetchReport}>
-                            <Filter className="w-4 h-4 mr-2" />
-                            Apply Filters
-                        </Button>
+                            {user.role !== 'user' && (
+                                <div className="space-y-2">
+                                    <Label className="text-xs uppercase font-bold text-muted-foreground">Team Member</Label>
+                                    <UserSearchSelect
+                                        users={users}
+                                        value={filters.userId}
+                                        onChange={(v) => setFilters(f => ({ ...f, userId: v }))}
+                                        placeholder="All Users"
+                                        showAllOption
+                                        allOptionLabel="All Users"
+                                    />
+                                </div>
+                            )}
+                            <Button variant="secondary" className="h-9" onClick={fetchReport}>
+                                <Filter className="w-4 h-4 mr-2" />
+                                Apply Filters
+                            </Button>
                         </div>
                     </div>
                 </CardContent>
@@ -283,7 +283,7 @@ export default function Reports() {
                                         <TableRow key={i}>
                                             {activeTab === 'summary' && (
                                                 <>
-                                                    <TableCell className="font-medium">{new Date(row.work_date).toLocaleDateString()}</TableCell>
+                                                    <TableCell className="font-medium">{utcToLocal(row.work_date, user.timezone, 'MMM dd, yyyy')}</TableCell>
                                                     <TableCell>{row.user_name}</TableCell>
                                                     <TableCell>{row.shift_start ? utcToLocal(row.shift_start, user.timezone, 'HH:mm') : '-'}</TableCell>
                                                     <TableCell>{row.shift_end ? utcToLocal(row.shift_end, user.timezone, 'HH:mm') : 'Active'}</TableCell>

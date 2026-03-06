@@ -172,7 +172,7 @@ const AdminDashboard = ({ stats }) => {
                                             />
                                         </div>
                                         <div className="text-center">
-                                            <span className="text-[10px] text-muted-foreground uppercase block">{utcToLocal(day.date, stats.orgTimezone, 'EEE')}</span>
+                                            <span className="text-[10px] text-muted-foreground uppercase block">{utcToLocal(day.date, stats.orgTimezone || 'UTC', 'EEE')}</span>
                                             <span className="text-[10px] font-bold">{totalH.toFixed(1)}h</span>
                                         </div>
                                     </div>
@@ -340,7 +340,7 @@ const UserDashboard = ({ stats }) => {
                     <CardContent>
                         <div className="text-2xl font-bold capitalize">{today.status || 'No Active Session'}</div>
                         <p className="text-xs text-muted-foreground">
-                            {today.start_time ? `Started at ${utcToLocal(today.start_time, stats.userTimezone, 'HH:mm')}` : 'Please start the agent to track time'}
+                            {today.start_time ? `Started at ${utcToLocal(today.start_time, stats.userTimezone || 'UTC', 'HH:mm')}` : 'Please start the agent to track time'}
                         </p>
                     </CardContent>
                 </Card>
@@ -371,7 +371,7 @@ const UserDashboard = ({ stats }) => {
                                             {Number(day.hours).toFixed(1)}h
                                         </div>
                                     </div>
-                                    <span className="text-[10px] text-muted-foreground uppercase">{utcToLocal(day.date, stats.userTimezone, 'EEE')}</span>
+                                    <span className="text-[10px] text-muted-foreground uppercase">{utcToLocal(day.date, stats.userTimezone || 'UTC', 'EEE')}</span>
                                 </div>
                             ))
                         )}

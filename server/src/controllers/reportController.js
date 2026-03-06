@@ -163,7 +163,7 @@ export async function fetchScreenshotsData(req) {
             SELECT 
                 s.id,
                 s.captured_at,
-                s.file_path,
+                s.storage_path as file_path,
                 u.full_name as user_name
             FROM screenshots s
             JOIN users u ON s.user_id = u.id

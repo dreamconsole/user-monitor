@@ -21,6 +21,7 @@ export default function Settings() {
         timezone: 'UTC',
         shift_start_time: '09:00',
         shift_end_time: '18:00',
+        org_working_hours: 9.00,
         shift_duration: 9.00,
         work_days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
         start_of_day: '00:00',
@@ -49,6 +50,7 @@ export default function Settings() {
                 ...data,
                 shift_start_time: data.shift_start_time || '09:00',
                 shift_end_time: data.shift_end_time || '18:00',
+                org_working_hours: data.org_working_hours || 9.00,
                 shift_duration: data.shift_duration || 9.00,
                 work_days: data.work_days || ["Mon", "Tue", "Wed", "Thu", "Fri"],
                 start_of_day: data.start_of_day || '00:00',
@@ -83,25 +85,51 @@ export default function Settings() {
         }));
     };
 
-    const calculateDuration = (start, end) => {
-        if (!start || !end) return 0;
-        const [startH, startM] = start.split(':').map(Number);
-        const [endH, endM] = end.split(':').map(Number);
-        let duration = (endH + endM / 60) - (startH + startM / 60);
-        if (duration < 0) duration += 24; // Handle overnight
-        return parseFloat(duration.toFixed(2));
+    const handleShiftDurationChange = (value) => {
+        setSettings(prev => {
+            const numValue = parseFloat(value);
+            const [startH, startM] = prev.shift_start_time.split(':').map(Number);
+            let endH = startH + Math.floor(numValue);
+            let endM = startM + ((numValue % 1) * 60);
+
+            if (endM >= 60) {
+                endH += Math.floor(endM / 60);
+                endM = endM % 60;
+            }
+
+            endH = endH % 24;
+
+            const shift_end_time = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+            return {
+                ...prev,
+                org_working_hours: numValue,
+                shift_end_time
+            };
+        });
     };
 
-    const handleShiftChange = (key, value) => {
+    const handleShiftStartChange = (value) => {
         setSettings(prev => {
-            const newSettings = { ...prev, [key]: value };
-            if (key === 'shift_start_time' || key === 'shift_end_time') {
-                newSettings.shift_duration = calculateDuration(
-                    key === 'shift_start_time' ? value : prev.shift_start_time,
-                    key === 'shift_end_time' ? value : prev.shift_end_time
-                );
+            const numValue = prev.org_working_hours;
+            const [startH, startM] = value.split(':').map(Number);
+            let endH = startH + Math.floor(numValue);
+            let endM = startM + ((numValue % 1) * 60);
+
+            if (endM >= 60) {
+                endH += Math.floor(endM / 60);
+                endM = endM % 60;
             }
-            return newSettings;
+
+            endH = endH % 24;
+
+            const shift_end_time = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+            return {
+                ...prev,
+                shift_start_time: value,
+                shift_end_time
+            };
         });
     };
 
@@ -124,6 +152,7 @@ export default function Settings() {
                 timezone: settings.timezone,
                 shift_start_time: settings.shift_start_time,
                 shift_end_time: settings.shift_end_time,
+                org_working_hours: settings.org_working_hours,
                 shift_duration: settings.shift_duration,
                 work_days: JSON.stringify(settings.work_days),
                 start_of_day: settings.start_of_day,
@@ -252,25 +281,56 @@ export default function Settings() {
                             <Input
                                 type="time"
                                 value={settings.shift_start_time}
-                                onChange={(e) => handleShiftChange('shift_start_time', e.target.value)}
+                                onChange={(e) => handleShiftStartChange(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>Shift End Time</Label>
+                            <Label>Org Working Hours</Label>
+                            <Select
+                                value={settings.org_working_hours?.toString() || "9"}
+                                onValueChange={(v) => handleShiftDurationChange(v)}
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select working hours" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="4">4 Hours</SelectItem>
+                                    <SelectItem value="8">8 Hours</SelectItem>
+                                    <SelectItem value="9">9 Hours</SelectItem>
+                                    <SelectItem value="12">12 Hours</SelectItem>
+                                    <SelectItem value="14">14 Hours</SelectItem>
+                                    <SelectItem value="24">24 Hours</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Calculated End Time (Next Day if needed)</Label>
                             <Input
                                 type="time"
                                 value={settings.shift_end_time}
-                                onChange={(e) => handleShiftChange('shift_end_time', e.target.value)}
+                                readOnly
+                                className="bg-muted text-muted-foreground"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>Calculated Duration (Hours)</Label>
-                            <Input
-                                type="number"
-                                value={settings.shift_duration}
-                                readOnly
-                                className="bg-muted"
-                            />
+                            <Label>User's Max Shift Duration</Label>
+                            <Select
+                                value={settings.shift_duration?.toString() || "9"}
+                                onValueChange={(v) => setSettings(prev => ({ ...prev, shift_duration: parseFloat(v) }))}
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select user max hours" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="4">4 Hours</SelectItem>
+                                    <SelectItem value="8">8 Hours</SelectItem>
+                                    <SelectItem value="9">9 Hours</SelectItem>
+                                    <SelectItem value="10">10 Hours</SelectItem>
+                                    <SelectItem value="12">12 Hours</SelectItem>
+                                    <SelectItem value="14">14 Hours</SelectItem>
+                                    <SelectItem value="24">24 Hours</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
 
@@ -297,7 +357,17 @@ export default function Settings() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <Label>Start of the Day</Label>
+                            <Label className="flex items-center gap-2">
+                                Start of the Day
+                                <span className="relative group flex items-center">
+                                    <div className="flex items-center justify-center w-4 h-4 rounded-full border border-muted-foreground text-muted-foreground text-[10px] font-bold cursor-help">
+                                        i
+                                    </div>
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-popover text-popover-foreground text-xs rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                                        Determines the 24-hour cutoff for daily reporting. For standard days, leave at 00:00 (Midnight). If your org handles heavy night shifts (e.g. 10PM-6AM), setting this to 06:00 means the "work day" resets at 6AM instead of midnight.
+                                    </div>
+                                </span>
+                            </Label>
                             <Input
                                 type="time"
                                 value={settings.start_of_day}

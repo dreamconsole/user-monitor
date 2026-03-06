@@ -15,6 +15,8 @@ import {
     Search, Filter, X, User, Settings, Coffee, Layers, AppWindow
 } from 'lucide-react';
 import DateRangeFilter from '@/components/DateRangeFilter';
+import { utcToLocal } from '@/lib/dateUtils';
+import useAuthStore from '@/lib/useAuthStore';
 
 const ACTION_LABELS = {
     USER_CREATED: 'User Created',
@@ -68,12 +70,7 @@ function getActionColor(action) {
     return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
 }
 
-function formatDate(dateStr) {
-    if (!dateStr) return '-';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-}
+// Remove unused formatDate function as we use utcToLocal now
 
 function ChangeDiff({ oldValues, newValues }) {
     if (!oldValues && !newValues) {
@@ -132,6 +129,7 @@ export default function ActivityLogs() {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [showFilters, setShowFilters] = useState(false);
+    const orgTimezone = useAuthStore(state => state.user?.timezone) || 'UTC';
 
     const fetchLogs = useCallback(async (page = 1) => {
         setLoading(true);
@@ -270,7 +268,7 @@ export default function ActivityLogs() {
                                                     onClick={() => setExpandedRow(isExpanded ? null : log.id)}
                                                 >
                                                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                                                        {formatDate(log.performed_at)}
+                                                        {utcToLocal(log.performed_at, orgTimezone, 'MMM d, yyyy hh:mm a')}
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-col">
