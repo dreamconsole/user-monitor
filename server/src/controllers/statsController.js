@@ -89,7 +89,7 @@ export const getManagerStats = async (req, res) => {
                 u.last_heartbeat
              FROM users u
              LEFT JOIN work_sessions ws ON u.id = ws.user_id AND DATE(ws.start_time) = CURRENT_DATE
-             WHERE u.org_id = $1 AND (u.team_id = $2 OR u.id = $3) AND u.deleted_at IS NULL`,
+             WHERE u.org_id = $1 AND (u.team_id = $2 OR u.id = $3) AND u.deleted_at IS NULL AND u.role != 'orgadmin'`,
             [orgId, teamId, req.user.id]
         );
 
@@ -118,6 +118,7 @@ export const getManagerStats = async (req, res) => {
              JOIN users u ON u.id = ws.user_id
              WHERE u.org_id = $1 AND u.deleted_at IS NULL
                AND (u.team_id = $2 OR u.id = $3)
+               AND u.role != 'orgadmin'
                AND ws.start_time > CURRENT_DATE - INTERVAL '7 days'
              GROUP BY DATE(ws.start_time)
              ORDER BY date ASC`,
@@ -197,11 +198,14 @@ export const getUserHourlyStats = async (req, res) => {
     const orgId = req.user.org_id;
 
     // Security check: Ensure requester can view this user
-    if (req.user.role !== 'orgadmin' && req.user.id !== userId) {
+    if (req.user.role !== 'orgadmin' && String(req.user.id) !== String(userId)) {
         // If manager, check if user reports to them
         if (req.user.role === 'manager') {
-            const userCheck = await query('SELECT team_id FROM users WHERE id = $1', [userId]);
-            if (userCheck.rows.length === 0 || userCheck.rows[0].team_id !== req.user.team_id) {
+            if (!req.user.team_id) {
+                return res.status(403).json({ error: 'Unauthorized to view this user stats' });
+            }
+            const userCheck = await query('SELECT team_id, role FROM users WHERE id = $1', [userId]);
+            if (userCheck.rows.length === 0 || String(userCheck.rows[0].team_id) !== String(req.user.team_id) || userCheck.rows[0].role === 'orgadmin') {
                 return res.status(403).json({ error: 'Unauthorized to view this user stats' });
             }
         } else {
@@ -313,10 +317,13 @@ export const getTimelineData = async (req, res) => {
     if (req.user.role === 'user') {
         // Regular users can only view their own timeline
         targetUserId = req.user.id;
-    } else if (req.user.role === 'manager' && targetUserId && targetUserId !== req.user.id) {
-        // Managers can only view their direct reports
-        const userCheck = await query('SELECT team_id FROM users WHERE id = $1 AND org_id = $2', [targetUserId, orgId]);
-        if (userCheck.rows.length === 0 || userCheck.rows[0].team_id !== req.user.team_id) {
+    } else if (req.user.role === 'manager' && targetUserId && String(targetUserId) !== String(req.user.id)) {
+        // Managers can only view their direct reports (non-admins)
+        if (!req.user.team_id) {
+            return res.status(403).json({ error: 'Unauthorized: not your direct report' });
+        }
+        const userCheck = await query('SELECT team_id, role FROM users WHERE id = $1 AND org_id = $2', [targetUserId, orgId]);
+        if (userCheck.rows.length === 0 || String(userCheck.rows[0].team_id) !== String(req.user.team_id) || userCheck.rows[0].role === 'orgadmin') {
             return res.status(403).json({ error: 'Unauthorized: not your direct report' });
         }
     }

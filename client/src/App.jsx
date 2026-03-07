@@ -90,8 +90,12 @@ function App() {
 
               {/* App Usage Analytics Sub-menus */}
               <Route path="/app-usage" element={<AppUsageDashboard />} />
-              <Route path="/app-categories" element={<AppCategories />} />
-              <Route path="/app-mapping" element={<AppMapping />} />
+
+              {/* App Categories & Mapping: Admin only */}
+              <Route element={<RoleGuard allowedRoles={['orgadmin']} />}>
+                <Route path="/app-categories" element={<AppCategories />} />
+                <Route path="/app-mapping" element={<AppMapping />} />
+              </Route>
 
               <Route path="/app-management" element={<Navigate to="/app-usage" replace />} />
 

@@ -59,6 +59,7 @@ export const getManagerDashboard = async (req, res) => {
              JOIN users u ON uas.user_id = u.id
              WHERE uas.org_id = $1 
              AND u.team_id = $2
+             AND u.role != 'orgadmin'
              AND uas.summary_date >= $3 AND uas.summary_date <= $4
              GROUP BY uas.user_id, u.full_name, u.email
              ORDER BY total_working_seconds DESC`,
@@ -243,13 +244,24 @@ export const getProductivitySummary = async (req, res) => {
     }
 
     if (req.user.role === 'manager') {
-        const userCheck = await query(
-            `SELECT team_id FROM users WHERE id = $1 AND org_id = $2`,
-            [userId, orgId]
-        );
-        if (userCheck.rows.length === 0 || userCheck.rows[0].team_id !== req.user.team_id) {
-            return res.status(403).json({ error: 'Unauthorized' });
+        if (!req.user.team_id) {
+            // Manager has no team — only allow viewing their own data
+            if (String(req.user.id) !== String(userId)) {
+                return res.status(403).json({ error: 'Unauthorized' });
+            }
+        } else {
+            const userCheck = await query(
+                `SELECT team_id FROM users WHERE id = $1 AND org_id = $2`,
+                [userId, orgId]
+            );
+            if (userCheck.rows.length === 0 || String(userCheck.rows[0].team_id) !== String(req.user.team_id)) {
+                return res.status(403).json({ error: 'Unauthorized' });
+            }
         }
+    }
+
+    if (!start_date || !end_date) {
+        return res.status(400).json({ error: 'start_date and end_date are required' });
     }
 
     try {

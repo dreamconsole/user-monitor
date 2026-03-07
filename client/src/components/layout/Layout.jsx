@@ -74,8 +74,8 @@ const Sidebar = ({ className, onLinkClick }) => {
                     roles: ['orgadmin', 'manager', 'user'],
                     sublinks: [
                         { href: '/app-usage', label: 'App Usage Dashboard' },
-                        { href: '/app-categories', label: 'App Categories' },
-                        { href: '/app-mapping', label: 'App Mapping' }
+                        { href: '/app-categories', label: 'App Categories', roles: ['orgadmin'] },
+                        { href: '/app-mapping', label: 'App Mapping', roles: ['orgadmin'] }
                     ]
                 },
                 {
@@ -164,7 +164,7 @@ const Sidebar = ({ className, onLinkClick }) => {
                                                 </div>
                                                 {(openSubmenus[link.label] || isActiveChild) && !collapsed && (
                                                     <div className="ml-7 space-y-1 mt-1">
-                                                        {link.sublinks.map(sublink => {
+                                                        {link.sublinks.filter(sub => !sub.roles || sub.roles.includes(user?.role)).map(sublink => {
                                                             const subActive = location.pathname === sublink.href;
                                                             return (
                                                                 <Link to={sublink.href} key={sublink.href} onClick={onLinkClick}>

@@ -38,15 +38,26 @@ export const getAuditLogs = async (req, res) => {
         const params = [orgId];
         let paramCount = 1;
 
-        // Role-based access: managers can only see their own logs + logs targeting their team members
+        // Role-based access: managers only see logs for themselves and their team members (no orgadmin logs)
         if (req.user.role === 'manager') {
-            paramCount++;
-            sql += ` AND (
-                al.actor_id = $${paramCount}
-                OR al.target_id IN (SELECT id FROM users WHERE team_id = $${paramCount + 1} AND org_id = $1)
-            )`;
-            params.push(req.user.id, req.user.team_id);
-            paramCount++;
+            // Exclude logs performed by orgadmins
+            sql += ` AND al.actor_role != 'orgadmin'`;
+
+            if (req.user.team_id) {
+                paramCount++;
+                sql += ` AND (
+                    al.actor_id = $${paramCount}
+                    OR al.actor_id IN (SELECT id FROM users WHERE team_id = $${paramCount + 1} AND org_id = $1 AND role != 'orgadmin')
+                    OR al.target_id::text IN (SELECT id::text FROM users WHERE team_id = $${paramCount + 1} AND org_id = $1 AND role != 'orgadmin')
+                )`;
+                params.push(req.user.id, req.user.team_id);
+                paramCount++;
+            } else {
+                // No team assigned — only show the manager's own logs
+                paramCount++;
+                sql += ` AND al.actor_id = $${paramCount}`;
+                params.push(req.user.id);
+            }
         }
 
         // Filters

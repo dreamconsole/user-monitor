@@ -43,10 +43,18 @@ export async function fetchDailySummaryData(req) {
     }
 
     if (role === 'manager') {
-        paramCount++;
-        sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
-        params.push(req.user.team_id, currentUserId);
-        paramCount++;
+        // Always exclude orgadmins from manager's view
+        sql += ` AND u.role != 'orgadmin'`;
+        if (req.user.team_id) {
+            paramCount++;
+            sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
+            params.push(req.user.team_id, currentUserId);
+            paramCount++;
+        } else {
+            paramCount++;
+            sql += ` AND u.id = $${paramCount}`;
+            params.push(currentUserId);
+        }
     } else if (role === 'user') {
         paramCount++;
         sql += ` AND u.id = $${paramCount}`;
@@ -115,10 +123,18 @@ export async function fetchBreakUsageData(req) {
     }
 
     if (role === 'manager') {
-        paramCount++;
-        sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
-        params.push(req.user.team_id, currentUserId);
-        paramCount++;
+        // Always exclude orgadmins from manager's view
+        sql += ` AND u.role != 'orgadmin'`;
+        if (req.user.team_id) {
+            paramCount++;
+            sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
+            params.push(req.user.team_id, currentUserId);
+            paramCount++;
+        } else {
+            paramCount++;
+            sql += ` AND u.id = $${paramCount}`;
+            params.push(currentUserId);
+        }
     } else if (role === 'user') {
         paramCount++;
         sql += ` AND u.id = $${paramCount}`;
@@ -184,9 +200,18 @@ export async function fetchScreenshotsData(req) {
     }
 
     if (role === 'manager') {
-        paramCount++;
-        sql += ` AND (u.manager_id = $${paramCount} OR u.id = $${paramCount})`;
-        params.push(currentUserId);
+        // Always exclude orgadmins from manager's view
+        sql += ` AND u.role != 'orgadmin'`;
+        if (req.user.team_id) {
+            paramCount++;
+            sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
+            params.push(req.user.team_id, currentUserId);
+            paramCount++;
+        } else {
+            paramCount++;
+            sql += ` AND u.id = $${paramCount}`;
+            params.push(currentUserId);
+        }
     } else if (role === 'user') {
         paramCount++;
         sql += ` AND u.id = $${paramCount}`;
@@ -248,10 +273,18 @@ export const getIdleEvents = async (req, res) => {
         }
 
         if (role === 'manager') {
-            paramCount++;
-            sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
-            params.push(req.user.team_id, currentUserId);
-            paramCount++;
+            // Always exclude orgadmins from manager's view
+            sql += ` AND u.role != 'orgadmin'`;
+            if (req.user.team_id) {
+                paramCount++;
+                sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
+                params.push(req.user.team_id, currentUserId);
+                paramCount++;
+            } else {
+                paramCount++;
+                sql += ` AND u.id = $${paramCount}`;
+                params.push(currentUserId);
+            }
         } else if (role === 'user') {
             paramCount++;
             sql += ` AND u.id = $${paramCount}`;

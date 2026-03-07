@@ -227,7 +227,7 @@ export default function Users() {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Roles</SelectItem>
-                        <SelectItem value="orgadmin">Admin</SelectItem>
+                        {isAdmin && <SelectItem value="orgadmin">Admin</SelectItem>}
                         <SelectItem value="manager">Manager</SelectItem>
                         <SelectItem value="user">User</SelectItem>
                     </SelectContent>

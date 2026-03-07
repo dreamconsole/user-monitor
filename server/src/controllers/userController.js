@@ -22,9 +22,18 @@ export const getUsers = async (req, res) => {
         let paramCount = 1;
 
         if (req.user.role === 'manager') {
-            paramCount++;
-            sql += ` AND u.team_id = $${paramCount}`;
-            params.push(req.user.team_id);
+            // Exclude orgadmins from manager's view
+            sql += ` AND u.role != 'orgadmin'`;
+            if (req.user.team_id) {
+                paramCount++;
+                sql += ` AND u.team_id = $${paramCount}`;
+                params.push(req.user.team_id);
+            } else {
+                // Manager has no team assigned — only show themselves
+                paramCount++;
+                sql += ` AND u.id = $${paramCount}`;
+                params.push(req.user.id);
+            }
         }
 
         if (search) {

@@ -243,8 +243,11 @@ export const getTeamProductivity = async (req, res) => {
                 `SELECT u.id, u.full_name, u.team_id, t.name as team_name
                  FROM users u
                  LEFT JOIN teams t ON u.team_id = t.id
-                 WHERE u.org_id = $1 AND u.team_id = $2 AND u.is_active = true`,
-                [orgId, req.user.team_id]
+                 WHERE u.org_id = $1 
+                   AND (u.team_id = $2 OR u.id = $3)
+                   AND u.role != 'orgadmin'
+                   AND u.is_active = true`,
+                [orgId, req.user.team_id, req.user.id]
             );
         } else {
             usersResult = await query(

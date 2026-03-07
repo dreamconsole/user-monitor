@@ -128,13 +128,13 @@ export const login = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: user.id, org_id: user.org_id, role: user.role },
+            { id: user.id, org_id: user.org_id, role: user.role, team_id: user.team_id || null },
             process.env.JWT_SECRET,
             { expiresIn: '1d' }
         );
 
         const userName = user.full_name ?? user.name;
-        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, timezone: user.timezone, org_primary_color_light: user.org_primary_color_light, org_primary_color_dark: user.org_primary_color_dark } });
+        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, team_id: user.team_id || null, timezone: user.timezone, org_primary_color_light: user.org_primary_color_light, org_primary_color_dark: user.org_primary_color_dark } });
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Login failed' });
@@ -255,7 +255,7 @@ export const changePassword = async (req, res) => {
 export const getMe = async (req, res) => {
     try {
         const result = await query(
-            'SELECT u.id, u.full_name as name, u.email, u.role, u.org_id, u.timezone, o.name as org_name, o.primary_color_light as org_primary_color_light, o.primary_color_dark as org_primary_color_dark FROM users u JOIN organizations o ON u.org_id = o.id WHERE u.id = $1',
+            'SELECT u.id, u.full_name as name, u.email, u.role, u.org_id, u.team_id, u.timezone, o.name as org_name, o.primary_color_light as org_primary_color_light, o.primary_color_dark as org_primary_color_dark FROM users u JOIN organizations o ON u.org_id = o.id WHERE u.id = $1',
             [req.user.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
@@ -354,13 +354,13 @@ export const verifySSO = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: user.id, org_id: user.org_id, role: user.role },
+            { id: user.id, org_id: user.org_id, role: user.role, team_id: user.team_id || null },
             process.env.JWT_SECRET,
             { expiresIn: '1d' }
         );
 
         const userName = user.full_name ?? user.name;
-        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, timezone: user.timezone, org_primary_color_light: user.org_primary_color_light, org_primary_color_dark: user.org_primary_color_dark } });
+        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, team_id: user.team_id || null, timezone: user.timezone, org_primary_color_light: user.org_primary_color_light, org_primary_color_dark: user.org_primary_color_dark } });
 
     } catch (error) {
         console.error('verifySSO error:', error);
