@@ -3,17 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { X, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { format, subDays, addDays } from 'date-fns';
-import { utcToLocal } from '@/lib/dateUtils';
+import { utcToLocal, getWorkDate } from '@/lib/dateUtils';
 import api from '@/lib/api';
+import useAuthStore from '@/lib/useAuthStore';
 import CalendarView from '@/components/timeline/CalendarView';
 import DailyTimeline from '@/components/timeline/DailyTimeline';
 
-const TODAY = new Date().toISOString().split('T')[0];
-
 export default function UserActivityDetail({ user, onClose }) {
-    const [year, setYear] = useState(new Date().getFullYear());
-    const [month, setMonth] = useState(new Date().getMonth() + 1);
-    const [selectedDate, setSelectedDate] = useState(TODAY);
+    const { user: currentUser } = useAuthStore();
+    const tz = currentUser.org_timezone || currentUser.timezone;
+    const today = getWorkDate(new Date(), tz);
+
+    const [year, setYear] = useState(parseInt(today.split('-')[0], 10));
+    const [month, setMonth] = useState(parseInt(today.split('-')[1], 10));
+    const [selectedDate, setSelectedDate] = useState(today);
 
     const [monthData, setMonthData] = useState([]);
     const [dayData, setDayData] = useState(null);
@@ -70,10 +73,9 @@ export default function UserActivityDetail({ user, onClose }) {
         else setMonth(m => m + 1);
     };
     const goToday = () => {
-        const now = new Date();
-        setYear(now.getFullYear());
-        setMonth(now.getMonth() + 1);
-        setSelectedDate(TODAY);
+        setYear(parseInt(today.split('-')[0], 10));
+        setMonth(parseInt(today.split('-')[1], 10));
+        setSelectedDate(today);
     };
 
     const prevDay = () => setSelectedDate(d => {
@@ -116,7 +118,7 @@ export default function UserActivityDetail({ user, onClose }) {
                             <Calendar className="w-4 h-4 text-muted-foreground" />
                             {new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={nextDay} disabled={selectedDate === TODAY}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={nextDay} disabled={selectedDate === today}>
                             <ChevronRight className="w-4 h-4" />
                         </Button>
                     </div>
@@ -144,6 +146,7 @@ export default function UserActivityDetail({ user, onClose }) {
                                 onNextMonth={nextMonth}
                                 onToday={goToday}
                                 loading={loadingMonth}
+                                today={today}
                             />
                         </div>
                     </div>
@@ -156,6 +159,7 @@ export default function UserActivityDetail({ user, onClose }) {
                             loading={loadingDay}
                             screenshotUrl={screenshotUrl}
                             setScreenshotUrl={setScreenshotUrl}
+                            user={currentUser}
                         />
                     </div>
                 </div>

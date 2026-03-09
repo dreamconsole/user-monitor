@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { FileText, ArrowRight } from 'lucide-react';
 import { formatTime, formatSeconds } from './utils';
 
-export default function SessionLogTable({ sessions, breaks }) {
+export default function SessionLogTable({ sessions, breaks, formatTimeLocal }) {
     // Combine and sort events
     const events = [
         ...sessions.map(s => ({
@@ -54,9 +54,9 @@ export default function SessionLogTable({ sessions, breaks }) {
                                             {event.label}
                                         </div>
                                     </TableCell>
-                                    <TableCell>{formatTime(event.start)}</TableCell>
+                                    <TableCell>{formatTimeLocal(event.start)}</TableCell>
                                     <TableCell>
-                                        {event.end ? formatTime(event.end) : <span className="text-muted-foreground italic">Ongoing</span>}
+                                        {event.end ? formatTimeLocal(event.end) : <span className="text-muted-foreground italic">Ongoing</span>}
                                     </TableCell>
                                     <TableCell>{formatSeconds(event.duration)}</TableCell>
                                 </TableRow>

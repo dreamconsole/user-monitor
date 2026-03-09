@@ -392,6 +392,9 @@ async function handleMonthView(req, res, userId, orgId, month) {
 async function handleDayView(req, res, userId, orgId, date) {
     const targetDate = date || new Date().toISOString().split('T')[0];
 
+    const orgTzQuery = await query('SELECT timezone FROM organizations WHERE id = $1', [orgId]);
+    const orgTz = orgTzQuery.rows[0]?.timezone || 'UTC';
+
     // 1. Work Sessions
     const sessionsResult = await query(
         `SELECT id, start_time, end_time, total_work_seconds, total_idle_seconds,
@@ -408,9 +411,9 @@ async function handleDayView(req, res, userId, orgId, date) {
                 COALESCE(bm.name, 'Break') as break_name, bm.is_paid
          FROM break_logs bl
          LEFT JOIN break_master bm ON bl.break_type_id = bm.id
-         WHERE bl.user_id = $1 AND bl.org_id = $2 AND DATE(bl.start_time) = $3
+         WHERE bl.user_id = $1 AND bl.org_id = $2 AND (bl.start_time AT TIME ZONE $4)::DATE = $3
          ORDER BY bl.start_time`,
-        [userId, orgId, targetDate]
+        [userId, orgId, targetDate, orgTz]
     );
 
     // 3. Activity State Changes (for intensity bar)
@@ -419,9 +422,9 @@ async function handleDayView(req, res, userId, orgId, date) {
                 COALESCE(left_clicks, 0) as left_clicks, 
                 COALESCE(right_clicks, 0) as right_clicks
          FROM activity_logs
-         WHERE user_id = $1 AND org_id = $2 AND DATE(log_time) = $3
+         WHERE user_id = $1 AND org_id = $2 AND (log_time AT TIME ZONE $4)::DATE = $3
          ORDER BY log_time`,
-        [userId, orgId, targetDate]
+        [userId, orgId, targetDate, orgTz]
     );
 
     // 4. App Usage Segments
@@ -434,18 +437,18 @@ async function handleDayView(req, res, userId, orgId, date) {
          FROM app_usage_logs aul
          LEFT JOIN tracked_apps ta ON aul.app_id = ta.id
          LEFT JOIN app_categories ac ON ta.category_id = ac.id
-         WHERE aul.user_id = $1 AND aul.org_id = $2 AND aul.log_date = $3
+         WHERE aul.user_id = $1 AND aul.org_id = $2 AND (aul.start_time AT TIME ZONE $4)::DATE = $3
          ORDER BY aul.start_time`,
-        [userId, orgId, targetDate]
+        [userId, orgId, targetDate, orgTz]
     );
 
     // 5. Screenshots
     const screenshotsResult = await query(
         `SELECT id, captured_at, storage_path
          FROM screenshots
-         WHERE user_id = $1 AND org_id = $2 AND DATE(captured_at) = $3
+         WHERE user_id = $1 AND org_id = $2 AND (captured_at AT TIME ZONE $4)::DATE = $3
          ORDER BY captured_at`,
-        [userId, orgId, targetDate]
+        [userId, orgId, targetDate, orgTz]
     );
 
     // Calculate totals

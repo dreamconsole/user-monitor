@@ -13,6 +13,7 @@ import { Download, Search, Filter, FileText, Coffee, Monitor, Image as ImageIcon
 import DateRangeFilter from '@/components/DateRangeFilter';
 import { Badge } from '@/components/ui/badge';
 import { utcToLocal } from '@/lib/dateUtils';
+import { format } from 'date-fns';
 
 const ExportButton = ({ data, filename, headers }) => {
     const exportToCSV = () => {
@@ -283,10 +284,10 @@ export default function Reports() {
                                         <TableRow key={i}>
                                             {activeTab === 'summary' && (
                                                 <>
-                                                    <TableCell className="font-medium">{utcToLocal(row.work_date, user.timezone, 'MMM dd, yyyy')}</TableCell>
+                                                    <TableCell className="font-medium">{row.work_date ? format(new Date(row.work_date + 'T12:00:00'), 'MMM dd, yyyy') : '-'}</TableCell>
                                                     <TableCell>{row.user_name}</TableCell>
-                                                    <TableCell>{row.shift_start ? utcToLocal(row.shift_start, user.timezone, 'HH:mm') : '-'}</TableCell>
-                                                    <TableCell>{row.shift_end ? utcToLocal(row.shift_end, user.timezone, 'HH:mm') : 'Active'}</TableCell>
+                                                    <TableCell>{row.shift_start ? utcToLocal(row.shift_start, user.org_timezone || user.timezone, 'HH:mm') : '-'}</TableCell>
+                                                    <TableCell>{row.shift_end ? utcToLocal(row.shift_end, user.org_timezone || user.timezone, 'HH:mm') : 'Active'}</TableCell>
                                                     <TableCell>{parseFloat(row.work_hours).toFixed(1)}h</TableCell>
                                                     <TableCell>{parseFloat(row.idle_hours).toFixed(1)}h</TableCell>
                                                     <TableCell>{(parseFloat(row.break_seconds || 0) / 3600).toFixed(1)}h</TableCell>
@@ -299,7 +300,7 @@ export default function Reports() {
                                             )}
                                             {activeTab === 'breaks' && (
                                                 <>
-                                                    <TableCell className="font-medium">{utcToLocal(row.start_time, user.timezone, 'MMM dd, HH:mm')}</TableCell>
+                                                    <TableCell className="font-medium">{utcToLocal(row.start_time, user.org_timezone || user.timezone, 'MMM dd, HH:mm')}</TableCell>
                                                     <TableCell>{row.user_name}</TableCell>
                                                     <TableCell><Badge variant="outline">{row.break_type}</Badge></TableCell>
                                                     <TableCell className="text-right">{parseFloat(row.duration_minutes).toFixed(0)} min</TableCell>
@@ -307,8 +308,8 @@ export default function Reports() {
                                             )}
                                             {activeTab === 'idle' && (
                                                 <>
-                                                    <TableCell className="font-medium">{utcToLocal(row.start_time, user.timezone, 'MMM dd, HH:mm')}</TableCell>
-                                                    <TableCell className="text-muted-foreground">{utcToLocal(row.end_time, user.timezone, 'HH:mm')}</TableCell>
+                                                    <TableCell className="font-medium">{utcToLocal(row.start_time, user.org_timezone || user.timezone, 'MMM dd, HH:mm')}</TableCell>
+                                                    <TableCell className="text-muted-foreground">{utcToLocal(row.end_time, user.org_timezone || user.timezone, 'HH:mm')}</TableCell>
                                                     <TableCell>{row.user_name}</TableCell>
                                                     <TableCell className="text-right font-mono">{parseFloat(row.duration_minutes).toFixed(0)} min</TableCell>
                                                 </>
@@ -316,7 +317,7 @@ export default function Reports() {
 
                                             {activeTab === 'screenshots' && (
                                                 <>
-                                                    <TableCell className="font-medium">{utcToLocal(row.captured_at, user.timezone, 'MMM dd, HH:mm:ss')}</TableCell>
+                                                    <TableCell className="font-medium">{utcToLocal(row.captured_at, user.org_timezone || user.timezone, 'MMM dd, HH:mm:ss')}</TableCell>
                                                     <TableCell>{row.user_name}</TableCell>
                                                     <TableCell className="text-right">
                                                         <Button
@@ -346,7 +347,7 @@ export default function Reports() {
                         <div className="p-4 border-b flex items-center justify-between">
                             <div>
                                 <h3 className="font-semibold">{selectedScreenshot.user_name}</h3>
-                                <p className="text-xs text-muted-foreground">{utcToLocal(selectedScreenshot.captured_at, user.timezone, 'MMM dd, HH:mm:ss')}</p>
+                                <p className="text-xs text-muted-foreground">{utcToLocal(selectedScreenshot.captured_at, user.org_timezone || user.timezone, 'MMM dd, HH:mm:ss')}</p>
                             </div>
                             <Button variant="ghost" size="icon" onClick={() => setSelectedScreenshot(null)}>
                                 <span className="sr-only">Close</span>

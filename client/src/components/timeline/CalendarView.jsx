@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Camera } from 'lucide-react';
 import { getDaysInMonth, getFirstDayOfWeek, toDateStr, getMonthName, formatSeconds, formatTime } from './utils';
 
-const TODAY = new Date().toISOString().split('T')[0];
 
 export default function CalendarView({
     year,
@@ -15,7 +14,8 @@ export default function CalendarView({
     onPrevMonth,
     onNextMonth,
     onToday,
-    loading
+    loading,
+    today
 }) {
     const calendarDays = useMemo(() => {
         const daysInMonth = getDaysInMonth(year, month);
@@ -38,7 +38,7 @@ export default function CalendarView({
                 day: d,
                 dateStr,
                 data: dayMap[dateStr] || null,
-                isToday: dateStr === TODAY,
+                isToday: dateStr === today,
                 isSelected: dateStr === selectedDate,
                 isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
                 key: dateStr,

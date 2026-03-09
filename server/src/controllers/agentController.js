@@ -122,18 +122,12 @@ export const syncActivitySession = async (req, res) => {
             });
         }
         // activity_sessions is now work_sessions
-        // Calculate work_date based on start_time AT TIME ZONE user's timezone
-        // Use a CASE to handle the unrecognized 'Asia/Calcutta' alias often found in older systems
+        // Calculate work_date based on start_time AT TIME ZONE org's timezone
         await query(
             `INSERT INTO work_sessions (id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, total_break_seconds, status, work_date)
              SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, ($4::TIMESTAMPTZ AT TIME ZONE 
-                CASE 
-                    WHEN u.timezone = 'Asia/Calcutta' THEN 'Asia/Kolkata'
-                    WHEN u.timezone IS NULL OR BTRIM(u.timezone) = '' THEN 'UTC'
-                    WHEN EXISTS (SELECT 1 FROM pg_timezone_names ptn WHERE ptn.name = u.timezone) THEN u.timezone
-                    ELSE 'UTC'
-                END)::DATE
-             FROM users u WHERE u.id = $3
+                COALESCE((SELECT timezone FROM organizations WHERE id = $2), 'UTC')
+             )::DATE
              ON CONFLICT (id) DO UPDATE SET
              end_time = EXCLUDED.end_time,
              total_work_seconds = EXCLUDED.total_work_seconds,

@@ -319,7 +319,7 @@ export default function Users() {
                                             </span>
                                             {status === 'offline' && user.last_heartbeat && (
                                                 <span className="text-[10px] text-muted-foreground">
-                                                    last seen {utcToLocal(user.last_heartbeat, currentUser.timezone, 'HH:mm')}
+                                                    last seen {utcToLocal(user.last_heartbeat, currentUser.org_timezone || currentUser.timezone, 'HH:mm')}
                                                 </span>
                                             )}
                                         </div>

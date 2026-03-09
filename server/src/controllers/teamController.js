@@ -8,10 +8,10 @@ export const getTeams = async (req, res) => {
                    COUNT(u.id) as total_members,
                    (
                        SELECT json_agg(json_build_object('id', m.id, 'name', m.full_name, 'email', m.email, 'role', m.role))
-                       FROM users m WHERE m.team_id = t.id AND m.role = 'manager'
+                       FROM users m WHERE m.team_id = t.id AND m.role = 'manager' AND m.is_active = true
                    ) as managers
             FROM teams t
-            LEFT JOIN users u ON u.team_id = t.id
+            LEFT JOIN users u ON u.team_id = t.id AND u.is_active = true
             LEFT JOIN break_groups bg ON t.break_group_id = bg.id
             WHERE t.org_id = $1
         `;
@@ -111,7 +111,7 @@ export const getTeamMembers = async (req, res) => {
         }
 
         const result = await query(
-            'SELECT id, full_name as name, email, role, is_active as status FROM users WHERE team_id = $1 AND org_id = $2 ORDER BY role ASC, full_name ASC',
+            'SELECT id, full_name as name, email, role, is_active as status FROM users WHERE team_id = $1 AND org_id = $2 AND is_active = true ORDER BY role ASC, full_name ASC',
             [id, req.user.org_id]
         );
         res.json(result.rows);
@@ -126,10 +126,10 @@ export const addMembers = async (req, res) => {
     if (req.user.role !== 'orgadmin') return res.status(403).json({ error: 'Forbidden' });
 
     const { id } = req.params;
-    const { userIds } = req.body; // Array of UUIDs
+    const userIds = req.body.userIds || req.body.user_ids; // Array of UUIDs
 
     if (!Array.isArray(userIds) || userIds.length === 0) {
-        return res.status(400).json({ error: 'userIds array is required' });
+        return res.status(400).json({ error: 'userIds (or user_ids) array is required' });
     }
 
     try {
@@ -140,7 +140,7 @@ export const addMembers = async (req, res) => {
         const maxMembers = teamCheck.rows[0].max_members;
 
         if (maxMembers) {
-            const currentMembersCount = await query('SELECT COUNT(*) FROM users WHERE team_id = $1 AND org_id = $2 AND role != $3', [id, req.user.org_id, 'manager']);
+            const currentMembersCount = await query('SELECT COUNT(*) FROM users WHERE team_id = $1 AND org_id = $2 AND role != $3 AND is_active = true', [id, req.user.org_id, 'manager']);
             const newMembersLength = userIds.length;
             const totalEst = parseInt(currentMembersCount.rows[0].count) + newMembersLength;
             if (totalEst > maxMembers) {
@@ -151,7 +151,7 @@ export const addMembers = async (req, res) => {
         // Enforce max 2 managers rule
         // 1. Get current managers on the team
         const currentManagersRes = await query(
-            'SELECT id FROM users WHERE team_id = $1 AND role = $2 AND org_id = $3',
+            'SELECT id FROM users WHERE team_id = $1 AND role = $2 AND org_id = $3 AND is_active = true',
             [id, 'manager', req.user.org_id]
         );
         const currentManagers = currentManagersRes.rows.map(r => r.id);

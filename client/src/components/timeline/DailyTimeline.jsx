@@ -1,11 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Timer, Pause, Coffee, Clock, Activity, Monitor, Camera, MousePointerClick, MousePointer2, Moon, Mouse } from 'lucide-react';
-import { formatSeconds, formatTime, PRODUCTIVITY_COLORS } from './utils';
+import { formatSeconds, PRODUCTIVITY_COLORS } from './utils';
+import { utcToLocal, getWorkDate } from '@/lib/dateUtils';
 import api from '@/lib/api';
 import AppUsageList from './AppUsageList';
 import SessionLogTable from './SessionLogTable';
 
-export default function DailyTimeline({ date, data, loading, screenshotUrl, setScreenshotUrl }) {
+export default function DailyTimeline({ date, data, loading, screenshotUrl, setScreenshotUrl, user }) {
     if (loading) {
         return (
             <Card>
@@ -21,6 +22,7 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
     const dateLabel = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
+    const formatTimeLocal = (iso) => utcToLocal(iso, user.org_timezone || user.timezone, 'HH:mm');
 
     return (
         <div className="space-y-4">
@@ -50,7 +52,7 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
                 <SummaryCard
                     icon={<Clock className="w-4 h-4 text-blue-500" />}
                     label="Clock In/Out"
-                    value={`${formatTime(totals.first_clock_in)} - ${formatTime(totals.last_clock_out)}`}
+                    value={`${formatTimeLocal(totals.first_clock_in)} - ${formatTimeLocal(totals.last_clock_out)}`}
                     color="blue"
                 />
             </div>
@@ -106,6 +108,8 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
                         screenshots={screenshots}
                         setScreenshotUrl={setScreenshotUrl}
                         date={date}
+                        user={user}
+                        formatTimeLocal={formatTimeLocal}
                     />
                 </CardContent>
             </Card>
@@ -144,7 +148,7 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
 
             {/* Session & Break Log Table */}
             <div className="mt-4">
-                <SessionLogTable sessions={sessions} breaks={breaks} />
+                <SessionLogTable sessions={sessions} breaks={breaks} formatTimeLocal={formatTimeLocal} />
             </div>
         </div>
     );
@@ -174,7 +178,8 @@ function SummaryCard({ icon, label, value, color, subtitle }) {
     );
 }
 
-function TimelineChart({ sessions, breaks, apps, screenshots, setScreenshotUrl, date }) {
+function TimelineChart({ sessions, breaks, apps, screenshots, setScreenshotUrl, date, user, formatTimeLocal }) {
+    const tz = user?.org_timezone || user?.timezone || 'UTC';
     let minHour = 8, maxHour = 20;
 
     const allTimes = [
@@ -185,24 +190,33 @@ function TimelineChart({ sessions, breaks, apps, screenshots, setScreenshotUrl, 
     ].filter(Boolean);
 
     allTimes.forEach(t => {
-        const h = new Date(t).getHours();
+        const timeStr = utcToLocal(t, tz, 'HH:mm');
+        const h = parseInt(timeStr.split(':')[0], 10);
         if (h < minHour) minHour = Math.max(0, h - 1);
         if (h >= maxHour) maxHour = Math.min(24, h + 2);
     });
 
     const totalHours = maxHour - minHour;
+    const totalSeconds = totalHours * 3600;
     if (totalHours <= 0) {
         return <div className="text-sm text-muted-foreground py-4 text-center">No activity recorded for this day</div>;
     }
 
-    const dayStart = new Date(`${date}T${String(minHour).padStart(2, '0')}:00:00`);
-    const dayEnd = new Date(`${date}T${String(maxHour).padStart(2, '0')}:00:00`);
-    const totalMs = dayEnd - dayStart;
+    const getSecondsOfDay = (iso) => {
+        const timeStr = utcToLocal(iso, tz, 'HH:mm:ss');
+        const [h, m, s] = timeStr.split(':').map(Number);
+        return h * 3600 + m * 60 + s;
+    };
 
     function pct(time) {
         if (!time) return 0;
-        const t = new Date(time);
-        return Math.max(0, Math.min(100, ((t - dayStart) / totalMs) * 100));
+        const workDate = getWorkDate(time, tz);
+        let sec;
+        if (workDate < date) sec = 0;
+        else if (workDate > date) sec = 24 * 3600;
+        else sec = getSecondsOfDay(time);
+
+        return Math.max(0, Math.min(100, ((sec - minHour * 3600) / totalSeconds) * 100));
     }
 
     function widthPct(start, end) {
@@ -215,10 +229,10 @@ function TimelineChart({ sessions, breaks, apps, screenshots, setScreenshotUrl, 
         hourLines.push(h);
     }
 
-    const now = new Date();
-    const nowDate = now.toISOString().split('T')[0];
-    const showNowLine = nowDate === date && now >= dayStart && now <= dayEnd;
-    const nowPct = showNowLine ? ((now - dayStart) / totalMs) * 100 : -1;
+    const nowIso = new Date().toISOString();
+    const nowDateStr = getWorkDate(nowIso, tz);
+    const showNowLine = nowDateStr === date;
+    const nowPct = showNowLine ? pct(nowIso) : -1;
 
     return (
         <div className="min-w-[600px]">
@@ -243,7 +257,7 @@ function TimelineChart({ sessions, breaks, apps, screenshots, setScreenshotUrl, 
                         left={pct(s.start_time)}
                         width={widthPct(s.start_time, s.end_time)}
                         color="#22c55e"
-                        tooltip={`Work: ${formatTime(s.start_time)} - ${formatTime(s.end_time)} (${formatSeconds(s.work_seconds)})`}
+                        tooltip={`Work: ${formatTimeLocal(s.start_time)} - ${formatTimeLocal(s.end_time)} (${formatSeconds(s.work_seconds)})`}
                     />
                 ))}
             </TimelineLane>
@@ -256,7 +270,7 @@ function TimelineChart({ sessions, breaks, apps, screenshots, setScreenshotUrl, 
                         left={pct(b.start_time)}
                         width={widthPct(b.start_time, b.end_time)}
                         color="#f97316"
-                        tooltip={`${b.break_name}: ${formatTime(b.start_time)} - ${formatTime(b.end_time)} (${formatSeconds(b.duration_seconds)})`}
+                        tooltip={`${b.break_name}: ${formatTimeLocal(b.start_time)} - ${formatTimeLocal(b.end_time)} (${formatSeconds(b.duration_seconds)})`}
                         label={b.break_name}
                     />
                 ))}
@@ -270,7 +284,7 @@ function TimelineChart({ sessions, breaks, apps, screenshots, setScreenshotUrl, 
                         left={pct(a.start_time)}
                         width={widthPct(a.start_time, a.end_time)}
                         color={PRODUCTIVITY_COLORS[a.productivity_type] || '#6366f1'}
-                        tooltip={`${a.app_name}: ${formatTime(a.start_time)} - ${formatTime(a.end_time)} (${formatSeconds(a.duration_seconds)})`}
+                        tooltip={`${a.app_name}: ${formatTimeLocal(a.start_time)} - ${formatTimeLocal(a.end_time)} (${formatSeconds(a.duration_seconds)})`}
                         label={a.app_name}
                     />
                 ))}
@@ -283,7 +297,7 @@ function TimelineChart({ sessions, breaks, apps, screenshots, setScreenshotUrl, 
                         key={i}
                         className="absolute top-1 cursor-pointer hover:scale-125 transition-transform z-10"
                         style={{ left: `${pct(s.captured_at)}%` }}
-                        title={`Screenshot at ${formatTime(s.captured_at)}`}
+                        title={`Screenshot at ${formatTimeLocal(s.captured_at)}`}
                         onClick={() => {
                             const baseUrl = api.defaults.baseURL || 'http://localhost:3000';
                             setScreenshotUrl(`${baseUrl}/${s.storage_path}`);
