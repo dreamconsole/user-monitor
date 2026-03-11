@@ -101,6 +101,36 @@ export default function Reports() {
     };
 
     const [selectedScreenshot, setSelectedScreenshot] = useState(null);
+    const [screenshotUrl, setScreenshotUrl] = useState(null);
+    const [screenshotLoading, setScreenshotLoading] = useState(false);
+
+    useEffect(() => {
+        if (!selectedScreenshot) {
+            if (screenshotUrl && screenshotUrl !== 'error') URL.revokeObjectURL(screenshotUrl);
+            setScreenshotUrl(null);
+            return;
+        }
+
+        let isMounted = true;
+        setScreenshotLoading(true);
+
+        // Fetch securely with JWT token
+        api.get(`/${selectedScreenshot.file_path}`, { responseType: 'blob' })
+            .then(response => {
+                if (isMounted) {
+                    setScreenshotUrl(URL.createObjectURL(response.data));
+                }
+            })
+            .catch(error => {
+                console.error("Failed to fetch image", error);
+                if (isMounted) setScreenshotUrl('error');
+            })
+            .finally(() => {
+                if (isMounted) setScreenshotLoading(false);
+            });
+
+        return () => { isMounted = false; };
+    }, [selectedScreenshot]);
 
     return (
         <div className="space-y-6">
@@ -355,12 +385,21 @@ export default function Reports() {
                             </Button>
                         </div>
                         <div className="flex-1 overflow-auto bg-slate-950 flex items-center justify-center p-4">
-                            <img
-                                src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/${selectedScreenshot.file_path}`}
-                                alt="Screenshot"
-                                className="max-w-full max-h-full object-contain shadow-lg"
-                                onError={(e) => { e.target.src = 'https://placehold.co/600x400?text=Image+Not+Found'; }}
-                            />
+                            {screenshotLoading ? (
+                                <div className="text-muted-foreground animate-pulse text-sm">Loading secure image...</div>
+                            ) : screenshotUrl === 'error' ? (
+                                <div className="text-center p-8 bg-slate-900 rounded-lg flex flex-col items-center">
+                                    <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
+                                    <p className="text-muted-foreground font-medium">Image Not Found</p>
+                                    <p className="text-xs text-slate-500 mt-2">The screenshot may have been deleted or never uploaded.</p>
+                                </div>
+                            ) : screenshotUrl ? (
+                                <img
+                                    src={screenshotUrl}
+                                    alt="Screenshot"
+                                    className="max-w-full max-h-full object-contain shadow-lg"
+                                />
+                            ) : null}
                         </div>
                     </div>
                 </div>

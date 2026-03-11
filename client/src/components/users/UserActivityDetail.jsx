@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import useAuthStore from '@/lib/useAuthStore';
 import CalendarView from '@/components/timeline/CalendarView';
 import DailyTimeline from '@/components/timeline/DailyTimeline';
+import AuthenticatedImage from '@/components/AuthenticatedImage';
 
 export default function UserActivityDetail({ user, onClose }) {
     const { user: currentUser } = useAuthStore();
@@ -180,10 +181,10 @@ export default function UserActivityDetail({ user, onClose }) {
                         <button className="absolute -top-10 right-0 text-white" onClick={() => setScreenshotUrl(null)}>
                             <X className="w-8 h-8" />
                         </button>
-                        <img
+                        <AuthenticatedImage
                             src={screenshotUrl}
                             alt="Screenshot"
-                            className="w-full rounded-lg"
+                            className="w-full rounded-lg max-h-[85vh] object-contain"
                         />
                     </div>
                 </div>
