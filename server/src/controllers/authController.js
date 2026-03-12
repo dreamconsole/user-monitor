@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { query, getClient } from '../db.js';
+import { broadcastToManagers } from '../websocket.js';
 
 const googleClient = new OAuth2Client(process.env.VITE_GOOGLE_CLIENT_ID);
 
@@ -120,10 +121,22 @@ export const login = async (req, res) => {
             return res.status(403).json({ error: 'Account suspended' });
         }
 
-        // Update last login (only when using new schema with last_login_at)
+        // Update last login and heartbeat status (only when using new schema)
         if (user.password_hash != null) {
             try {
-                await query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
+                await query(
+                    'UPDATE users SET last_login_at = CURRENT_TIMESTAMP, last_heartbeat = CURRENT_TIMESTAMP, force_logout = false WHERE id = $1',
+                    [user.id]
+                );
+
+                // Broadcast heartbeat to managers for live dashboard updates
+                try {
+                    broadcastToManagers(user.org_id, {
+                        type: 'USER_HEARTBEAT',
+                        userId: user.id,
+                        timestamp: new Date().toISOString()
+                    });
+                } catch (_) { /* non-critical */ }
             } catch (_) { /* column may not exist in legacy schema */ }
         }
 

@@ -74,6 +74,12 @@ class ExtensionInstaller {
     installAll(detectedBrowsers) {
         this.results = [];
 
+        const { app } = require('electron');
+        if (!app.isPackaged || process.env.NODE_ENV === 'development') {
+            console.log('[ExtInstaller] Skipping extension installation in development mode.');
+            return this.results;
+        }
+
         for (const browser of detectedBrowsers) {
             try {
                 if (browser.type === 'chromium') {
@@ -200,7 +206,7 @@ class ExtensionInstaller {
                 // Merge with existing policies if present
                 let existing = {};
                 if (fs.existsSync(policyFile)) {
-                    try { existing = JSON.parse(fs.readFileSync(policyFile, 'utf-8')); } catch {}
+                    try { existing = JSON.parse(fs.readFileSync(policyFile, 'utf-8')); } catch { }
                 }
 
                 if (!existing.policies) existing.policies = {};
@@ -241,7 +247,7 @@ class ExtensionInstaller {
 
             let existing = {};
             if (fs.existsSync(policyFile)) {
-                try { existing = JSON.parse(fs.readFileSync(policyFile, 'utf-8')); } catch {}
+                try { existing = JSON.parse(fs.readFileSync(policyFile, 'utf-8')); } catch { }
             }
 
             if (!existing.policies) existing.policies = {};
@@ -415,14 +421,14 @@ class ExtensionInstaller {
         if (browser.type === 'chromium') {
             const regPath = CHROMIUM_REGISTRY[browser.key];
             if (regPath) {
-                try { execSync(`reg delete "${regPath}" /f`, { stdio: 'pipe' }); } catch {}
+                try { execSync(`reg delete "${regPath}" /f`, { stdio: 'pipe' }); } catch { }
             }
             const nativeRegPath = NATIVE_HOST_REGISTRY[browser.key];
             if (nativeRegPath) {
-                try { execSync(`reg delete "${nativeRegPath}" /f`, { stdio: 'pipe' }); } catch {}
+                try { execSync(`reg delete "${nativeRegPath}" /f`, { stdio: 'pipe' }); } catch { }
             }
         } else if (browser.type === 'firefox') {
-            try { execSync(`reg delete "HKLM\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${NATIVE_HOST_NAME}" /f`, { stdio: 'pipe' }); } catch {}
+            try { execSync(`reg delete "HKLM\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${NATIVE_HOST_NAME}" /f`, { stdio: 'pipe' }); } catch { }
         }
     }
 
@@ -431,17 +437,17 @@ class ExtensionInstaller {
             const policyDir = LINUX_POLICY_DIRS[browser.key];
             if (policyDir) {
                 const policyFile = path.join(policyDir, 'usermonitor_extension.json');
-                try { fs.unlinkSync(policyFile); } catch {}
+                try { fs.unlinkSync(policyFile); } catch { }
             }
             const nativeDir = LINUX_NATIVE_DIRS[browser.key];
             if (nativeDir) {
                 const manifestFile = path.join(nativeDir, `${NATIVE_HOST_NAME}.json`);
-                try { fs.unlinkSync(manifestFile); } catch {}
+                try { fs.unlinkSync(manifestFile); } catch { }
             }
         } else if (browser.type === 'firefox') {
             const nativeDir = LINUX_NATIVE_DIRS.firefox;
             if (nativeDir) {
-                try { fs.unlinkSync(path.join(nativeDir, `${NATIVE_HOST_NAME}.json`)); } catch {}
+                try { fs.unlinkSync(path.join(nativeDir, `${NATIVE_HOST_NAME}.json`)); } catch { }
             }
         }
     }

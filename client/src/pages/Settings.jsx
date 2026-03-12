@@ -492,6 +492,29 @@ export default function Settings() {
                             onCheckedChange={() => handleToggle('is_force_logout_enabled')}
                         />
                     </div>
+                    <Separator />
+
+                    {/* Heartbeat Interval */}
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label>Agent Heartbeat Interval</Label>
+                            <p className="text-sm text-muted-foreground">Frequency at which the agent checks in with the server.</p>
+                        </div>
+                        <Select
+                            value={(settings.features.heartbeat_interval_seconds || 300).toString()}
+                            onValueChange={(v) => handleSelectChange('heartbeat_interval_seconds', v)}
+                        >
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Select interval" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="60">1 Minute</SelectItem>
+                                <SelectItem value="180">3 Minutes</SelectItem>
+                                <SelectItem value="300">5 Minutes</SelectItem>
+                                <SelectItem value="600">10 Minutes</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </CardContent>
             </Card>
 

@@ -70,14 +70,16 @@ export const updateUserFeatures = async (req, res) => {
                 is_afk_tracking_enabled, 
                 afk_threshold_seconds,
                 is_breaks_enabled,
+                heartbeat_interval_seconds,
                 updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
             ON CONFLICT (user_id) DO UPDATE SET
                 is_screenshots_enabled = EXCLUDED.is_screenshots_enabled,
                 screenshot_interval_seconds = EXCLUDED.screenshot_interval_seconds,
                 is_afk_tracking_enabled = EXCLUDED.is_afk_tracking_enabled,
                 afk_threshold_seconds = EXCLUDED.afk_threshold_seconds,
                 is_breaks_enabled = EXCLUDED.is_breaks_enabled,
+                heartbeat_interval_seconds = EXCLUDED.heartbeat_interval_seconds,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING *`,
             [
@@ -87,7 +89,8 @@ export const updateUserFeatures = async (req, res) => {
                 features.screenshot_interval_seconds,
                 features.is_afk_tracking_enabled,
                 features.afk_threshold_seconds,
-                features.is_breaks_enabled
+                features.is_breaks_enabled,
+                features.heartbeat_interval_seconds
             ]
         );
 

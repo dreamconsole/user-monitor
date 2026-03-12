@@ -87,7 +87,8 @@ export const logHeartbeat = async (req, res) => {
             screenshot_interval_seconds: userFeatures.screenshot_interval_seconds || orgFeatures.screenshot_interval_seconds || 600,
             is_afk_tracking_enabled: userFeatures.is_afk_tracking_enabled ?? orgFeatures.is_afk_tracking_enabled ?? true,
             afk_threshold_seconds: userFeatures.afk_threshold_seconds || orgFeatures.afk_threshold_seconds || 300,
-            is_breaks_enabled: userFeatures.is_breaks_enabled ?? orgFeatures.is_breaks_enabled ?? true
+            is_breaks_enabled: userFeatures.is_breaks_enabled ?? orgFeatures.is_breaks_enabled ?? true,
+            heartbeat_interval_seconds: userFeatures.heartbeat_interval_seconds || orgFeatures.heartbeat_interval_seconds || 300
         };
 
         // Broadcast heartbeat to managers for live dashboard updates
@@ -137,6 +138,15 @@ export const syncActivitySession = async (req, res) => {
              work_date = EXCLUDED.work_date`,
             [id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, req.body.total_break_seconds || 0, status]
         );
+        // Refresh heartbeat status
+        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
+        try {
+            broadcastToManagers(org_id, {
+                type: 'USER_HEARTBEAT',
+                userId: user_id,
+                timestamp: new Date().toISOString()
+            });
+        } catch (_) { /* non-critical */ }
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Work session sync failed:', error);
@@ -166,6 +176,15 @@ export const uploadScreenshot = async (req, res) => {
             'INSERT INTO screenshots (id, org_id, user_id, session_id, storage_path, captured_at, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7)',
             [crypto.randomUUID(), org_id, user_id, session_id, storagePath, captured_at, metadata || {}]
         );
+        // Refresh heartbeat status
+        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
+        try {
+            broadcastToManagers(org_id, {
+                type: 'USER_HEARTBEAT',
+                userId: user_id,
+                timestamp: new Date().toISOString()
+            });
+        } catch (_) { /* non-critical */ }
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Screenshot upload failed:', error);
@@ -193,6 +212,15 @@ export const logActivity = async (req, res) => {
             [org_id, user_id, session_id, log_time, keyboard_events || 0, mouse_events || 0, left_clicks || 0, right_clicks || 0, state, metadata || null]
         );
         console.log('[logActivity] SUCCESS, inserted ID:', result.rows[0].id);
+        // Refresh heartbeat status
+        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
+        try {
+            broadcastToManagers(org_id, {
+                type: 'USER_HEARTBEAT',
+                userId: user_id,
+                timestamp: new Date().toISOString()
+            });
+        } catch (_) { /* non-critical */ }
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('[logActivity] CRITICAL ERROR:', error);
@@ -260,6 +288,15 @@ export const logBreak = async (req, res) => {
                 .catch(err => console.error('Break violation check failed:', err));
         }
 
+        // Refresh heartbeat status
+        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
+        try {
+            broadcastToManagers(org_id, {
+                type: 'USER_HEARTBEAT',
+                userId: user_id,
+                timestamp: new Date().toISOString()
+            });
+        } catch (_) { /* non-critical */ }
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Break log failed:', error);
@@ -391,6 +428,15 @@ export const logBrowserActivity = async (req, res) => {
         }
 
         console.log(`[BrowserActivity] Synced ${inserted} logs for user ${user_id}`);
+        // Refresh heartbeat status
+        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
+        try {
+            broadcastToManagers(org_id, {
+                type: 'USER_HEARTBEAT',
+                userId: user_id,
+                timestamp: new Date().toISOString()
+            });
+        } catch (_) { /* non-critical */ }
         res.status(200).json({ success: true, inserted });
     } catch (error) {
         console.error('[BrowserActivity] Sync failed:', error);

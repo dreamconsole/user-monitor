@@ -256,15 +256,45 @@ export const forceLogoutUser = async (req, res) => {
     const { id } = req.params;
 
     try {
-        const result = await query(
-            'UPDATE users SET force_logout = true WHERE id = $1 AND org_id = $2 RETURNING id',
+        // 1. Set force_logout flag and clear last_heartbeat to show offline immediately
+        const userUpdate = await query(
+            'UPDATE users SET force_logout = true, last_heartbeat = NULL WHERE id = $1 AND org_id = $2 RETURNING id',
             [id, req.user.org_id]
         );
 
-        if (result.rows.length === 0) {
+        if (userUpdate.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.json({ message: 'User will be forced to logout on next heartbeat' });
+
+        // 2. Terminate any active work session
+        await query(
+            `UPDATE work_sessions 
+             SET end_time = CURRENT_TIMESTAMP, status = 'force_logged_out' 
+             WHERE user_id = $1 AND org_id = $2 AND status = 'active'`,
+            [id, req.user.org_id]
+        );
+
+        // 3. Terminate any active break
+        await query(
+            `UPDATE break_logs 
+             SET end_time = CURRENT_TIMESTAMP, 
+                 duration_seconds = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - start_time))::INTEGER
+             WHERE user_id = $1 AND org_id = $2 AND end_time IS NULL`,
+            [id, req.user.org_id]
+        );
+
+        // 3. Broadcast to managers so UI updates immediately
+        try {
+            import('../websocket.js').then(({ broadcastToManagers }) => {
+                broadcastToManagers(req.user.org_id, {
+                    type: 'USER_OFFLINE',
+                    userId: id,
+                    timestamp: new Date().toISOString()
+                });
+            });
+        } catch (_) { /* ignore socket errors */ }
+
+        res.json({ message: 'User logged out and session terminated immediately' });
     } catch (error) {
         console.error('forceLogoutUser error:', error);
         res.status(500).json({ error: 'Failed to force logout user' });

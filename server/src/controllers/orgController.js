@@ -83,8 +83,9 @@ export const updateOrgSettings = async (req, res) => {
                     afk_threshold_seconds = COALESCE($5, afk_threshold_seconds),
                     is_breaks_enabled = COALESCE($6, is_breaks_enabled),
                     is_force_logout_enabled = COALESCE($7, is_force_logout_enabled),
+                    heartbeat_interval_seconds = COALESCE($8, heartbeat_interval_seconds),
                     updated_at = CURRENT_TIMESTAMP
-                WHERE org_id = $8
+                WHERE org_id = $9
                 RETURNING *`,
                 [
                     features.is_activity_tracking_enabled,
@@ -94,6 +95,7 @@ export const updateOrgSettings = async (req, res) => {
                     features.afk_threshold_seconds,
                     features.is_breaks_enabled,
                     features.is_force_logout_enabled,
+                    features.heartbeat_interval_seconds,
                     orgId
                 ]
             );
@@ -108,8 +110,9 @@ export const updateOrgSettings = async (req, res) => {
                         is_afk_tracking_enabled,
                         afk_threshold_seconds,
                         is_breaks_enabled,
-                        is_force_logout_enabled
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                        is_force_logout_enabled,
+                        heartbeat_interval_seconds
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
                     [
                         orgId,
                         features.is_activity_tracking_enabled ?? true,
@@ -118,7 +121,8 @@ export const updateOrgSettings = async (req, res) => {
                         features.is_afk_tracking_enabled ?? true,
                         features.afk_threshold_seconds ?? 300,
                         features.is_breaks_enabled ?? true,
-                        features.is_force_logout_enabled ?? true
+                        features.is_force_logout_enabled ?? true,
+                        features.heartbeat_interval_seconds ?? 300
                     ]
                 );
             }

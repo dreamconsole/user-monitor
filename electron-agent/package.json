@@ -37,6 +37,9 @@
   "build": {
     "appId": "com.usermonitor.agent",
     "productName": "User Monitor Agent",
+    "asarUnpack": [
+      "**/node_modules/screenshot-desktop/**/*"
+    ],
     "win": {
       "target": [
         "nsis"

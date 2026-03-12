@@ -12,30 +12,36 @@ const { API_URL } = require('../config');
 const monitorService = require('./monitor');
 const logger = require('./logger');
 
-const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes default
 
 class SyncService {
     constructor() {
         this.interval = null;
         this.isSyncing = false;
+        this.currentIntervalMs = DEFAULT_SYNC_INTERVAL_MS;
     }
 
     start() {
         if (this.interval) return; // Already running
 
         console.log('Starting Sync Service...');
-        try {
-            this.interval = setInterval(() => {
-                this.sync();
-            }, SYNC_INTERVAL_MS);
-            console.log('Sync Service interval set.');
-        } catch (e) {
-            console.error('CRITICAL ERROR in SyncService.start:', e);
-        }
+        this.resetInterval(this.currentIntervalMs);
+    }
+
+    resetInterval(newIntervalMs) {
+        if (this.interval) clearInterval(this.interval);
+
+        this.currentIntervalMs = newIntervalMs;
+        console.log(`Sync Service interval set to ${this.currentIntervalMs / 1000}s.`);
+
+        this.interval = setInterval(() => {
+            this.sync();
+        }, this.currentIntervalMs);
     }
 
     stop() {
         if (this.interval) clearInterval(this.interval);
+        this.interval = null;
         console.log('Sync Service stopped.');
     }
 
@@ -310,6 +316,13 @@ class SyncService {
             if (response.data && response.data.features) {
                 const configService = require('./config');
                 configService.update(response.data.features);
+
+                // Update Sync Interval if heartbeat_interval_seconds changed
+                const newInterval = (response.data.features.heartbeat_interval_seconds || 300) * 1000;
+                if (newInterval !== this.currentIntervalMs) {
+                    console.log(`[SyncService] Heartbeat interval changed from ${this.currentIntervalMs} to ${newInterval}. Resetting...`);
+                    this.resetInterval(newInterval);
+                }
             }
 
             this.checkForForcedLogout(response);

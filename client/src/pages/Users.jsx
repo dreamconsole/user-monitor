@@ -13,6 +13,7 @@ import { Plus, Edit, Trash2, LogOut, X, Users as UsersIcon, Search } from 'lucid
 import UserForm from '@/components/users/UserForm';
 import UserActivityDetail from '@/components/users/UserActivityDetail';
 import { utcToLocal } from '@/lib/dateUtils';
+import useWebSocket from '@/lib/useWebSocket';
 
 export default function Users() {
     const { user: currentUser } = useAuthStore();
@@ -35,6 +36,18 @@ export default function Users() {
     const [roleFilter, setRoleFilter] = useState('all');
     const [accountFilter, setAccountFilter] = useState('all');
     const filterStatus = searchParams.get('status'); // 'offline' or 'online' from URL
+    const [hbInterval, setHbInterval] = useState(300); // Default 5 mins
+
+    const fetchOrgSettings = async () => {
+        try {
+            const { data } = await api.get('/org/settings');
+            if (data.features?.heartbeat_interval_seconds) {
+                setHbInterval(data.features.heartbeat_interval_seconds);
+            }
+        } catch (e) {
+            console.error('Failed to fetch org settings:', e);
+        }
+    };
 
     const fetchUsers = async () => {
         try {
@@ -49,7 +62,28 @@ export default function Users() {
 
     useEffect(() => {
         fetchUsers();
+        fetchOrgSettings();
     }, []);
+
+    // WebSocket for real-time status updates
+    useWebSocket((message) => {
+        if (message.type === 'USER_OFFLINE') {
+            setUsers(prev => prev.map(u =>
+                u.id === message.userId
+                    ? { ...u, last_heartbeat: null, is_on_break: false }
+                    : u
+            ));
+        } else if (message.type === 'HEARTBEAT') {
+            // Optional: update last_heartbeat in real-time if broadcasted
+            setUsers(prev => prev.map(u =>
+                u.id === message.userId
+                    ? { ...u, last_heartbeat: message.timestamp }
+                    : u
+            ));
+        }
+    });
+
+    const hbThreshold = (hbInterval + 60) * 1000; // Interval + 1 minute grace
 
     // Apply all filters whenever any filter or users change
     useEffect(() => {
@@ -84,13 +118,13 @@ export default function Users() {
             const now = Date.now();
             result = result.filter(u => {
                 if (!u.last_heartbeat) return true;
-                return (now - new Date(u.last_heartbeat).getTime()) > 2 * 60 * 1000;
+                return (now - new Date(u.last_heartbeat).getTime()) > hbThreshold;
             });
         } else if (filterStatus === 'online') {
             const now = Date.now();
             result = result.filter(u => {
                 if (!u.last_heartbeat) return false;
-                return (now - new Date(u.last_heartbeat).getTime()) < 2 * 60 * 1000;
+                return (now - new Date(u.last_heartbeat).getTime()) < hbThreshold;
             });
         }
 
@@ -164,7 +198,7 @@ export default function Users() {
         if (user.is_on_break) return 'break';
         if (!user.last_heartbeat) return 'offline';
         const diff = Date.now() - new Date(user.last_heartbeat).getTime();
-        return diff < 2 * 60 * 1000 ? 'online' : 'offline';
+        return diff < hbThreshold ? 'online' : 'offline';
     };
 
     if (loading) {
