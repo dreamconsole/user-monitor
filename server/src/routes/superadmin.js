@@ -1,5 +1,5 @@
 import express from 'express';
-import { getOrgs, updateOrg, deleteOrg, getSettings, updateSettings, getSystemHealth } from '../controllers/superadminController.js';
+import { getOrgs, createOrg, updateOrg, deleteOrg, getSettings, updateSettings, getSystemHealth, getDBStats, cleanupData } from '../controllers/superadminController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -9,6 +9,7 @@ router.use(authenticateToken, authorizeRoles('superadmin'));
 
 // Orgs Management
 router.get('/orgs', getOrgs);
+router.post('/orgs', createOrg);
 router.put('/orgs/:id', updateOrg);
 router.delete('/orgs/:id', deleteOrg); // Note: Should probably soft-delete or deactivate
 
@@ -18,5 +19,7 @@ router.put('/settings', updateSettings);
 
 // System Health / Stats
 router.get('/health', getSystemHealth);
+router.get('/db-stats', getDBStats);
+router.post('/cleanup', cleanupData);
 
 export default router;
