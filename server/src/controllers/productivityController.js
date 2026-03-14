@@ -67,6 +67,7 @@ async function calculateProductivityScore(userId, orgId, startDate, endDate) {
     const totalIdleSeconds = parseInt(workRow.total_idle_seconds || 0);
     const totalBreakSeconds = parseInt(workRow.total_break_seconds || 0);
 
+    // --- App-level productivity from tracked apps ---
     const appResult = await query(
         `SELECT 
             COALESCE(SUM(CASE WHEN ac.productivity_type = 'productive' THEN aul.duration_seconds ELSE 0 END), 0) as productive_seconds,
@@ -80,9 +81,31 @@ async function calculateProductivityScore(userId, orgId, startDate, endDate) {
     );
 
     const appRow = appResult.rows[0];
-    const productiveSeconds = parseInt(appRow.productive_seconds || 0);
-    const nonProductiveSeconds = parseInt(appRow.non_productive_seconds || 0);
-    const neutralSeconds = parseInt(appRow.neutral_seconds || 0);
+    let productiveSeconds = parseInt(appRow.productive_seconds || 0);
+    let nonProductiveSeconds = parseInt(appRow.non_productive_seconds || 0);
+    let neutralSeconds = parseInt(appRow.neutral_seconds || 0);
+
+    // --- Domain-level productivity from browser activity ---
+    // Only counts domains that have been explicitly classified via category_id.
+    const domainResult = await query(
+        `SELECT
+            COALESCE(SUM(CASE WHEN ac.productivity_type = 'productive' THEN bal.duration_seconds ELSE 0 END), 0) as domain_productive_seconds,
+            COALESCE(SUM(CASE WHEN ac.productivity_type = 'non_productive' THEN bal.duration_seconds ELSE 0 END), 0) as domain_non_productive_seconds,
+            COALESCE(SUM(CASE WHEN ac.productivity_type = 'neutral' THEN bal.duration_seconds ELSE 0 END), 0) as domain_neutral_seconds
+         FROM browser_activity_logs bal
+         INNER JOIN domain_productivity dp ON bal.domain = dp.domain AND dp.org_id = $2
+         INNER JOIN app_categories ac ON dp.category_id = ac.id
+         WHERE bal.user_id = $1
+           AND bal.org_id = $2
+           AND DATE(bal.start_time) BETWEEN $3 AND $4`,
+        [userId, orgId, startDate, endDate]
+    );
+
+    const domainRow = domainResult.rows[0];
+    productiveSeconds += parseInt(domainRow.domain_productive_seconds || 0);
+    nonProductiveSeconds += parseInt(domainRow.domain_non_productive_seconds || 0);
+    neutralSeconds += parseInt(domainRow.domain_neutral_seconds || 0);
+
     const totalAppSeconds = productiveSeconds + nonProductiveSeconds + neutralSeconds;
 
     const attendance = expectedShiftSeconds > 0

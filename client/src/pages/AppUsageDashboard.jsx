@@ -459,6 +459,8 @@ export default function AppUsageDashboard() {
                                                                 <tr className="bg-primary/10">
                                                                     <th className="px-10 py-2 text-left text-xs font-medium text-primary uppercase">Page Title</th>
                                                                     <th className="px-6 py-2 text-left text-xs font-medium text-primary uppercase">Browser</th>
+                                                                    <th className="px-6 py-2 text-left text-xs font-medium text-primary uppercase">Category</th>
+                                                                    <th className="px-6 py-2 text-left text-xs font-medium text-primary uppercase">Type</th>
                                                                     <th className="px-6 py-2 text-center text-xs font-medium text-primary uppercase">Visits</th>
                                                                     <th className="px-6 py-2 text-right text-xs font-medium text-primary uppercase">Time Spent</th>
                                                                 </tr>
@@ -476,6 +478,18 @@ export default function AppUsageDashboard() {
                                                                         </td>
                                                                         <td className="px-6 py-2.5 text-sm text-muted-foreground capitalize">
                                                                             {domain.browser}
+                                                                        </td>
+                                                                        <td className="px-6 py-2.5 text-sm text-muted-foreground">
+                                                                            {domain.category_name || 'Uncategorized'}
+                                                                        </td>
+                                                                        <td className="px-6 py-2.5">
+                                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                                                domain.productivity_type === 'productive' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                                                                                domain.productivity_type === 'non_productive' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                                                                                'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                                                                            }`}>
+                                                                                {domain.productivity_type?.replace('_', ' ') || 'neutral'}
+                                                                            </span>
                                                                         </td>
                                                                         <td className="px-6 py-2.5 text-center text-sm text-muted-foreground">
                                                                             {domain.visit_count}

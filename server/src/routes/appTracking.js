@@ -26,6 +26,11 @@ import {
     getProductivitySummary,
     getBrowserActivityDetails
 } from '../controllers/appReportsController.js';
+import {
+    getDomains,
+    upsertDomain,
+    deleteDomain
+} from '../controllers/domainProductivityController.js';
 
 const router = express.Router();
 
@@ -68,5 +73,10 @@ router.get('/reports/manager', authorizeRoles('manager'), getManagerDashboard);
 router.get('/reports/user/:userId', authorizeRoles('orgadmin', 'manager', 'user'), getUserDashboard);
 router.get('/reports/productivity/:userId', authorizeRoles('orgadmin', 'manager', 'user'), getProductivitySummary);
 router.get('/reports/browser-activity/:userId', authorizeRoles('orgadmin', 'manager', 'user'), getBrowserActivityDetails);
+
+// Domain Productivity Rules (Admin only)
+router.get('/domains', authorizeRoles('orgadmin', 'manager'), getDomains);
+router.post('/domains', authorizeRoles('orgadmin'), upsertDomain);
+router.delete('/domains/:domain', authorizeRoles('orgadmin'), deleteDomain);
 
 export default router;

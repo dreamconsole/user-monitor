@@ -193,12 +193,16 @@ export const getBrowserActivityDetails = async (req, res) => {
                 ${sourceSelect},
                 COUNT(*) as visit_count,
                 SUM(bal.duration_seconds) as total_seconds,
-                MAX(bal.title) as last_title
+                MAX(bal.title) as last_title,
+                ac.name as category_name,
+                ac.productivity_type
              FROM browser_activity_logs bal
+             LEFT JOIN domain_productivity dp ON COALESCE(bal.domain, bal.title) = dp.domain AND dp.org_id = $2
+             LEFT JOIN app_categories ac ON dp.category_id = ac.id
              WHERE bal.user_id = $1 AND bal.org_id = $2
              AND bal.start_time::date >= $3::date AND bal.start_time::date <= $4::date
              ${browserFilter}
-             GROUP BY COALESCE(bal.domain, bal.title), bal.browser${sourceGroupBy}
+             GROUP BY COALESCE(bal.domain, bal.title), bal.browser${sourceGroupBy}, ac.name, ac.productivity_type
              ORDER BY total_seconds DESC
              LIMIT 50`,
             params
