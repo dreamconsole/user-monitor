@@ -54,3 +54,6 @@ logs/
 *.log
 
 server/uploads/*
+
+# Internal Project Documentation
+PROJECT-INFO.md

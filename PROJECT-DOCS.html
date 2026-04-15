@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Official Project Documentation - User Monitor System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f6f8fa;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .document {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 60px 80px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .no-print {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+        }
+
+        button.export-btn {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        button.export-btn:hover {
+            background-color: #1d4ed8;
+        }
+
+        header {
+            border-bottom: 2px solid #2563eb;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 2.4rem;
+            color: #111;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: #666;
+            font-style: italic;
+        }
+
+        h2 {
+            font-size: 1.6rem;
+            color: #1e40af;
+            margin-top: 40px;
+            border-left: 4px solid #3b82f6;
+            padding-left: 15px;
+            background: #f8fafc;
+            padding-top: 5px;
+            padding-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            color: #111;
+            margin-top: 30px;
+            background-color: #f1f5f9;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+
+        p {
+            margin-bottom: 18px;
+            font-size: 1.05rem;
+        }
+
+        ul {
+            margin-bottom: 25px;
+            padding-left: 30px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .highlight {
+            background-color: #fef9c3;
+            padding: 2px 5px;
+            font-weight: 500;
+            border-radius: 2px;
+        }
+
+        .feature-box {
+            border: 1px solid #e2e8f0;
+            background-color: #fcfcfc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        .feature-box strong {
+            color: #2563eb;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #2563eb;
+            color: #fff;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .tech-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .tech-table td {
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .page-item {
+            margin-bottom: 15px;
+            padding-left: 10px;
+            border-left: 3px solid #e2e8f0;
+        }
+
+        .page-item strong {
+            color: #111;
+        }
+
+        footer {
+            margin-top: 60px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #888;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        @media print {
+            body {
+                background-color: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .document {
+                box-shadow: none !important;
+                border: none !important;
+                width: 100% !important;
+                max-width: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            h2 {
+                border-left: 4px solid #333 !important;
+                color: #111 !important;
+                background: none !important;
+                page-break-after: avoid;
+                margin-top: 30px !important;
+                padding-bottom: 5px !important;
+                border-bottom: 1px solid #eee !important;
+            }
+
+            section:not(:first-of-type) {
+                page-break-before: always;
+            }
+
+            .feature-box {
+                page-break-inside: avoid;
+                border: 1px solid #eee !important;
+            }
+
+            .tech-table {
+                page-break-inside: avoid;
+            }
+
+            footer {
+                position: fixed;
+                bottom: 0;
+                width: 100%;
+                text-align: center;
+                font-size: 0.8rem;
+                padding: 10px 0;
+                border-top: 1px solid #eee;
+                background: white;
+            }
+        }
+
+        @media screen and (max-width: 768px) {
+            .document {
+                padding: 40px 20px;
+            }
+
+            .no-print {
+                position: static;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="document">
+        <div class="no-print">
+            <button class="export-btn" onclick="window.print()">
+                Export as PDF
+            </button>
+        </div>
+
+        <header>
+            <h1>User Monitor System</h1>
+            <!-- <p class="subtitle">Official Comprehensive Project Documentation</p> -->
+        </header>
+
+        <section>
+            <!-- <h2>The User Monitor?</h2> -->
+            <p>The <span class="highlight">User Monitor System</span> is a sophisticated, all-in-one platform designed
+                to help modern organizations understand how their teams work. Whether your team is remote, hybrid, or
+                in-office, this system provides the transparency and insights needed to boost focus, manage workloads
+                fairly, and ensure high-level productivity across the board.</p>
+            <p>At its core, the system is a <span class="highlight">digital workspace assistant</span>. It helps
+                managers see "the big picture" of their team's activity while giving employees tools to manage their own
+                schedules, breaks, and output.</p>
+            <p>Unlike old-school tracking, this platform is designed for <strong>transparency</strong>. Employees can
+                see exactly what data is being shared, and managers use this data to identify burnout, reward high
+                performers, or help those who might be struggling with time management.</p>
+        </section>
+
+        <section>
+            <h2>Access Levels & Three Logins</h2>
+            <p>The system is organized into three distinct "levels," each with its own specialized login and dashboard
+                experience to ensure users only see what they need.</p>
+
+            <div class="feature-box">
+                <span class="badge">Level A</span> <strong>SuperAdmin Login (The Platform Owner)</strong>
+                <p>Designed for high-level system administrators who manage the entire platform. This level provides a
+                    master control panel to oversee all organizations, manage subscriptions, and monitor global system
+                    health.</p>
+            </div>
+
+            <div class="feature-box">
+                <span class="badge">Level B</span> <strong>Organization Admin & Manager Login (The Leadership)</strong>
+                <p>Designed for business owners, HR managers, and Team Leads. It provides full visibility into their
+                    specific company or team, allowing them to set rules, view timelines, and generate reports.</p>
+            </div>
+
+            <div class="feature-box">
+                <span class="badge">Level C</span> <strong>Employee & User Login (The Team Member)</strong>
+                <p>Designed for every staff member being tracked. A personal dashboard focused on their own
+                    productivity, stats, and profile management, connecting seamlessly with the Desktop Agent.</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>The Desktop Agent (.EXE)</h2>
+            <p>The <strong>Desktop Agent</strong> is the heart of the monitoring system. It's a lightweight application
+                (often installed as an <span class="highlight">.exe</span> on Windows) that runs quietly on your
+                computer.</p>
+            <ul>
+                <li><strong>Automatic Tracking</strong>: Detects when you're active or idle without you having to click
+                    anything.</li>
+                <li><strong>Local Intelligence</strong>: Even if your internet goes down, the agent keeps tracking your
+                    work and syncs everything once you're back online.</li>
+                <li><strong>Low System Impact</strong>: Designed to be extremely light, so it won't slow down your
+                    computer or apps.</li>
+                <li><strong>Visibility</strong>: A simple interface shows you if the agent is currently "In Work" or "On
+                    Break."</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Automated Screen Captures</h2>
+            <p>The system uses randomized periodic screenshots to provide a visual log of your workday accomplishments.
+            </p>
+            <ul>
+                <li><strong>Frequency Control</strong>: Organization admins decide the interval (e.g., a snapshot every
+                    5 or 10 minutes).</li>
+                <li><strong>Privacy Awareness</strong>: Screenshots are only taken when you are officially in <span
+                        class="highlight">"In Work"</span> mode.</li>
+                <li><strong>Visual Proof</strong>: Helps managers see the complexity of the tasks you're handling and
+                    provides proof of work for billing or performance reviews.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Customization & Control Center</h2>
+            <p>Every organization works differently, so the system provides deep customization options.</p>
+
+            <h3>Organization Custom Settings</h3>
+            <p>Admins can define organization-wide rules on the <strong>Settings Page</strong>:</p>
+            <ul>
+                <li><strong>Screenshot Policy</strong>: Turn screenshots on or off for the entire company.</li>
+                <li><strong>Idle Thresholds</strong>: Set how many minutes of inactivity should trigger an "Idle"
+                    status.</li>
+                <li><strong>Feature Toggles</strong>: Enable or disable specific features like AFK tracking or
+                    specialized break types.</li>
+            </ul>
+
+            <h3>User-Specific Overrides</h3>
+            <p>We recognize that "one size doesn't fit all." Managers can customize features for individual users:</p>
+            <ul>
+                <li><strong>High-Trust Roles</strong>: Disable screenshots for senior management while keeping them
+                    active for others.</li>
+                <li><strong>Specific Breaks</strong>: Allow custom break types or durations for specific employees based
+                    on needs.</li>
+                <li><strong>Custom Intervals</strong>: Adjust how often data is captured for specific high-stakes
+                    projects.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>SuperAdmin Master Panel</h2>
+            <p>For the highest level of oversight, the <strong>SuperAdmin Panel</strong> is a dedicated area for
+                platform owners.</p>
+            <ul>
+                <li><strong>Organization Management</strong>: Create, suspend, or upgrade entire company accounts.</li>
+                <li><strong>Platform Health</strong>: Monitor system performance and storage usage globally.</li>
+                <li><strong>Database Optimization</strong>: Keep the system fast by managing and cleaning up old logs
+                    and large physical files.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>A Tour of the Application</h2>
+
+            <div class="page-item">
+                <strong>Main Dashboard</strong>: The "Command Center" showing a real-time summary of who is online,
+                productivity scores, and recent snapshots.
+            </div>
+            <div class="page-item">
+                <strong>SuperAdmin Overview</strong>: Master dashboard for managing multiple companies and global
+                platform settings.
+            </div>
+            <div class="page-item">
+                <strong>Users & Teams Page</strong>: A full directory of employees and functional groups for organized
+                management.
+            </div>
+            <div class="page-item">
+                <strong>Team Comparison</strong>: A high-level view that compares performance metrics of different
+                departments.
+            </div>
+            <div class="page-item">
+                <strong>Timeline View</strong>: A beautiful, color-coded bar chart of an employee's day, showing work,
+                breaks, and idle time.
+            </div>
+            <div class="page-item">
+                <strong>App Usage Dashboard</strong>: Visual charts showing which applications are consuming the most
+                time.
+            </div>
+            <div class="page-item">
+                <strong>Reports Page</strong>: Generate professional PDF/Excel documents for payroll or performance
+                reviews.
+            </div>
+            <div class="page-item">
+                <strong>Profile & Settings</strong>: Personal stats management and organizational configuration rules.
+            </div>
+        </section>
+
+        <section>
+            <h2>Detailed Features</h2>
+
+            <h3>1. Smart Productivity Tracking</h3>
+            <p>The system automatically learns how you work, categorizing time into <span class="highlight">Active
+                    Work</span>, <span class="highlight">Idle Time</span>, and <span class="highlight">AFK (Away From
+                    Keyboard)</span> status.</p>
+
+            <h3>2. Application & Website Insights</h3>
+            <p>The platform tracks what software and websites are being used most frequently, allowing you to categorize
+                them as "Productive," "Neutral," or "Non-Productive."</p>
+
+            <h3>3. Advanced Break Management & Groups</h3>
+            <p>Ensures employees are taking healthy breaks throughout the day while keeping policies organized.</p>
+            <ul>
+                <li><strong>Break Groups</strong>: Group multiple break types together (e.g., "Full-Time Shift Group").
+                </li>
+                <li><strong>Assign Group</strong>: Assign specific break policies to teams or individuals with one
+                    click.</li>
+                <li><strong>Policy Logic</strong>: Automatic calculation of Paid vs. Unpaid components based on assigned
+                    group rules.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Technology Overview</h2>
+            <table class="tech-table">
+                <tr>
+                    <td><strong>Interface (Dashboard)</strong></td>
+                    <td>Built with React, a leading technology for fast, responsive web applications.</td>
+                </tr>
+                <tr>
+                    <td><strong>Brain (Backend)</strong></td>
+                    <td>Powered by Node.js, designed to handle massive amounts of real-time activity data.</td>
+                </tr>
+                <tr>
+                    <td><strong>Storage (Database)</strong></td>
+                    <td>Uses PostgreSQL, a secure and reliable database for protecting sensitive data.</td>
+                </tr>
+                <tr>
+                    <td><strong>Desktop App</strong></td>
+                    <td>Built with Electron, allowing seamless operation on both Windows and Mac.</td>
+                </tr>
+            </table>
+        </section>
+
+        <section>
+            <h2>System Requirements & Planned Improvements</h2>
+            <p>The current iteration of the User Monitor system is highly effective for its core purpose. However, there
+                are several modules and features identified for future phases to further enhance visibility and
+                administrative control.</p>
+
+            <div class="feature-box">
+                <p><strong>Camera Monitoring (Near-Term Priority)</strong></p>
+                <p>As per the strategic roadmap, <span class="highlight">Camera Monitoring</span> is a primary planned
+                    feature. This will enable periodic webcam snapshots or optional live monitoring to provide deeper
+                    insight into remote activity and physical presence during work sessions.</p>
+            </div>
+
+            <h3>Current Gaps & Roadmap Status</h3>
+            <table class="tech-table">
+                <thead>
+                    <tr style="background-color: #f1f5f9; font-weight: 600;">
+                        <td style="width: 40%;">Module / Feature</td>
+                        <td>Current Status</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Employee Management</td>
+                        <td>Basic details only</td>
+                    </tr>
+                    <tr>
+                        <td>Teams Architecture</td>
+                        <td>Available (Standard), but lacking Team Lead (TL) structure</td>
+                    </tr>
+                    <tr>
+                        <td>Campaign Management</td>
+                        <td>Not currently available</td>
+                    </tr>
+                    <tr>
+                        <td>Payroll Integration</td>
+                        <td>Not currently available</td>
+                    </tr>
+                    <tr>
+                        <td>Automated Attendance</td>
+                        <td>Not currently available</td>
+                    </tr>
+                    <tr>
+                        <td>Role Granularity</td>
+                        <td>Limited roles (SuperAdmin, Admin, Employee)</td>
+                    </tr>
+                    <tr>
+                        <td>Camera Monitoring</td>
+                        <td>Under development (Not yet available)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- <footer>
+            <p>© 2026 User Monitor System | Professional Digital Workspace Verification</p>
+        </footer> -->
+    </div>
+
+</body>
+
+</html>
