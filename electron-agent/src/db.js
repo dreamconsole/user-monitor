@@ -40,6 +40,7 @@ function initDB(orgId, userId) {
             total_work_seconds INTEGER DEFAULT 0,
             total_idle_seconds INTEGER DEFAULT 0,
             total_break_seconds INTEGER DEFAULT 0,
+            campaign_id TEXT,
             sync_status TEXT DEFAULT 'pending'
         )
     `;
@@ -171,6 +172,14 @@ function initDB(orgId, userId) {
     if (!hasRightClicks) {
         console.log('Migrating: Adding right_clicks to activity_logs');
         db.exec('ALTER TABLE activity_logs ADD COLUMN right_clicks INTEGER DEFAULT 0');
+    }
+
+    // Migration: Add campaign_id to work_sessions if missing
+    const workSessionCols = db.prepare("PRAGMA table_info(work_sessions)").all();
+    const hasCampaignId = workSessionCols.some(col => col.name === 'campaign_id');
+    if (!hasCampaignId) {
+        console.log('Migrating: Adding campaign_id to work_sessions');
+        db.exec('ALTER TABLE work_sessions ADD COLUMN campaign_id TEXT');
     }
 
     const domainCol = browserCols.find(col => col.name === 'domain');

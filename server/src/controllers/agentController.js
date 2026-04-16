@@ -4,6 +4,31 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { broadcastToManagers } from '../websocket.js';
 
+export const getAssignedCampaigns = async (req, res) => {
+    try {
+        const { org_id, id: user_id } = req.user;
+
+        // Check feature flag
+        const featureRes = await query('SELECT is_campaigns_enabled FROM org_features WHERE org_id = $1', [org_id]);
+        if (featureRes.rows.length === 0 || !featureRes.rows[0].is_campaigns_enabled) {
+            return res.status(200).json({ success: true, campaigns: [] });
+        }
+
+        const result = await query(`
+            SELECT DISTINCT c.id, c.name 
+            FROM campaigns c 
+            JOIN campaign_assignments ca ON c.id = ca.campaign_id 
+            LEFT JOIN users u ON ca.user_id = u.id OR ca.team_id = u.team_id
+            WHERE c.org_id = $1 AND c.is_active = true AND u.id = $2
+        `, [org_id, user_id]);
+        
+        res.status(200).json({ success: true, campaigns: result.rows });
+    } catch (error) {
+        console.error('Error fetching user campaigns:', error);
+        res.status(500).json({ success: false, error: 'Failed to construct campaigns' });
+    }
+};
+
 export const logHeartbeat = async (req, res) => {
     const { org_id, user_id, device_identifier } = req.body;
     try {
@@ -139,7 +164,7 @@ export const logHeartbeat = async (req, res) => {
 };
 
 export const syncActivitySession = async (req, res) => {
-    const { id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, status } = req.body;
+    const { id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, status, campaign_id } = req.body;
     try {
         // Validate user and org existence
         const userCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
@@ -153,18 +178,19 @@ export const syncActivitySession = async (req, res) => {
         // activity_sessions is now work_sessions
         // Calculate work_date based on start_time AT TIME ZONE org's timezone
         await query(
-            `INSERT INTO work_sessions (id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, total_break_seconds, status, work_date)
+            `INSERT INTO work_sessions (id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, total_break_seconds, status, work_date, campaign_id)
              SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, ($4::TIMESTAMPTZ AT TIME ZONE 
                 COALESCE((SELECT timezone FROM organizations WHERE id = $2), 'UTC')
-             )::DATE
+             )::DATE, $10
              ON CONFLICT (id) DO UPDATE SET
              end_time = EXCLUDED.end_time,
              total_work_seconds = EXCLUDED.total_work_seconds,
              total_idle_seconds = EXCLUDED.total_idle_seconds,
              total_break_seconds = EXCLUDED.total_break_seconds,
              status = EXCLUDED.status,
-             work_date = EXCLUDED.work_date`,
-            [id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, req.body.total_break_seconds || 0, status]
+             work_date = EXCLUDED.work_date,
+             campaign_id = EXCLUDED.campaign_id`,
+            [id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, req.body.total_break_seconds || 0, status, campaign_id || null]
         );
         // Refresh heartbeat status
         await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);

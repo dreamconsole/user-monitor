@@ -24,6 +24,7 @@ import Timeline from '@/pages/Timeline';
 import Profile from '@/pages/Profile';
 import TeamComparison from '@/pages/TeamComparison';
 import ActivityLogs from '@/pages/ActivityLogs';
+import Campaigns from '@/pages/Campaigns';
 import SuperAdminOverview from '@/pages/SuperAdminOverview';
 import SuperAdminOrgs from '@/pages/SuperAdminOrgs';
 import SuperAdminSettings from '@/pages/SuperAdminSettings';
@@ -84,6 +85,7 @@ function App() {
                 <Route path="/users" element={<Users />} />
                 <Route path="/team-comparison" element={<TeamComparison />} />
                 <Route path="/activity-logs" element={<ActivityLogs />} />
+                <Route path="/campaigns" element={<Campaigns />} />
               </Route>
 
               <Route path="/reports" element={<Reports />} />

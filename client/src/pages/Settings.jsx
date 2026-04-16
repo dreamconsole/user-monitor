@@ -35,6 +35,7 @@ export default function Settings() {
             afk_threshold_seconds: 300,
             is_breaks_enabled: true,
             is_force_logout_enabled: true,
+            is_campaigns_enabled: false,
         }
     });
 
@@ -544,6 +545,19 @@ export default function Settings() {
                                 </Select>
                             </div>
                         )}
+                    </div>
+                    <Separator />
+
+                    {/* Campaigns */}
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label>Enable Campaigns</Label>
+                            <p className="text-sm text-muted-foreground text-sm">Allow assigning campaigns to users and track campaign-specific work hours.</p>
+                        </div>
+                        <Switch
+                            checked={settings.features.is_campaigns_enabled}
+                            onCheckedChange={() => handleToggle('is_campaigns_enabled')}
+                        />
                     </div>
                     <Separator />
 

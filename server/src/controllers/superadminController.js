@@ -60,8 +60,10 @@ export const getOrgs = async (req, res) => {
                 o.max_users_limit, 
                 o.is_active, 
                 o.created_at,
-                (SELECT COUNT(*) FROM users u WHERE u.org_id = o.id) as current_users
+                (SELECT COUNT(*) FROM users u WHERE u.org_id = o.id) as current_users,
+                COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled
             FROM organizations o
+            LEFT JOIN org_features of ON of.org_id = o.id
             ORDER BY o.name ASC
         `);
         res.json(result.rows);
@@ -74,7 +76,7 @@ export const getOrgs = async (req, res) => {
 // Update an organization (subscription limit, active status etc)
 export const updateOrg = async (req, res) => {
     const { id } = req.params;
-    const { max_users_limit, is_active } = req.body;
+    const { max_users_limit, is_active, is_campaigns_enabled } = req.body;
 
     try {
         const result = await query(`
@@ -88,6 +90,15 @@ export const updateOrg = async (req, res) => {
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        // Update org_features if is_campaigns_enabled is provided
+        if (is_campaigns_enabled !== undefined) {
+            await query(`
+                INSERT INTO org_features (org_id, is_campaigns_enabled)
+                VALUES ($1, $2)
+                ON CONFLICT (org_id) DO UPDATE SET is_campaigns_enabled = $2
+            `, [id, is_campaigns_enabled]);
         }
 
         res.json(result.rows[0]);

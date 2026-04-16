@@ -20,6 +20,7 @@ import appTrackingRoutes from './routes/appTracking.js';
 import auditRoutes from './routes/audit.js';
 import superadminRoutes from './routes/superadmin.js';
 import teamRoutes from './routes/teams.js';
+import campaignRoutes from './routes/campaigns.js';
 
 dotenv.config();
 
@@ -75,6 +76,7 @@ app.use('/app-tracking', appTrackingRoutes);
 app.use('/audit-logs', auditRoutes);
 app.use('/superadmin', superadminRoutes);
 app.use('/teams', teamRoutes);
+app.use('/campaigns', campaignRoutes);
 
 app.get('/', (req, res) => {
     res.send({ message: 'User Monitor API' });

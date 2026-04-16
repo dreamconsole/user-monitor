@@ -15,6 +15,7 @@ export async function fetchDailySummaryData(req) {
                 ws.work_date,
                 u.id as user_id,
                 u.full_name as user_name,
+                c.name as campaign_name,
                 SUM(ws.total_work_seconds) / 3600.0 as work_hours,
                 SUM(ws.total_idle_seconds) / 3600.0 as idle_hours,
                 MIN(ws.start_time) as shift_start,
@@ -26,6 +27,7 @@ export async function fetchDailySummaryData(req) {
                 ) as break_seconds
             FROM work_sessions ws
             JOIN users u ON ws.user_id = u.id
+            LEFT JOIN campaigns c ON ws.campaign_id = c.id
             WHERE ws.org_id = $1
         `;
     const params = [orgId];
@@ -67,7 +69,7 @@ export async function fetchDailySummaryData(req) {
         params.push(userId);
     }
 
-    sql += ` GROUP BY ws.work_date, u.id, u.full_name ORDER BY ws.work_date DESC, u.full_name ASC`;
+    sql += ` GROUP BY ws.work_date, u.id, u.full_name, c.name ORDER BY ws.work_date DESC, u.full_name ASC`;
 
     const result = await query(sql, params);
     return result.rows;

@@ -31,6 +31,7 @@ import {
     ChevronLeft,
     ChevronRight,
     ChevronDown,
+    Megaphone,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from '../ThemeToggle';
@@ -87,6 +88,9 @@ const Sidebar = ({ className, onLinkClick }) => {
                         { href: '/breaks', label: 'Break Policies' }
                     ]
                 },
+                ...(user?.features?.is_campaigns_enabled ? [
+                    { href: '/campaigns', label: 'Campaigns', icon: Megaphone, roles: ['orgadmin', 'manager'] },
+                ] : []),
                 { href: '/activity-logs', label: 'Activity Logs', icon: ClipboardList, roles: ['orgadmin', 'manager'] },
                 { href: '/reports', label: user?.role === 'user' ? 'My Reports' : 'Reports', icon: FileText, roles: ['orgadmin', 'manager', 'user'] },
             ]

@@ -114,6 +114,19 @@ class AuthService {
             return [];
         }
     }
+
+    async fetchCampaigns() {
+        if (!this.token) return [];
+        try {
+            const response = await axios.get(`${API_URL}/agent/campaigns`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            return response.data.campaigns || [];
+        } catch (error) {
+            console.error('Failed to fetch campaigns:', error.message);
+            return [];
+        }
+    }
 }
 
 module.exports = new AuthService();

@@ -15,6 +15,7 @@ class MonitorService {
         this.orgId = null;
         this.userId = null;
         this.deviceId = null;
+        this.campaignId = null;
         this.isPaused = false;
         this.currentState = 'OFFLINE';
         this.breakType = null;
@@ -68,7 +69,7 @@ class MonitorService {
         return Math.min(systemIdleTime, inputIdleTime);
     }
 
-    start() {
+    start(campaignId = null) {
         console.log('Starting Monitor Service...');
         try {
             const user = authService.getUser();
@@ -84,6 +85,7 @@ class MonitorService {
             this.orgId = user.org_id;
             this.userId = user.id;
             this.deviceId = authService.getDeviceId();
+            this.campaignId = campaignId || null;
             this.isPaused = false;
             this.breakType = null;
             this.lastCheckTime = Date.now();
@@ -143,8 +145,8 @@ class MonitorService {
 
             console.log('Preparing INSERT work_sessions statement...');
             const stmt = db.getDB().prepare(`
-                INSERT INTO work_sessions (id, org_id, user_id, device_id, start_time, sync_status)
-                VALUES (?, ?, ?, ?, ?, 'pending')
+                INSERT INTO work_sessions (id, org_id, user_id, device_id, start_time, campaign_id, sync_status)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending')
             `);
 
             console.log('Running INSERT work_sessions statement...');
@@ -153,9 +155,10 @@ class MonitorService {
                 this.orgId,
                 this.userId,
                 this.deviceId,
-                this.sessionStartTime
+                this.sessionStartTime,
+                this.campaignId
             );
-            console.log(`Started Work Session: ${this.currentWorkSessionId}`);
+            console.log(`Started Work Session: ${this.currentWorkSessionId} (Campaign: ${this.campaignId || 'None'})`);
 
             // Immediate sync to server
             require('./sync').forceSync();

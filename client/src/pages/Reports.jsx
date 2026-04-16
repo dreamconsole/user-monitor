@@ -144,7 +144,7 @@ export default function Reports() {
                         data={data}
                         filename={`report_${activeTab}`}
                         headers={
-                            activeTab === 'summary' ? ['Work Date', 'User Name', 'Shift Start', 'Shift End', 'Work Hours', 'Idle Hours', 'Break Hours'] :
+                            activeTab === 'summary' ? ['Work Date', 'User Name', 'Campaign', 'Shift Start', 'Shift End', 'Work Hours', 'Idle Hours', 'Break Hours'] :
                                 activeTab === 'breaks' ? ['User Name', 'Break Type', 'Duration Minutes', 'Start Time'] :
                                     activeTab === 'idle' ? ['User Name', 'Start Time', 'End Time', 'Duration Minutes'] :
                                         ['User Name', 'Captured At', 'File Path']
@@ -272,6 +272,7 @@ export default function Reports() {
                                     <TableRow>
                                         <TableHead>Date</TableHead>
                                         <TableHead>User</TableHead>
+                                        <TableHead>Campaign</TableHead>
                                         <TableHead>Shift Start</TableHead>
                                         <TableHead>Shift End</TableHead>
                                         <TableHead>Work Hours</TableHead>
@@ -316,6 +317,15 @@ export default function Reports() {
                                                 <>
                                                     <TableCell className="font-medium">{row.work_date ? format(new Date(row.work_date + 'T12:00:00'), 'MMM dd, yyyy') : '-'}</TableCell>
                                                     <TableCell>{row.user_name}</TableCell>
+                                                    <TableCell>
+                                                        {row.campaign_name ? (
+                                                            <Badge variant="secondary" className="font-normal">
+                                                                {row.campaign_name}
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-muted-foreground italic text-xs">No Campaign</span>
+                                                        )}
+                                                    </TableCell>
                                                     <TableCell>{row.shift_start ? utcToLocal(row.shift_start, user.org_timezone || user.timezone, 'HH:mm') : '-'}</TableCell>
                                                     <TableCell>{row.shift_end ? utcToLocal(row.shift_end, user.org_timezone || user.timezone, 'HH:mm') : 'Active'}</TableCell>
                                                     <TableCell>{parseFloat(row.work_hours).toFixed(1)}h</TableCell>

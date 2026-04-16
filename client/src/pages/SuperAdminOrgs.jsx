@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Plus, Pencil, Trash2, Power, PowerOff } from 'lucide-react';
+import { MoreHorizontal, Plus, Pencil, Trash2, Power, PowerOff, Megaphone } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 
@@ -83,6 +84,16 @@ export default function SuperAdminOrgs() {
             fetchData();
         } catch (error) {
             toast.error('Failed to update status');
+        }
+    };
+
+    const toggleCampaigns = async (org) => {
+        try {
+            await api.put(`/superadmin/orgs/${org.id}`, { is_campaigns_enabled: !org.is_campaigns_enabled });
+            toast.success(`Campaigns ${org.is_campaigns_enabled ? 'disabled' : 'enabled'} for ${org.name}`);
+            fetchData();
+        } catch (error) {
+            toast.error('Failed to update campaigns feature');
         }
     };
 
@@ -178,6 +189,7 @@ export default function SuperAdminOrgs() {
                                 <TableHead>Domain</TableHead>
                                 <TableHead>Current Users</TableHead>
                                 <TableHead>Max Users Limit</TableHead>
+                                <TableHead>Campaigns</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="w-[100px]">Actions</TableHead>
                             </TableRow>
@@ -190,10 +202,17 @@ export default function SuperAdminOrgs() {
                                     <TableCell>{org.current_users}</TableCell>
                                     <TableCell>{org.max_users_limit}</TableCell>
                                     <TableCell>
+                                        <Badge variant={org.is_campaigns_enabled ? 'default' : 'secondary'} className="text-xs gap-1">
+                                            <Megaphone className="w-3 h-3" />
+                                            {org.is_campaigns_enabled ? 'On' : 'Off'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
                                         <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset ${org.is_active ? 'bg-green-50 text-green-700 ring-green-600/20' : 'bg-red-50 text-red-700 ring-red-600/20'}`}>
                                             {org.is_active ? 'Active' : 'Deactivated'}
                                         </span>
                                     </TableCell>
+
                                     <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -206,6 +225,14 @@ export default function SuperAdminOrgs() {
                                                 <DropdownMenuItem onClick={() => openEdit(org)}>
                                                     <Pencil className="mr-2 h-4 w-4" />
                                                     Edit Details
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    onClick={() => toggleCampaigns(org)}
+                                                    className={org.is_campaigns_enabled ? 'text-orange-600' : 'text-violet-600'}
+                                                >
+                                                    <Megaphone className="mr-2 h-4 w-4" />
+                                                    {org.is_campaigns_enabled ? 'Disable Campaigns' : 'Enable Campaigns'}
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem

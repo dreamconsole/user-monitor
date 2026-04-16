@@ -29,6 +29,7 @@ CREATE TABLE org_features (
     afk_threshold_seconds INTEGER DEFAULT 300,
     is_breaks_enabled BOOLEAN DEFAULT true,
     is_force_logout_enabled BOOLEAN DEFAULT true,
+    is_campaigns_enabled BOOLEAN DEFAULT false,
     idle_action VARCHAR(20) DEFAULT 'none',
     idle_action_duration_minutes INTEGER DEFAULT 60,
     break_exceeded_action VARCHAR(20) DEFAULT 'notification',
@@ -47,6 +48,30 @@ CREATE TABLE teams (
 );
 
 COMMENT ON TABLE teams IS 'Teams for user grouping';
+
+-- 3.5 Campaigns
+CREATE TABLE campaigns (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE campaign_assignments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT check_assignment_target CHECK (
+        (team_id IS NOT NULL AND user_id IS NULL) OR 
+        (user_id IS NOT NULL AND team_id IS NULL)
+    ),
+    UNIQUE(campaign_id, team_id),
+    UNIQUE(campaign_id, user_id)
+);
+
 
 -- 4. Users
 CREATE TYPE user_role AS ENUM ('orgadmin', 'manager', 'user');
@@ -118,6 +143,7 @@ CREATE TABLE work_sessions (
     total_idle_seconds INTEGER DEFAULT 0,
     total_break_seconds INTEGER DEFAULT 0,
     status session_status DEFAULT 'active',
+    campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

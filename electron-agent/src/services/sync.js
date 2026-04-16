@@ -81,7 +81,8 @@ class SyncService {
                     total_work_seconds: row.total_work_seconds,
                     total_idle_seconds: row.total_idle_seconds,
                     total_break_seconds: row.total_break_seconds,
-                    status: 'active' // TODO: Detect finished status
+                    campaign_id: row.campaign_id || null,
+                    status: 'active'
                 }, {
                     headers: { Authorization: `Bearer ${authService.getToken()}` }
                 });

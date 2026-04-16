@@ -23,13 +23,28 @@ const endShiftBtn = document.getElementById('endShiftBtn');
 const breakBtn = document.getElementById('breakBtn');
 const resumeBtn = document.getElementById('resumeBtn');
 const logoutBtn = document.getElementById('logoutBtn');
-const breakTypeSelect = document.getElementById('breakType');
+
+// Custom Dropdowns
+const campaignTrigger = document.getElementById('campaignTrigger');
+const campaignMenu = document.getElementById('campaignMenu');
+const campaignList = document.getElementById('campaignList');
+const selectedCampaignText = document.getElementById('selectedCampaignText');
+
+const breakTrigger = document.getElementById('breakTrigger');
+const breakMenu = document.getElementById('breakMenu');
+const breakList = document.getElementById('breakList');
+const selectedBreakText = document.getElementById('selectedBreakText');
+
 const currentBreakTypeSpan = document.getElementById('currentBreakType');
+const campaignSection = document.getElementById('campaignSection');
+const campaignBadge = document.getElementById('campaignBadge');
 
 let timerInterval = null;
 let secondsElapsed = 0;
 let sessionStartTime = null;
 let isTracking = false;
+let selectedCampaignId = null;
+let hasCampaigns = false;
 
 // Break Timer Variables
 let breakTimerInterval = null;
@@ -39,6 +54,25 @@ let breakStartTime = null;
 
 // Store break definitions (id -> { name, max_duration_seconds, is_paid })
 let breakDefinitions = {};
+
+// Selections
+let selectedBreakName = null;
+
+function toggleDropdown(menu) {
+    const isHidden = menu.classList.contains('hidden');
+    closeAllDropdowns();
+    if (isHidden) {
+        menu.classList.remove('hidden');
+        menu.classList.add('flex');
+    }
+}
+
+function closeAllDropdowns() {
+    [campaignMenu, breakMenu].forEach(m => {
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+    });
+}
 
 function formatTime(s) {
     const h = Math.floor(s / 3600).toString().padStart(2, '0');
@@ -50,51 +84,103 @@ function formatTime(s) {
 async function fetchAndPopulateBreaks() {
     try {
         const breaks = await ipcRenderer.invoke('get-breaks');
-        breakTypeSelect.innerHTML = '<option value="" disabled selected>Select Break</option>';
+        breakList.innerHTML = '';
         breakDefinitions = {};
 
+        const renderItem = (b) => {
+            const li = document.createElement('li');
+            li.className = 'dropdown-item';
+            li.innerHTML = `<i data-lucide="coffee" class="w-3 h-3 text-amber-500/60"></i> ${b.name}`;
+            li.onclick = () => {
+                selectedBreakName = b.name;
+                selectedBreakText.innerText = b.name;
+                selectedBreakText.classList.remove('text-slate-400');
+                selectedBreakText.classList.add('text-slate-900');
+                closeAllDropdowns();
+                
+                // Highlight selection
+                Array.from(breakList.children).forEach(child => child.classList.remove('selected'));
+                li.classList.add('selected');
+            };
+            breakList.appendChild(li);
+            breakDefinitions[b.name] = b;
+        };
+
         if (breaks && breaks.length > 0) {
-            breaks.forEach(b => {
-                const opt = document.createElement('option');
-                opt.value = b.name; // Using name as ID for now to match backend expectation, or change backend to use ID
-                opt.textContent = b.name;
-                // Store limits
-                breakDefinitions[b.name] = b;
-                breakTypeSelect.appendChild(opt);
-            });
+            breaks.forEach(renderItem);
         } else {
-            // Fallback if no breaks found
             const defaults = ['Lunch Break', 'Tea Break', 'Meeting', 'Personal'];
-            defaults.forEach(name => {
-                const opt = document.createElement('option');
-                opt.value = name;
-                opt.textContent = name;
-                breakDefinitions[name] = { name, max_duration_seconds: null };
-                breakTypeSelect.appendChild(opt);
-            });
+            defaults.forEach(name => renderItem({ name, max_duration_seconds: null }));
         }
+        
+        if (window.lucide) window.lucide.refresh();
     } catch (e) {
         console.error('Failed to load breaks:', e);
     }
 }
 
+async function fetchAndPopulateCampaigns() {
+    try {
+        const campaigns = await ipcRenderer.invoke('get-campaigns');
+        campaignList.innerHTML = '';
+        if (campaigns && campaigns.length > 0) {
+            hasCampaigns = true;
+            campaigns.forEach(c => {
+                const li = document.createElement('li');
+                li.className = 'dropdown-item';
+                li.innerHTML = `<i data-lucide="megaphone" class="w-3 h-3 text-primary/60"></i> ${c.name}`;
+                li.onclick = () => {
+                    selectedCampaignId = c.id;
+                    selectedCampaignText.innerText = c.name;
+                    selectedCampaignText.classList.remove('text-slate-400');
+                    selectedCampaignText.classList.add('text-slate-900');
+                    closeAllDropdowns();
+                    
+                    // Highlight
+                    Array.from(campaignList.children).forEach(child => child.classList.remove('selected'));
+                    li.classList.add('selected');
+                };
+                campaignList.appendChild(li);
+            });
+            campaignSection.classList.remove('hidden');
+            campaignSection.classList.add('flex');
+            if (window.lucide) window.lucide.refresh();
+        } else {
+            hasCampaigns = false;
+            campaignSection.classList.add('hidden');
+            campaignSection.classList.remove('flex');
+        }
+    } catch (e) {
+        console.error('Failed to load campaigns:', e);
+        hasCampaigns = false;
+    }
+}
+
 function updateStatus(status) {
-    statusBadge.className = 'status-badge';
+    // Reset classes while keeping common base classes
+    statusBadge.className = 'inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-slate-200 transition-all duration-500';
+    const dot = statusBadge.querySelector('.status-dot');
+    dot.className = 'status-dot w-2 h-2 rounded-full status-pulse'; // Reset dot classes
+    
     if (status === 'ACTIVE') {
-        statusBadge.classList.add('status-active');
-        statusText.innerText = 'Tracking Active';
+        statusBadge.classList.add('bg-emerald-500/10', 'border-emerald-500/20', 'text-emerald-600');
+        dot.classList.add('bg-emerald-500');
+        statusText.innerText = 'Shift Active';
         timerDisplay.classList.add('tracking-pulse');
-        // Reset timer color
-        timerDisplay.style.color = 'var(--text-main)';
+        timerDisplay.classList.add('text-slate-900');
     } else if (status === 'BREAK' || status === 'AFK') {
-        statusBadge.classList.add('status-idle');
+        statusBadge.classList.add('bg-amber-500/10', 'border-amber-500/20', 'text-amber-600');
+        dot.classList.add('bg-amber-500');
         statusText.innerText = status === 'AFK' ? 'Idle / AFK' : 'On Break';
         timerDisplay.classList.remove('tracking-pulse');
+        timerDisplay.classList.add('text-amber-600');
     } else {
-        statusBadge.classList.add('status-offline');
+        statusBadge.classList.add('bg-red-500/10', 'border-red-500/20', 'text-red-500');
+        dot.classList.add('bg-red-500');
         statusText.innerText = 'Offline';
         timerDisplay.classList.remove('tracking-pulse');
-        timerDisplay.style.color = 'var(--text-main)';
+        timerDisplay.classList.remove('text-amber-600');
+        timerDisplay.classList.add('text-slate-900');
     }
 }
 
@@ -192,13 +278,17 @@ function stopBreakTimer() {
 }
 
 function showTracking(user) {
-    loginView.style.display = 'none';
-    trackingView.style.display = 'flex';
+    loginView.classList.add('hidden');
+    trackingView.classList.remove('hidden');
+    trackingView.classList.add('flex');
+    logoutBtn.classList.remove('hidden');
+    
     roleBadge.innerText = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Standard User';
     updateLastSync();
 
-    // Load breaks
+    // Load breaks and campaigns
     fetchAndPopulateBreaks();
+    fetchAndPopulateCampaigns();
 
     // Re-run lucide icons to catch any new elements
     if (window.lucide) {
@@ -224,7 +314,7 @@ loginForm.addEventListener('submit', async (e) => {
     } catch (error) {
         console.error(error);
         errorMsg.textContent = error.response?.data?.error || 'Login failed. Please check credentials.';
-        errorMsg.style.display = 'block';
+        errorMsg.classList.remove('hidden');
         submitBtn.innerHTML = originalContent;
         if (window.lucide) window.lucide.createIcons();
     } finally {
@@ -233,10 +323,31 @@ loginForm.addEventListener('submit', async (e) => {
 });
 
 startShiftBtn.addEventListener('click', () => {
+    // Check selection
+    if (hasCampaigns && !selectedCampaignId) {
+        campaignTrigger.classList.add('ring-2', 'ring-red-500/50');
+        campaignTrigger.focus();
+        return;
+    }
+    campaignTrigger.classList.remove('ring-2', 'ring-red-500/50');
+
+    // Show the active campaign as a badge
+    if (selectedCampaignId) {
+        campaignBadge.innerHTML = `<i data-lucide="megaphone" class="w-3 h-3"></i> <span>${selectedCampaignText.innerText}</span>`;
+        campaignBadge.className = 'badge-pill'; // Correctly apply the new pill class
+        if (window.lucide) window.lucide.createIcons();
+    }
+
     isTracking = true;
-    ipcRenderer.send('start-tracking');
-    startActions.style.display = 'none';
-    activeActions.style.display = 'flex';
+    ipcRenderer.send('start-tracking', { campaignId: selectedCampaignId });
+    startActions.classList.add('hidden');
+    activeActions.classList.remove('hidden');
+    activeActions.classList.add('flex');
+    
+    // Hide overflow during shift
+    document.querySelector('main').classList.add('overflow-hidden');
+    document.querySelector('main').classList.remove('overflow-y-auto');
+
     startTimer();
     updateLastSync();
 });
@@ -244,21 +355,39 @@ startShiftBtn.addEventListener('click', () => {
 endShiftBtn.addEventListener('click', () => {
     isTracking = false;
     ipcRenderer.send('end-shift');
-    activeActions.style.display = 'none';
-    startActions.style.display = 'flex';
+    activeActions.classList.add('hidden');
+    activeActions.classList.remove('flex');
+    startActions.classList.remove('hidden');
+    startActions.classList.add('flex');
+
+    // Restore overflow
+    document.querySelector('main').classList.add('overflow-y-auto');
+    document.querySelector('main').classList.remove('overflow-hidden');
+
     stopTimer();
     secondsElapsed = 0;
     timerDisplay.innerText = "00:00:00";
+    
+    // Hide campaign badge on shift end
+    campaignBadge.innerHTML = '';
+    campaignBadge.className = 'hidden';
+    
     updateLastSync();
 });
 
 breakBtn.addEventListener('click', () => {
-    const breakName = breakTypeSelect.value;
-    if (!breakName) return; // Prevent if nothing selected
+    const breakName = selectedBreakName;
+    if (!breakName) {
+        breakTrigger.classList.add('ring-2', 'ring-amber-500/50');
+        return;
+    }
+    breakTrigger.classList.remove('ring-2', 'ring-amber-500/50');
 
     ipcRenderer.send('pause-tracking', breakName);
-    activeActions.style.display = 'none';
-    breakActions.style.display = 'flex';
+    activeActions.classList.add('hidden');
+    activeActions.classList.remove('flex');
+    breakActions.classList.remove('hidden');
+    breakActions.classList.add('flex');
     currentBreakTypeSpan.innerText = breakName;
 
     // Stop work timer
@@ -286,8 +415,10 @@ breakBtn.addEventListener('click', () => {
 
 resumeBtn.addEventListener('click', () => {
     ipcRenderer.send('resume-tracking');
-    breakActions.style.display = 'none';
-    activeActions.style.display = 'flex';
+    breakActions.classList.add('hidden');
+    breakActions.classList.remove('flex');
+    activeActions.classList.remove('hidden');
+    activeActions.classList.add('flex');
 
     stopBreakTimer();
     startTimer();
@@ -295,6 +426,7 @@ resumeBtn.addEventListener('click', () => {
 });
 
 logoutBtn.addEventListener('click', () => {
+    console.log('[UI] Logout button clicked.');
     ipcRenderer.send('logout');
     stopTimer();
     stopBreakTimer();
@@ -303,4 +435,24 @@ logoutBtn.addEventListener('click', () => {
 // Auto-login listener
 ipcRenderer.on('auto-login-success', (event, { user, token }) => {
     showTracking(user);
+});
+
+// Dropdown Triggers
+if (campaignTrigger) {
+    campaignTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleDropdown(campaignMenu);
+    });
+}
+
+if (breakTrigger) {
+    breakTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleDropdown(breakMenu);
+    });
+}
+
+// Global Click-Outside
+window.addEventListener('click', () => {
+    closeAllDropdowns();
 });

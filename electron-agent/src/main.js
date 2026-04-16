@@ -44,6 +44,7 @@ function createWindow() {
         height: 600,
         resizable: false,
         maximizable: false,
+        icon: path.join(__dirname, '../assets/icon.png'),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false, // TODO: migrate to contextIsolation: true with preload script
@@ -195,10 +196,11 @@ function scanAndInstallBrowserExtensions() {
     }
 }
 
-ipcMain.on('start-tracking', () => {
+ipcMain.on('start-tracking', (event, data) => {
     console.log('Starting tracking...');
+    const campaignId = data?.campaignId || null;
     const monitorService = require('./services/monitor');
-    monitorService.start();
+    monitorService.start(campaignId);
     startPowerBlocker();
 });
 
@@ -278,4 +280,9 @@ ipcMain.on('get-user-data-path', (event) => {
 ipcMain.handle('get-breaks', async () => {
     const authService = require('./services/auth');
     return await authService.fetchBreaks();
+});
+
+ipcMain.handle('get-campaigns', async () => {
+    const authService = require('./services/auth');
+    return await authService.fetchCampaigns();
 });
