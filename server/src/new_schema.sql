@@ -29,6 +29,9 @@ CREATE TABLE org_features (
     afk_threshold_seconds INTEGER DEFAULT 300,
     is_breaks_enabled BOOLEAN DEFAULT true,
     is_force_logout_enabled BOOLEAN DEFAULT true,
+    idle_action VARCHAR(20) DEFAULT 'none',
+    idle_action_duration_minutes INTEGER DEFAULT 60,
+    break_exceeded_action VARCHAR(20) DEFAULT 'notification',
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -67,6 +70,7 @@ CREATE TABLE users (
     last_heartbeat TIMESTAMPTZ,
     is_active BOOLEAN DEFAULT true,
     force_logout BOOLEAN DEFAULT false,
+    current_state VARCHAR(20) DEFAULT 'offline',
     last_login_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,

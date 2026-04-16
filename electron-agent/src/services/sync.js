@@ -303,6 +303,8 @@ class SyncService {
                 user_id: user.id,
                 device_identifier: authService.getDeviceId(),
                 status: 'ONLINE',
+                state: monitorService.currentState,
+                current_idle_time: monitorService.getCurrentIdleTime(),
                 last_seen_at: Date.now()
             };
 

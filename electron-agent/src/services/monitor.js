@@ -61,6 +61,13 @@ class MonitorService {
         return this.currentWorkSessionId;
     }
 
+    getCurrentIdleTime() {
+        if (this.isPaused || !this.currentWorkSessionId) return 0;
+        const systemIdleTime = powerMonitor.getSystemIdleTime();
+        const inputIdleTime = Math.floor((Date.now() - this.lastInputTime) / 1000);
+        return Math.min(systemIdleTime, inputIdleTime);
+    }
+
     start() {
         console.log('Starting Monitor Service...');
         try {
@@ -85,6 +92,16 @@ class MonitorService {
             // Refresh config on start
             this.afkThresholdSeconds = configService.get('afk_threshold_seconds') || 300;
             this.isAfkTrackingEnabled = configService.get('is_afk_tracking_enabled') !== false;
+
+            // Session Recovery: Close old sessions/breaks in local DB
+            try {
+                const closeTime = Date.now();
+                db.getDB().prepare(`UPDATE work_sessions SET end_time = ?, sync_status = 'pending' WHERE end_time IS NULL`).run(closeTime);
+                db.getDB().prepare(`UPDATE break_logs SET end_time = ?, sync_status = 'pending' WHERE end_time IS NULL`).run(closeTime);
+                console.log('[MonitorService] Local session recovery complete. Closed old pending sessions/breaks.');
+            } catch (e) {
+                console.error('[MonitorService] Session recovery error:', e);
+            }
 
             // Start a new Work Session (Shift)
             console.log('Calling startWorkSession...');

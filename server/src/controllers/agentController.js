@@ -31,7 +31,7 @@ export const logHeartbeat = async (req, res) => {
         }
 
         // Update last_heartbeat_at in agent_sessions or insert if not exists
-        const { agent_version, device_name } = req.body;
+        const { agent_version, device_name, state, current_idle_time } = req.body;
         let { token } = req.body;
 
         // If token is missing in body, try to get it from context/headers
@@ -66,9 +66,10 @@ export const logHeartbeat = async (req, res) => {
                 last_heartbeat = CURRENT_TIMESTAMP,
                 device_id = $1,
                 agent_version = COALESCE($2, agent_version),
-                token = COALESCE($3, token)
+                token = COALESCE($3, token),
+                current_state = COALESCE($5, current_state)
             WHERE id = $4`,
-            [device_identifier, agent_version || null, token || null, user_id]
+            [device_identifier, agent_version || null, token || null, user_id, state || null]
         );
 
         // Fetch Features (Org Defaults)
@@ -90,6 +91,33 @@ export const logHeartbeat = async (req, res) => {
             is_breaks_enabled: userFeatures.is_breaks_enabled ?? orgFeatures.is_breaks_enabled ?? true,
             heartbeat_interval_seconds: userFeatures.heartbeat_interval_seconds || orgFeatures.heartbeat_interval_seconds || 300
         };
+
+        // Check Idle Actions
+        if (current_idle_time !== undefined && orgFeatures.idle_action && orgFeatures.idle_action !== 'none') {
+            const idleMins = Math.floor(current_idle_time / 60);
+            if (idleMins >= (orgFeatures.idle_action_duration_minutes || 60)) {
+                if (orgFeatures.idle_action === 'logout') {
+                    console.log(`[logHeartbeat] Triggering Auto-Logout for User ${user_id} due to inactivity (${idleMins} mins)`);
+                    return res.status(200).json({ success: true, command: 'FORCE_LOGOUT' });
+                } else if (orgFeatures.idle_action === 'notification') {
+                    const managerId = user.manager_id || (await query('SELECT manager_id FROM users WHERE id = $1', [user_id])).rows[0]?.manager_id;
+                    if (managerId) {
+                        const recentNotif = await query(
+                            `SELECT id FROM notifications WHERE recipient_id = $1 AND actor_id = $2 AND type = 'IDLE_VIOLATION' AND created_at > NOW() - INTERVAL '1 hour'`,
+                            [managerId, user_id]
+                        );
+                        if (recentNotif.rows.length === 0) {
+                            const uName = (await query('SELECT full_name FROM users WHERE id = $1', [user_id])).rows[0]?.full_name || 'User';
+                            await query(
+                                `INSERT INTO notifications (org_id, recipient_id, actor_id, type, title, message)
+                                 VALUES ($1, $2, $3, 'IDLE_VIOLATION', $4, $5)`,
+                                [org_id, managerId, user_id, 'User Inactivity Detected', `${uName} has been idle for ${idleMins} minutes.`]
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         // Broadcast heartbeat to managers for live dashboard updates
         try {
@@ -359,39 +387,47 @@ export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
         const excess = totalUsed - max_duration_seconds;
         const excessMinutes = Math.ceil(excess / 60);
 
-        // Find managers of the team
-        const managersRes = await query(
-            'SELECT id FROM users WHERE team_id = $1 AND role = \'manager\' AND org_id = $2',
-            [team_id, finalOrgId]
-        );
+        const orgFeaturesRes = await query('SELECT break_exceeded_action FROM org_features WHERE org_id = $1', [finalOrgId]);
+        const breakAction = orgFeaturesRes.rows[0]?.break_exceeded_action || 'notification';
 
-        for (const managerRow of managersRes.rows) {
-            const manager_id = managerRow.id;
-            // 4. Check if already notified TODAY for this break type
-            const existingNotif = await query(
-                `SELECT id FROM notifications 
-                 WHERE recipient_id = $1 
-                   AND actor_id = $2 
-                   AND type = 'BREAK_VIOLATION'
-                   AND title LIKE $3
-                   AND created_at::DATE = CURRENT_DATE`,
-                [manager_id, userId, `%${break_name}%`]
+        if (breakAction === 'logout') {
+            await query('UPDATE users SET force_logout = true WHERE id = $1', [userId]);
+            console.log(`[Notification] Auto-logout triggered for User ${userId} due to break violation`);
+        } else if (breakAction === 'notification') {
+            // Find managers of the team
+            const managersRes = await query(
+                'SELECT id FROM users WHERE team_id = $1 AND role = \'manager\' AND org_id = $2',
+                [team_id, finalOrgId]
             );
 
-            if (existingNotif.rows.length === 0) {
-                // 5. Insert Notification
-                await query(
-                    `INSERT INTO notifications (org_id, recipient_id, actor_id, type, title, message)
-                     VALUES ($1, $2, $3, 'BREAK_VIOLATION', $4, $5)`,
-                    [
-                        finalOrgId,
-                        manager_id,
-                        userId,
-                        `Break Limit Exceeded: ${break_name}`,
-                        `${user_name} has exceeded the ${break_name} limit by ${excessMinutes} minutes.`
-                    ]
+            for (const managerRow of managersRes.rows) {
+                const manager_id = managerRow.id;
+                // 4. Check if already notified TODAY for this break type
+                const existingNotif = await query(
+                    `SELECT id FROM notifications 
+                     WHERE recipient_id = $1 
+                       AND actor_id = $2 
+                       AND type = 'BREAK_VIOLATION'
+                       AND title LIKE $3
+                       AND created_at::DATE = CURRENT_DATE`,
+                    [manager_id, userId, `%${break_name}%`]
                 );
-                console.log(`[Notification] Sent BREAK_VIOLATION for User ${userId} to Manager ${manager_id}`);
+
+                if (existingNotif.rows.length === 0) {
+                    // 5. Insert Notification
+                    await query(
+                        `INSERT INTO notifications (org_id, recipient_id, actor_id, type, title, message)
+                         VALUES ($1, $2, $3, 'BREAK_VIOLATION', $4, $5)`,
+                        [
+                            finalOrgId,
+                            manager_id,
+                            userId,
+                            `Break Limit Exceeded: ${break_name}`,
+                            `${user_name} has exceeded the ${break_name} limit by ${excessMinutes} minutes.`
+                        ]
+                    );
+                    console.log(`[Notification] Sent BREAK_VIOLATION for User ${userId} to Manager ${manager_id}`);
+                }
             }
         }
     }

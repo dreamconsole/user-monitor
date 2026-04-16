@@ -261,15 +261,23 @@ export const getUserHourlyStats = async (req, res) => {
         let currentStatus = 'offline';
         if (queryDate === new Date().toISOString().split('T')[0]) {
             const userStatus = await query(
-                `SELECT last_heartbeat, 
+                `SELECT last_heartbeat, current_state,
                   EXISTS(SELECT 1 FROM break_logs WHERE user_id = $1 AND end_time IS NULL) as on_break
                   FROM users WHERE id = $1`,
                 [userId]
             );
             if (userStatus.rows.length > 0) {
                 const u = userStatus.rows[0];
-                if (u.on_break) currentStatus = 'break';
-                else if (u.last_heartbeat && (Date.now() - new Date(u.last_heartbeat).getTime() < 2 * 60 * 1000)) currentStatus = 'online';
+                const isOnline = u.last_heartbeat && (Date.now() - new Date(u.last_heartbeat).getTime() < 5 * 60 * 1000); // 5 mins tolerance
+                if (!isOnline) {
+                    currentStatus = 'offline';
+                } else if (u.on_break || u.current_state === 'break') {
+                    currentStatus = 'break';
+                } else if (u.current_state === 'idle') {
+                    currentStatus = 'idle';
+                } else {
+                    currentStatus = 'online';
+                }
             }
         }
 

@@ -31,4 +31,24 @@ export const startCronJobs = () => {
             console.error('Cron Job Error:', err);
         }
     });
+
+    // Run every 15 minutes for stale break cleanup
+    schedule.scheduleJob('*/15 * * * *', async () => {
+        try {
+            // Close breaks where user's last_heartbeat is older than 2 hours
+            const breakResult = await query(
+                `UPDATE break_logs 
+                 SET end_time = u.last_heartbeat
+                 FROM users u
+                 WHERE u.id = break_logs.user_id 
+                   AND break_logs.end_time IS NULL 
+                   AND u.last_heartbeat < (NOW() - INTERVAL '2 hours')`
+            );
+            if (breakResult.rowCount > 0) {
+                console.log(`[Cron] Closed ${breakResult.rowCount} stale break(s).`);
+            }
+        } catch (err) {
+            console.error('Stale Cleanup Cron Error:', err);
+        }
+    });
 };

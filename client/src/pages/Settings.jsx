@@ -468,16 +468,82 @@ export default function Settings() {
                     </div>
                     <Separator />
 
-                    {/* Breaks */}
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label>Enable Breaks</Label>
-                            <p className="text-sm text-muted-foreground text-sm">Allow users to record breaks during shifts.</p>
+                    {/* Idle Action */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label>Action on Long Idle</Label>
+                                <p className="text-sm text-muted-foreground">What the system should do if a user remains idle for a long time.</p>
+                            </div>
+                            <Select
+                                value={settings.features.idle_action || 'none'}
+                                onValueChange={(v) => setSettings(prev => ({ ...prev, features: { ...prev.features, idle_action: v } }))}
+                            >
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Select action" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Take No Action</SelectItem>
+                                    <SelectItem value="notification">Notify Manager</SelectItem>
+                                    <SelectItem value="logout">Auto Logout User</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
-                        <Switch
-                            checked={settings.features.is_breaks_enabled}
-                            onCheckedChange={() => handleToggle('is_breaks_enabled')}
-                        />
+                        {settings.features.idle_action && settings.features.idle_action !== 'none' && (
+                            <div className="flex items-center justify-between pl-6 border-l-2">
+                                <Label>Idle Action Threshold</Label>
+                                <Select
+                                    value={(settings.features.idle_action_duration_minutes || 60).toString()}
+                                    onValueChange={(v) => handleSelectChange('idle_action_duration_minutes', v)}
+                                >
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Select duration" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="5">5 Minutes</SelectItem>
+                                        <SelectItem value="15">15 Minutes</SelectItem>
+                                        <SelectItem value="30">30 Minutes</SelectItem>
+                                        <SelectItem value="45">45 Minutes</SelectItem>
+                                        <SelectItem value="60">1 Hour</SelectItem>
+                                        <SelectItem value="120">2 Hours</SelectItem>
+                                        <SelectItem value="240">4 Hours</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                    </div>
+                    <Separator />
+
+                    {/* Breaks */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label>Enable Breaks</Label>
+                                <p className="text-sm text-muted-foreground text-sm">Allow users to record breaks during shifts.</p>
+                            </div>
+                            <Switch
+                                checked={settings.features.is_breaks_enabled}
+                                onCheckedChange={() => handleToggle('is_breaks_enabled')}
+                            />
+                        </div>
+                        {settings.features.is_breaks_enabled && (
+                            <div className="flex items-center justify-between pl-6 border-l-2 mt-4">
+                                <Label>Action on Break Limit Exceeded</Label>
+                                <Select
+                                    value={settings.features.break_exceeded_action || 'notification'}
+                                    onValueChange={(v) => handleSelectChange('break_exceeded_action', v)}
+                                >
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Select action" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Take No Action</SelectItem>
+                                        <SelectItem value="notification">Notify Manager</SelectItem>
+                                        <SelectItem value="logout">Auto Logout User</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                     </div>
                     <Separator />
 
