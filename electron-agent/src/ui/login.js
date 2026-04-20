@@ -55,8 +55,17 @@ let breakStartTime = null;
 // Store break definitions (id -> { name, max_duration_seconds, is_paid })
 let breakDefinitions = {};
 
-// Selections
-let selectedBreakName = null;
+// Notification States (ensure we don't spam the user)
+let shiftLimitNotified = false;
+let breakWarningNotified = false;
+let breakLimitNotified = false;
+let idleAlertNotified = false;
+
+function showOSNotification(title, body) {
+    if (ipcRenderer) {
+        ipcRenderer.send('show-notification', { title, body });
+    }
+}
 
 function toggleDropdown(menu) {
     const isHidden = menu.classList.contains('hidden');
@@ -168,12 +177,19 @@ function updateStatus(status) {
         statusText.innerText = 'Shift Active';
         timerDisplay.classList.add('tracking-pulse');
         timerDisplay.classList.add('text-slate-900');
+        idleAlertNotified = false; // Reset when active
     } else if (status === 'BREAK' || status === 'AFK') {
+        const isAFK = status === 'AFK';
         statusBadge.classList.add('bg-amber-500/10', 'border-amber-500/20', 'text-amber-600');
         dot.classList.add('bg-amber-500');
-        statusText.innerText = status === 'AFK' ? 'Idle / AFK' : 'On Break';
+        statusText.innerText = isAFK ? 'Idle / AFK' : 'On Break';
         timerDisplay.classList.remove('tracking-pulse');
         timerDisplay.classList.add('text-amber-600');
+
+        if (isAFK && !idleAlertNotified) {
+            idleAlertNotified = true;
+            showOSNotification("Inactivity Detected", "You appear to be idle. Would you like to start a break or resume work?");
+        }
     } else {
         statusBadge.classList.add('bg-red-500/10', 'border-red-500/20', 'text-red-500');
         dot.classList.add('bg-red-500');
@@ -207,6 +223,12 @@ function startTimer() {
         if (secondsElapsed % 60 === 0) {
             updateLastSync();
         }
+
+        // Shift Threshold Notification (e.g., 8 hours)
+        if (secondsElapsed >= 28800 && !shiftLimitNotified) {
+            shiftLimitNotified = true;
+            showOSNotification("Shift Duration Alert", "You have been on shift for 8 hours. Please consider taking a break or ending your shift.");
+        }
     }, 1000);
     updateStatus('ACTIVE');
 }
@@ -217,6 +239,7 @@ function stopTimer() {
         timerInterval = null;
     }
     sessionStartTime = null;
+    shiftLimitNotified = false; // Reset for next session
     updateStatus('OFFLINE');
 }
 
@@ -246,19 +269,22 @@ function startBreakTimer(durationLimit) {
                 // Time Exceeded
                 const exceededBy = Math.abs(remaining);
                 timerDisplay.innerText = `-${formatTime(exceededBy)}`;
-                timerDisplay.style.color = 'var(--error)';
+                timerDisplay.style.color = '#ef4444'; // Red-500
 
-                // Notify user ONCE when limits are reached
-                if (remaining === 0 && !window.breakLimitNotified) {
-                    window.breakLimitNotified = true;
-                    new Notification("Break Time Over", {
-                        body: "You have exceeded your break limit. Please resume work immediately."
-                    });
+                // Notify OS when limits are reached
+                if (!breakLimitNotified) {
+                    breakLimitNotified = true;
+                    showOSNotification("Break Time Over", "You have exceeded your break limit. Please resume work immediately.");
                 }
             } else {
                 // Normal Countdown
                 timerDisplay.innerText = formatTime(remaining);
-                window.breakLimitNotified = false; // Reset flag if they somehow go back (unlikely)
+
+                // 1-minute warning
+                if (remaining <= 60 && !breakWarningNotified) {
+                    breakWarningNotified = true;
+                    showOSNotification("Break Ending Soon", "Your break will end in less than 1 minute.");
+                }
             }
         } else {
             // Count UP (No limit)
@@ -274,7 +300,9 @@ function stopBreakTimer() {
     }
     breakStartTime = null;
     breakDurationLimit = null;
-    timerDisplay.style.color = 'var(--text-main)';
+    breakWarningNotified = false; // Reset for next break
+    breakLimitNotified = false;
+    timerDisplay.style.color = ''; // Let classes handle it
 }
 
 function showTracking(user) {

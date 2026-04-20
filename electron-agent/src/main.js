@@ -1,13 +1,18 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, powerSaveBlocker, Notification } = require('electron');
 
 // Prevent timer throttling and renderer backgrounding
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 // const { machineIdSync } = require('node-machine-id'); // Will use later
 const db = require('./db');
+
+// Set AppUserModelId for Windows Notifications
+if (process.platform === 'win32') {
+    app.setAppUserModelId('com.sourcecodekart.sckagent');
+}
 let powerSaveId = null;
 
 function startPowerBlocker() {
@@ -227,6 +232,25 @@ ipcMain.on('end-shift', () => {
 
 ipcMain.on('logout', () => {
     performLogout();
+});
+
+ipcMain.on('show-notification', (event, { title, body }) => {
+    if (Notification.isSupported()) {
+        const notif = new Notification({
+            title,
+            body,
+            icon: path.join(__dirname, '../assets/icon.png'),
+            silent: false
+        });
+        notif.show();
+        
+        notif.on('click', () => {
+            if (mainWindow) {
+                mainWindow.show();
+                mainWindow.focus();
+            }
+        });
+    }
 });
 
 function performLogout() {
