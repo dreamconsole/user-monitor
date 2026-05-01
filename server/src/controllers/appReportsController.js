@@ -186,6 +186,10 @@ export const getBrowserActivityDetails = async (req, res) => {
         const sourceGroupBy = hasSourceColumn ? ', bal.source' : '';
         const summarySourceSelect = hasSourceColumn ? 'MAX(bal.source) as source' : `'extension'::text as source`;
 
+        // TLD-stripping regex: removes .com, .net, .co.uk style TLDs
+        // Written as a plain string (not template literal) to avoid JS template interpolation of $
+        const tldRegex = '\\.[a-z]{2,6}(\\.[a-z]{2,3})?$';
+
         const domainBreakdown = await query(
             `SELECT 
                 COALESCE(bal.domain, bal.title) as domain,
@@ -194,15 +198,34 @@ export const getBrowserActivityDetails = async (req, res) => {
                 COUNT(*) as visit_count,
                 SUM(bal.duration_seconds) as total_seconds,
                 MAX(bal.title) as last_title,
-                ac.name as category_name,
-                ac.productivity_type
+                matched_dp.category_name,
+                matched_dp.productivity_type
              FROM browser_activity_logs bal
-             LEFT JOIN domain_productivity dp ON COALESCE(bal.domain, bal.title) = dp.domain AND dp.org_id = $2
-             LEFT JOIN app_categories ac ON dp.category_id = ac.id
+             LEFT JOIN LATERAL (
+                 SELECT dp.category_id, ac.name as category_name, ac.productivity_type
+                 FROM domain_productivity dp
+                 LEFT JOIN app_categories ac ON dp.category_id = ac.id
+                 WHERE dp.org_id = $2
+                   AND LENGTH(dp.domain) > 2
+                   AND (
+                         (bal.domain IS NOT NULL AND bal.domain != '' AND LOWER(bal.domain) LIKE '%' || LOWER(dp.domain) || '%')
+                      OR (bal.domain IS NOT NULL AND bal.domain != '' AND LOWER(dp.domain) LIKE '%' || LOWER(bal.domain) || '%')
+                      OR (LOWER(COALESCE(bal.title, '')) LIKE '%' || LOWER(dp.domain) || '%')
+                      OR (LENGTH(REGEXP_REPLACE(dp.domain, '` + tldRegex + `', '')) > 2
+                          AND LOWER(COALESCE(bal.title, '')) LIKE '%' || LOWER(REGEXP_REPLACE(dp.domain, '` + tldRegex + `', '')) || '%')
+                   )
+                 ORDER BY
+                     CASE WHEN bal.domain IS NOT NULL AND LOWER(bal.domain) = LOWER(dp.domain) THEN 0
+                          WHEN bal.domain IS NOT NULL AND LOWER(bal.domain) LIKE '%' || LOWER(dp.domain) || '%' THEN 1
+                          WHEN LOWER(COALESCE(bal.title, '')) LIKE '%' || LOWER(dp.domain) || '%' THEN 2
+                          ELSE 3 END,
+                     LENGTH(dp.domain) DESC
+                 LIMIT 1
+             ) matched_dp ON TRUE
              WHERE bal.user_id = $1 AND bal.org_id = $2
              AND bal.start_time::date >= $3::date AND bal.start_time::date <= $4::date
              ${browserFilter}
-             GROUP BY COALESCE(bal.domain, bal.title), bal.browser${sourceGroupBy}, ac.name, ac.productivity_type
+             GROUP BY COALESCE(bal.domain, bal.title), bal.browser${sourceGroupBy}, matched_dp.category_name, matched_dp.productivity_type
              ORDER BY total_seconds DESC
              LIMIT 50`,
             params
