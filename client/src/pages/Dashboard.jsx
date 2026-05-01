@@ -152,7 +152,10 @@ const AdminDashboard = ({ stats }) => {
                             <BarChart3 className="w-4 h-4" />
                             7-Day Productivity Trend
                         </CardTitle>
-                        <CardDescription>Ending on {dayLabel} (organization calendar).</CardDescription>
+                        <CardDescription>
+                            Ending on {dayLabel} (org calendar). Under each day: <span className="font-medium text-foreground">work</span> then{' '}
+                            <span className="font-medium text-foreground">idle</span> — same as the Work Hours and Productivity Mix cards for that date (the large number is not work+idle combined).
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="h-[240px] flex items-end justify-between gap-4 pt-4">
@@ -178,11 +181,12 @@ const AdminDashboard = ({ stats }) => {
                                                 title={`Idle: ${idleH.toFixed(1)}h`}
                                             />
                                         </div>
-                                        <div className="text-center">
-                                            <span className="text-[10px] text-muted-foreground uppercase block">
+                                        <div className="text-center leading-tight">
+                                            <span className="text-[10px] text-muted-foreground uppercase block mb-0.5">
                                                 {formatInTimeZone(parseISO(`${String(day.date).slice(0, 10)}T12:00:00.000Z`), orgTz, 'EEE')}
                                             </span>
-                                            <span className="text-[10px] font-bold">{totalH.toFixed(1)}h</span>
+                                            <span className="text-[10px] font-bold tabular-nums block text-foreground">{workH.toFixed(1)}h work</span>
+                                            <span className="text-[9px] text-muted-foreground tabular-nums">{idleH.toFixed(1)}h idle</span>
                                         </div>
                                     </div>
                                 );
