@@ -34,6 +34,7 @@ import {
     Megaphone,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import HeaderClocks from './HeaderClocks';
 import ThemeToggle from '../ThemeToggle';
 import useThemeStore from '@/lib/useThemeStore';
 import { hexToHSL } from '@/lib/colorUtils';
@@ -274,7 +275,9 @@ export default function Layout({ children }) {
                         </div>
                     </div>
 
-                    <div className="flex-1" />
+                    <div className="flex-1 flex items-center justify-start min-w-0 min-h-0 overflow-hidden">
+                        <HeaderClocks className="hidden lg:flex" />
+                    </div>
 
                     <div className="flex items-center gap-3">
                         <div className="flex flex-col items-end hidden sm:flex text-right">

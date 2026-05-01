@@ -69,6 +69,13 @@ class MonitorService {
         return Math.min(systemIdleTime, inputIdleTime);
     }
 
+    /** Raw system/input idle (seconds) for max-shift policy; non-zero on break so server can force logout after cap + idle. */
+    getShiftCapIdleSeconds() {
+        const systemIdleTime = powerMonitor.getSystemIdleTime();
+        const inputIdleTime = Math.floor((Date.now() - this.lastInputTime) / 1000);
+        return Math.min(systemIdleTime, inputIdleTime);
+    }
+
     start(campaignId = null) {
         console.log('Starting Monitor Service...');
         try {

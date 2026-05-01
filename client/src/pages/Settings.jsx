@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
+import useAuthStore from '@/lib/useAuthStore';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -11,6 +12,13 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** DB DECIMAL/NUMERIC often arrive as strings (e.g. "9.00"); SelectItem values are "9". */
+const hoursSelectValue = (v, fallback = 9) => {
+    const n = parseFloat(v);
+    if (Number.isFinite(n)) return String(n);
+    return String(fallback);
+};
 
 export default function Settings() {
     const [loading, setLoading] = useState(true);
@@ -47,12 +55,14 @@ export default function Settings() {
         try {
             const { data } = await api.get('/org/settings');
             // Ensure defaults if null
+            const ow = parseFloat(data.org_working_hours);
+            const sd = parseFloat(data.shift_duration);
             setSettings({
                 ...data,
                 shift_start_time: data.shift_start_time || '09:00',
                 shift_end_time: data.shift_end_time || '18:00',
-                org_working_hours: data.org_working_hours || 9.00,
-                shift_duration: data.shift_duration || 9.00,
+                org_working_hours: Number.isFinite(ow) ? ow : 9,
+                shift_duration: Number.isFinite(sd) ? sd : 9,
                 work_days: data.work_days || ["Mon", "Tue", "Wed", "Thu", "Fri"],
                 start_of_day: data.start_of_day || '00:00',
                 primary_color_light: data.primary_color_light || '#0f172a',
@@ -160,6 +170,7 @@ export default function Settings() {
                 primary_color_light: settings.primary_color_light,
                 primary_color_dark: settings.primary_color_dark
             });
+            await useAuthStore.getState().refreshUser();
             toast.success('Settings saved successfully!');
         } catch (error) {
             console.error('Failed to save settings:', error);
@@ -288,7 +299,7 @@ export default function Settings() {
                         <div className="space-y-2">
                             <Label>Org Working Hours</Label>
                             <Select
-                                value={settings.org_working_hours?.toString() || "9"}
+                                value={hoursSelectValue(settings.org_working_hours)}
                                 onValueChange={(v) => handleShiftDurationChange(v)}
                             >
                                 <SelectTrigger className="w-full">
@@ -316,7 +327,7 @@ export default function Settings() {
                         <div className="space-y-2">
                             <Label>User's Max Shift Duration</Label>
                             <Select
-                                value={settings.shift_duration?.toString() || "9"}
+                                value={hoursSelectValue(settings.shift_duration)}
                                 onValueChange={(v) => setSettings(prev => ({ ...prev, shift_duration: parseFloat(v) }))}
                             >
                                 <SelectTrigger className="w-full">

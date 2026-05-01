@@ -49,20 +49,22 @@ export default function CalendarView({
 
     return (
         <Card>
-            <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" className="h-10 w-10" onClick={onPrevMonth}>
-                            <ChevronLeft className="w-5 h-5" />
-                        </Button>
-                        <h2 className="text-xl font-semibold min-w-[220px] text-center">
-                            {getMonthName(year, month)}
-                        </h2>
-                        <Button variant="outline" size="icon" className="h-10 w-10" onClick={onNextMonth}>
-                            <ChevronRight className="w-5 h-5" />
-                        </Button>
-                    </div>
-                    <Button variant="outline" className="h-10 px-4 text-sm" onClick={onToday}>Today</Button>
+            <CardHeader className="pb-3 space-y-3">
+                <div className="w-full">
+                    <Button type="button" variant="outline" className="w-full h-10 text-sm" onClick={onToday}>
+                        Today
+                    </Button>
+                </div>
+                <div className="flex items-center justify-center gap-2 w-full">
+                    <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={onPrevMonth}>
+                        <ChevronLeft className="w-5 h-5" />
+                    </Button>
+                    <h2 className="text-xl font-semibold min-w-0 flex-1 text-center truncate px-1">
+                        {getMonthName(year, month)}
+                    </h2>
+                    <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={onNextMonth}>
+                        <ChevronRight className="w-5 h-5" />
+                    </Button>
                 </div>
             </CardHeader>
             <CardContent>

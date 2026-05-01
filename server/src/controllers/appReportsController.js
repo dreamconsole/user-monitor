@@ -1,4 +1,5 @@
 import { query } from '../db.js';
+import { managerCanAccessTeamMember, getManagerTeamIds } from '../utils/managerTeamAccess.js';
 
 // Admin dashboard - all users app usage summary
 export const getAdminDashboard = async (req, res) => {
@@ -38,7 +39,6 @@ export const getAdminDashboard = async (req, res) => {
 // Manager dashboard - team members only
 export const getManagerDashboard = async (req, res) => {
     const orgId = req.user.org_id;
-    const teamId = req.user.team_id;
     const { start_date, end_date } = req.query;
 
     if (!start_date || !end_date) {
@@ -46,6 +46,7 @@ export const getManagerDashboard = async (req, res) => {
     }
 
     try {
+        const teamIds = await getManagerTeamIds(req.user.id, orgId);
         const result = await query(
             `SELECT 
                 uas.user_id,
@@ -58,12 +59,12 @@ export const getManagerDashboard = async (req, res) => {
              FROM user_app_summary uas
              JOIN users u ON uas.user_id = u.id
              WHERE uas.org_id = $1 
-             AND u.team_id = $2
+             AND u.team_id = ANY($2::uuid[])
              AND u.role != 'orgadmin'
              AND uas.summary_date >= $3 AND uas.summary_date <= $4
              GROUP BY uas.user_id, u.full_name, u.email
              ORDER BY total_working_seconds DESC`,
-            [orgId, teamId, start_date, end_date]
+            [orgId, teamIds, start_date, end_date]
         );
 
         res.json(result.rows);
@@ -271,19 +272,9 @@ export const getProductivitySummary = async (req, res) => {
     }
 
     if (req.user.role === 'manager') {
-        if (!req.user.team_id) {
-            // Manager has no team — only allow viewing their own data
-            if (String(req.user.id) !== String(userId)) {
-                return res.status(403).json({ error: 'Unauthorized' });
-            }
-        } else {
-            const userCheck = await query(
-                `SELECT team_id FROM users WHERE id = $1 AND org_id = $2`,
-                [userId, orgId]
-            );
-            if (userCheck.rows.length === 0 || String(userCheck.rows[0].team_id) !== String(req.user.team_id)) {
-                return res.status(403).json({ error: 'Unauthorized' });
-            }
+        const may = await managerCanAccessTeamMember(req.user.id, orgId, userId);
+        if (!may) {
+            return res.status(403).json({ error: 'Unauthorized' });
         }
     }
 

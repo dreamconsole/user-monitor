@@ -1,4 +1,5 @@
 import { query } from '../db.js';
+import { managerCanAccessTeamMember } from '../utils/managerTeamAccess.js';
 
 // Log app usage from agent
 export const logAppUsage = async (req, res) => {
@@ -88,13 +89,8 @@ export const getUserAppUsage = async (req, res) => {
     }
 
     if (req.user.role === 'manager') {
-        // Check if user is under this manager
-        const userCheck = await query(
-            `SELECT team_id FROM users WHERE id = $1 AND org_id = $2`,
-            [userId, orgId]
-        );
-
-        if (userCheck.rows.length === 0 || userCheck.rows[0].team_id !== req.user.team_id) {
+        const may = await managerCanAccessTeamMember(req.user.id, orgId, userId);
+        if (!may) {
             return res.status(403).json({ error: 'Unauthorized: You can only view your team members' });
         }
     }

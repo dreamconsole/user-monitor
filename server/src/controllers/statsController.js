@@ -1,10 +1,43 @@
 import { query } from '../db.js';
+import { getManagerTeamIds, managerCanAccessTeamMember } from '../utils/managerTeamAccess.js';
+import { getOrgTimezone, getOrgTodayDateString, getOrgCurrentMonthString } from '../utils/orgTimezone.js';
+
+/** Org-calendar date (YYYY-MM-DD) for dashboard; optional `?date=` query, else today in org TZ. */
+async function resolveDashboardRefDate(req, orgId) {
+    const raw = req.query?.date;
+    if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return raw;
+    }
+    return getOrgTodayDateString(orgId);
+}
+
+/** Wall-clock hour/minute for an instant in an IANA zone (used for late-login vs org local 9:30). */
+function wallClockInZone(date, tz) {
+    try {
+        const parts = new Intl.DateTimeFormat('en-GB', {
+            timeZone: tz || 'UTC',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: false,
+        }).formatToParts(date);
+        const hour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
+        const minute = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+        return { hour, minute };
+    } catch {
+        const d = new Date(date);
+        return { hour: d.getUTCHours(), minute: d.getUTCMinutes() };
+    }
+}
 
 export const getAdminStats = async (req, res) => {
     const orgId = req.user.org_id;
     try {
         const orgInfo = await query('SELECT timezone FROM organizations WHERE id = $1', [orgId]);
         const orgTimezone = orgInfo.rows[0]?.timezone || 'UTC';
+
+        const refDate = await resolveDashboardRefDate(req, orgId);
+        const orgToday = await getOrgTodayDateString(orgId);
+        const isStatsToday = refDate === orgToday;
 
         const totalUsers = await query('SELECT COUNT(*) FROM users WHERE org_id = $1 AND deleted_at IS NULL', [orgId]);
 
@@ -19,30 +52,34 @@ export const getAdminStats = async (req, res) => {
                 SUM(total_work_seconds) as total_work,
                 SUM(total_idle_seconds) as total_idle
              FROM work_sessions 
-             WHERE org_id = $1 AND DATE(start_time) = CURRENT_DATE`,
-            [orgId]
+             WHERE org_id = $1 AND work_date = $2::date`,
+            [orgId, refDate]
         );
 
         const notLoggedIn = await query(
             `SELECT COUNT(*) FROM users u
-             LEFT JOIN work_sessions ws ON u.id = ws.user_id AND DATE(ws.start_time) = CURRENT_DATE
+             LEFT JOIN work_sessions ws ON u.id = ws.user_id 
+               AND ws.org_id = u.org_id 
+               AND ws.work_date = $2::date
              WHERE u.org_id = $1 AND ws.id IS NULL AND u.is_active = true AND u.deleted_at IS NULL`,
-            [orgId]
+            [orgId, refDate]
         );
 
         // --- NEW: Dashboard Analytics ---
 
-        // 1. Productivity Trend (Last 7 Days)
+        // 1. Productivity Trend (7 org-local days ending on refDate, keyed by work_date)
         const trend = await query(
             `SELECT 
-                DATE(start_time) as date, 
+                work_date as date, 
                 SUM(total_work_seconds) as work_seconds, 
                 SUM(total_idle_seconds) as idle_seconds
              FROM work_sessions 
-             WHERE org_id = $1 AND start_time > CURRENT_DATE - INTERVAL '7 days'
-             GROUP BY DATE(start_time)
-             ORDER BY date ASC`,
-            [orgId]
+             WHERE org_id = $1 
+               AND work_date >= $2::date - INTERVAL '6 days'
+               AND work_date <= $2::date
+             GROUP BY work_date
+             ORDER BY work_date ASC`,
+            [orgId, refDate]
         );
 
         // 2. Status Distribution (Online vs Offline)
@@ -63,6 +100,8 @@ export const getAdminStats = async (req, res) => {
             totalIdleHours: (parseInt(todayStats.rows[0].total_idle || 0) / 3600).toFixed(1),
             notLoggedInCount: parseInt(notLoggedIn.rows[0].count),
             orgTimezone,
+            statsDate: refDate,
+            isStatsToday,
             productivityTrend: trend.rows,
             statusDistribution: {
                 online: parseInt(statusDist.rows[0].online || 0),
@@ -77,7 +116,11 @@ export const getAdminStats = async (req, res) => {
 
 export const getManagerStats = async (req, res) => {
     const orgId = req.user.org_id;
-    const teamId = req.user.team_id;
+    const orgTimezone = await getOrgTimezone(orgId);
+    const refDate = await resolveDashboardRefDate(req, orgId);
+    const orgToday = await getOrgTodayDateString(orgId);
+    const isStatsToday = refDate === orgToday;
+    const teamIds = await getManagerTeamIds(req.user.id, orgId);
     try {
         const teamStats = await query(
             `SELECT 
@@ -88,16 +131,18 @@ export const getManagerStats = async (req, res) => {
                 ws.start_time,
                 u.last_heartbeat
              FROM users u
-             LEFT JOIN work_sessions ws ON u.id = ws.user_id AND DATE(ws.start_time) = CURRENT_DATE
-             WHERE u.org_id = $1 AND (u.team_id = $2 OR u.id = $3) AND u.deleted_at IS NULL AND u.role != 'orgadmin'`,
-            [orgId, teamId, req.user.id]
+             LEFT JOIN work_sessions ws ON u.id = ws.user_id 
+               AND ws.org_id = u.org_id 
+               AND ws.work_date = $4::date
+             WHERE u.org_id = $1 AND (u.id = $2 OR u.team_id = ANY($3::uuid[])) AND u.deleted_at IS NULL AND u.role != 'orgadmin'`,
+            [orgId, req.user.id, teamIds, refDate]
         );
 
-        // Simple late login detection (e.g., after 9:30 AM)
-        const lateLogins = teamStats.rows.filter(r => {
+        // Late login vs org-local wall clock (e.g. after 9:30 AM in organization timezone)
+        const lateLogins = teamStats.rows.filter((r) => {
             if (!r.start_time) return false;
-            const start = new Date(r.start_time);
-            return start.getHours() > 9 || (start.getHours() === 9 && start.getMinutes() > 30);
+            const { hour, minute } = wallClockInZone(new Date(r.start_time), orgTimezone);
+            return hour > 9 || (hour === 9 && minute > 30);
         });
 
         const highIdle = teamStats.rows.filter(r => {
@@ -111,18 +156,19 @@ export const getManagerStats = async (req, res) => {
         // 1. Team Productivity Trend (Last 7 Days)
         const trend = await query(
             `SELECT 
-                DATE(ws.start_time) as date, 
+                ws.work_date as date, 
                 SUM(ws.total_work_seconds) as work_seconds, 
                 SUM(ws.total_idle_seconds) as idle_seconds
              FROM work_sessions ws
              JOIN users u ON u.id = ws.user_id
              WHERE u.org_id = $1 AND u.deleted_at IS NULL
-               AND (u.team_id = $2 OR u.id = $3)
+               AND (u.id = $2 OR u.team_id = ANY($3::uuid[]))
                AND u.role != 'orgadmin'
-               AND ws.start_time > CURRENT_DATE - INTERVAL '7 days'
-             GROUP BY DATE(ws.start_time)
-             ORDER BY date ASC`,
-            [orgId, teamId, req.user.id]
+               AND ws.work_date >= $4::date - INTERVAL '6 days'
+               AND ws.work_date <= $4::date
+             GROUP BY ws.work_date
+             ORDER BY ws.work_date ASC`,
+            [orgId, req.user.id, teamIds, refDate]
         );
 
         // 2. Team Status Distribution
@@ -146,6 +192,9 @@ export const getManagerStats = async (req, res) => {
             lateLoginsCount: lateLogins.length,
             highIdleCount: highIdle.length,
             productivityTrend: trend.rows,
+            orgTimezone,
+            statsDate: refDate,
+            isStatsToday,
             statusDistribution: {
                 online: onlineCount,
                 offline: offlineCount
@@ -163,28 +212,39 @@ export const getUserStats = async (req, res) => {
     try {
         const user = await query('SELECT timezone FROM users WHERE id = $1', [userId]);
         const userTimezone = user.rows[0]?.timezone || 'UTC';
+        const orgTimezone = await getOrgTimezone(orgId);
+
+        const refDate = await resolveDashboardRefDate(req, orgId);
+        const orgToday = await getOrgTodayDateString(orgId);
+        const isStatsToday = refDate === orgToday;
 
         const today = await query(
             `SELECT * FROM work_sessions 
-             WHERE user_id = $1 AND DATE(start_time) = CURRENT_DATE`,
-            [userId]
+             WHERE user_id = $1 
+               AND work_date = $2::date`,
+            [userId, refDate]
         );
 
         const weekly = await query(
             `SELECT 
-                DATE(start_time) as date,
+                work_date as date,
                 SUM(total_work_seconds) / 3600.0 as hours
              FROM work_sessions 
-             WHERE user_id = $1 AND DATE(start_time) > CURRENT_DATE - INTERVAL '7 days'
-             GROUP BY DATE(start_time)
-             ORDER BY DATE(start_time) ASC`,
-            [userId]
+             WHERE user_id = $1 
+               AND work_date >= $2::date - INTERVAL '6 days'
+               AND work_date <= $2::date
+             GROUP BY work_date
+             ORDER BY work_date ASC`,
+            [userId, refDate]
         );
 
         res.json({
             today: today.rows[0] || null,
             weekly: weekly.rows,
-            userTimezone
+            userTimezone,
+            orgTimezone,
+            statsDate: refDate,
+            isStatsToday
         });
     } catch (error) {
         console.error('getUserStats error:', error);
@@ -201,11 +261,8 @@ export const getUserHourlyStats = async (req, res) => {
     if (req.user.role !== 'orgadmin' && String(req.user.id) !== String(userId)) {
         // If manager, check if user reports to them
         if (req.user.role === 'manager') {
-            if (!req.user.team_id) {
-                return res.status(403).json({ error: 'Unauthorized to view this user stats' });
-            }
-            const userCheck = await query('SELECT team_id, role FROM users WHERE id = $1', [userId]);
-            if (userCheck.rows.length === 0 || String(userCheck.rows[0].team_id) !== String(req.user.team_id) || userCheck.rows[0].role === 'orgadmin') {
+            const may = await managerCanAccessTeamMember(req.user.id, orgId, userId);
+            if (!may) {
                 return res.status(403).json({ error: 'Unauthorized to view this user stats' });
             }
         } else {
@@ -214,7 +271,9 @@ export const getUserHourlyStats = async (req, res) => {
     }
 
     try {
-        const queryDate = date || new Date().toISOString().split('T')[0];
+        const orgTimezone = await getOrgTimezone(orgId);
+        const orgTodayStr = await getOrgTodayDateString(orgId);
+        const queryDate = date || orgTodayStr;
 
         // 1. Hourly Stats (Existing Logic)
         const sqlHourly = `
@@ -224,7 +283,7 @@ export const getUserHourlyStats = async (req, res) => {
                 SUM(total_idle_seconds) as idle_seconds
             FROM work_sessions
             WHERE user_id = $1 
-              AND DATE(start_time) = $2
+              AND work_date = $2::date
               AND org_id = $3
             GROUP BY EXTRACT(HOUR FROM start_time)
             ORDER BY hour ASC
@@ -251,15 +310,17 @@ export const getUserHourlyStats = async (req, res) => {
             SELECT 
                 SUM(total_work_seconds) as total_work,
                 SUM(total_idle_seconds) as total_idle,
-                (SELECT SUM(duration_seconds) FROM break_logs WHERE user_id = $1 AND DATE(start_time) = $2) as total_break
+                (SELECT SUM(duration_seconds) FROM break_logs 
+                 WHERE user_id = $1 AND org_id = $4 
+                   AND (start_time AT TIME ZONE $5)::date = $2::date) as total_break
             FROM work_sessions
-            WHERE user_id = $1 AND DATE(start_time) = $2 AND org_id = $3
+            WHERE user_id = $1 AND work_date = $2::date AND org_id = $3
         `;
-        const resultTotals = await query(sqlTotals, [userId, queryDate, orgId]);
+        const resultTotals = await query(sqlTotals, [userId, queryDate, orgId, orgId, orgTimezone]);
 
         // Check current status for "Today" view (if querying today)
         let currentStatus = 'offline';
-        if (queryDate === new Date().toISOString().split('T')[0]) {
+        if (queryDate === orgTodayStr) {
             const userStatus = await query(
                 `SELECT last_heartbeat, current_state,
                   EXISTS(SELECT 1 FROM break_logs WHERE user_id = $1 AND end_time IS NULL) as on_break
@@ -286,14 +347,14 @@ export const getUserHourlyStats = async (req, res) => {
         const sqlLogs = `
             SELECT 'session' as type, start_time, end_time, total_work_seconds as duration, total_idle_seconds as idle
             FROM work_sessions
-            WHERE user_id = $1 AND DATE(start_time) = $2
+            WHERE user_id = $1 AND work_date = $2::date AND org_id = $3
             UNION ALL
             SELECT 'break' as type, start_time, end_time, duration_seconds as duration, 0 as idle
             FROM break_logs
-            WHERE user_id = $1 AND DATE(start_time) = $2
+            WHERE user_id = $1 AND org_id = $3 AND (start_time AT TIME ZONE $4)::date = $2::date
             ORDER BY start_time DESC
         `;
-        const resultLogs = await query(sqlLogs, [userId, queryDate]);
+        const resultLogs = await query(sqlLogs, [userId, queryDate, orgId, orgTimezone]);
 
         res.json({
             hourly: hourlyData,
@@ -326,12 +387,8 @@ export const getTimelineData = async (req, res) => {
         // Regular users can only view their own timeline
         targetUserId = req.user.id;
     } else if (req.user.role === 'manager' && targetUserId && String(targetUserId) !== String(req.user.id)) {
-        // Managers can only view their direct reports (non-admins)
-        if (!req.user.team_id) {
-            return res.status(403).json({ error: 'Unauthorized: not your direct report' });
-        }
-        const userCheck = await query('SELECT team_id, role FROM users WHERE id = $1 AND org_id = $2', [targetUserId, orgId]);
-        if (userCheck.rows.length === 0 || String(userCheck.rows[0].team_id) !== String(req.user.team_id) || userCheck.rows[0].role === 'orgadmin') {
+        const may = await managerCanAccessTeamMember(req.user.id, orgId, targetUserId);
+        if (!may) {
             return res.status(403).json({ error: 'Unauthorized: not your direct report' });
         }
     }
@@ -356,8 +413,8 @@ export const getTimelineData = async (req, res) => {
 };
 
 async function handleMonthView(req, res, userId, orgId, month) {
-    // month = "2026-02" => first day to last day
-    const targetMonth = month || new Date().toISOString().slice(0, 7);
+    // month = "2026-02" => first day to last day (default: current month in org TZ)
+    const targetMonth = month || (await getOrgCurrentMonthString(orgId));
     const startDate = `${targetMonth}-01`;
     // Calculate last day of month
     const [y, m] = targetMonth.split('-').map(Number);
@@ -373,7 +430,8 @@ async function handleMonthView(req, res, userId, orgId, month) {
             MIN(ws.start_time) as first_clock_in,
             MAX(ws.end_time) as last_clock_out,
             (SELECT COUNT(*) FROM screenshots s
-             WHERE s.user_id = $1 AND s.captured_at::date = ws.work_date) as screenshot_count
+             WHERE s.user_id = $1 AND s.org_id = $2
+               AND (s.captured_at AT TIME ZONE (SELECT COALESCE(o.timezone, 'UTC') FROM organizations o WHERE o.id = s.org_id))::date = ws.work_date) as screenshot_count
          FROM work_sessions ws
          WHERE ws.user_id = $1 AND ws.org_id = $2
            AND ws.work_date BETWEEN $3 AND $4
@@ -398,10 +456,8 @@ async function handleMonthView(req, res, userId, orgId, month) {
 }
 
 async function handleDayView(req, res, userId, orgId, date) {
-    const targetDate = date || new Date().toISOString().split('T')[0];
-
-    const orgTzQuery = await query('SELECT timezone FROM organizations WHERE id = $1', [orgId]);
-    const orgTz = orgTzQuery.rows[0]?.timezone || 'UTC';
+    const orgTz = await getOrgTimezone(orgId);
+    const targetDate = date || (await getOrgTodayDateString(orgId));
 
     // 1. Work Sessions
     const sessionsResult = await query(

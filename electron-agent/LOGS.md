@@ -2,6 +2,10 @@
 
 All updates to the electron-agent are tracked here.
 
+## 1.1.1 - 2026-05-01
+### Changes
+- [Feature] Heartbeat sends `shift_cap_idle_seconds` (system/input idle regardless of break) so the server can enforce max shift duration + 30m idle logout while on break.
+
 ## 1.1.0 - 2026-02-20
 ### Changes
 - [Feature] Dynamic fetching and application of feature configurations (AFK, screenshots).

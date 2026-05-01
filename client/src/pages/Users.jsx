@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -17,7 +17,7 @@ import useWebSocket from '@/lib/useWebSocket';
 
 export default function Users() {
     const { user: currentUser } = useAuthStore();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [users, setUsers] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -35,7 +35,12 @@ export default function Users() {
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
     const [accountFilter, setAccountFilter] = useState('all');
-    const filterStatus = searchParams.get('status'); // 'offline' or 'online' from URL
+    /** Presence filter: URL ?status=online|offline — kept in sync via Select + setSearchParams */
+    const presenceFilter = useMemo(() => {
+        const raw = searchParams.get('status')?.toLowerCase();
+        if (raw === 'online' || raw === 'offline') return raw;
+        return 'all';
+    }, [searchParams]);
     const [hbInterval, setHbInterval] = useState(300); // Default 5 mins
 
     const fetchOrgSettings = async () => {
@@ -73,8 +78,8 @@ export default function Users() {
                     ? { ...u, last_heartbeat: null, is_on_break: false }
                     : u
             ));
-        } else if (message.type === 'HEARTBEAT') {
-            // Optional: update last_heartbeat in real-time if broadcasted
+        } else if (message.type === 'USER_HEARTBEAT' || message.type === 'HEARTBEAT') {
+            // Keep user list live; server uses USER_HEARTBEAT
             setUsers(prev => prev.map(u =>
                 u.id === message.userId
                     ? { ...u, last_heartbeat: message.timestamp }
@@ -113,14 +118,14 @@ export default function Users() {
             result = result.filter(u => u.status === 'suspended');
         }
 
-        // Online/Offline filter from URL params
-        if (filterStatus === 'offline') {
+        // Online / offline (same logic as dashboard links ?status=)
+        if (presenceFilter === 'offline') {
             const now = Date.now();
             result = result.filter(u => {
                 if (!u.last_heartbeat) return true;
                 return (now - new Date(u.last_heartbeat).getTime()) > hbThreshold;
             });
-        } else if (filterStatus === 'online') {
+        } else if (presenceFilter === 'online') {
             const now = Date.now();
             result = result.filter(u => {
                 if (!u.last_heartbeat) return false;
@@ -129,7 +134,14 @@ export default function Users() {
         }
 
         setFilteredUsers(result);
-    }, [users, searchQuery, roleFilter, accountFilter, filterStatus]);
+    }, [users, searchQuery, roleFilter, accountFilter, presenceFilter, hbInterval]);
+
+    const setPresenceFilter = (value) => {
+        const next = new URLSearchParams(searchParams);
+        if (value === 'all') next.delete('status');
+        else next.set('status', value);
+        setSearchParams(next, { replace: true });
+    };
 
     const handleCreate = () => {
         setEditingUser(null);
@@ -276,14 +288,30 @@ export default function Users() {
                         <SelectItem value="suspended">Suspended</SelectItem>
                     </SelectContent>
                 </Select>
-                {filterStatus && (
-                    <Badge variant="secondary" className="px-3 py-1.5 flex items-center gap-1">
-                        {filterStatus}
-                        <a href="/users" className="ml-1 hover:text-primary"><X className="w-3 h-3" /></a>
-                    </Badge>
-                )}
-                {(searchQuery || roleFilter !== 'all' || accountFilter !== 'all') && (
-                    <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setRoleFilter('all'); setAccountFilter('all'); }} className="h-9 gap-1 text-muted-foreground">
+                <Select value={presenceFilter} onValueChange={setPresenceFilter}>
+                    <SelectTrigger className="w-[160px] h-9">
+                        <SelectValue placeholder="Presence" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All (presence)</SelectItem>
+                        <SelectItem value="online">Online</SelectItem>
+                        <SelectItem value="offline">Offline</SelectItem>
+                    </SelectContent>
+                </Select>
+                {(searchQuery || roleFilter !== 'all' || accountFilter !== 'all' || presenceFilter !== 'all') && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            setSearchQuery('');
+                            setRoleFilter('all');
+                            setAccountFilter('all');
+                            const next = new URLSearchParams(searchParams);
+                            next.delete('status');
+                            setSearchParams(next, { replace: true });
+                        }}
+                        className="h-9 gap-1 text-muted-foreground"
+                    >
                         <X className="h-3 w-3" /> Clear
                     </Button>
                 )}

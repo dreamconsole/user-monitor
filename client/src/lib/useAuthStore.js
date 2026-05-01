@@ -88,6 +88,17 @@ const useAuthStore = create((set, get) => ({
         }
     },
 
+    refreshUser: async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+            const { data } = await api.get('/auth/me');
+            set({ user: data, token });
+        } catch (e) {
+            console.error('refreshUser failed:', e);
+        }
+    },
+
     hasRole: (roles) => {
         const user = get().user;
         if (!user) return false;

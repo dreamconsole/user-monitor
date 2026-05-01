@@ -28,6 +28,9 @@ export const getWorkDate = (timestamp, timezone) => {
     return format(zonedDate, 'yyyy-MM-dd', { timeZone: timezone || 'UTC' });
 };
 
+/** Calendar "today" as YYYY-MM-DD in the given IANA timezone (client clock). */
+export const getTodayInTimezone = (timezone) => getWorkDate(new Date(), timezone);
+
 /**
  * Returns the browser's current IANA timezone.
  * @returns {string}

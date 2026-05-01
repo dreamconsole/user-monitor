@@ -1,4 +1,6 @@
 import { query } from '../db.js';
+import { managerCanAccessTeamMember, getManagerTeamIds } from '../utils/managerTeamAccess.js';
+import { getOrgTodayDateString } from '../utils/orgTimezone.js';
 
 /**
  * Resolve target user ID with role-based access control.
@@ -32,11 +34,8 @@ async function resolveTargetUser(req, orgId) {
         if (requestedUserId === currentUserId) {
             return { targetUserId: currentUserId };
         }
-        const userCheck = await query(
-            'SELECT team_id FROM users WHERE id = $1 AND org_id = $2',
-            [requestedUserId, orgId]
-        );
-        if (userCheck.rows.length === 0 || userCheck.rows[0].team_id !== req.user.team_id) {
+        const ok = await managerCanAccessTeamMember(currentUserId, orgId, requestedUserId);
+        if (!ok) {
             return { error: 'Unauthorized: not on your team' };
         }
         return { targetUserId: requestedUserId };
@@ -97,7 +96,7 @@ async function calculateProductivityScore(userId, orgId, startDate, endDate) {
          INNER JOIN app_categories ac ON dp.category_id = ac.id
          WHERE bal.user_id = $1
            AND bal.org_id = $2
-           AND DATE(bal.start_time) BETWEEN $3 AND $4`,
+           AND (bal.start_time AT TIME ZONE (SELECT COALESCE(o.timezone, 'UTC') FROM organizations o WHERE o.id = $2))::date BETWEEN $3::date AND $4::date`,
         [userId, orgId, startDate, endDate]
     );
 
@@ -108,23 +107,29 @@ async function calculateProductivityScore(userId, orgId, startDate, endDate) {
 
     const totalAppSeconds = productiveSeconds + nonProductiveSeconds + neutralSeconds;
 
+    /** No logged work in range → do not award "perfect" scores on other axes (was scoring ~70 with 0% attendance). */
+    const hasWorked = totalWorkSeconds > 0;
+
     const attendance = expectedShiftSeconds > 0
         ? Math.min(100, (totalWorkSeconds / expectedShiftSeconds) * 100)
         : 100;
 
-    const activity = totalWorkSeconds > 0
+    const activity = hasWorked
         ? Math.min(100, ((totalWorkSeconds - totalIdleSeconds) / totalWorkSeconds) * 100)
-        : 100;
+        : 0;
 
-    let breaks = 100;
-    if (allowedBreakSeconds > 0 && totalBreakSeconds > allowedBreakSeconds) {
-        const excess = totalBreakSeconds - allowedBreakSeconds;
-        breaks = Math.max(0, 100 - (excess / allowedBreakSeconds) * 100);
+    let breaks = 0;
+    if (hasWorked) {
+        breaks = 100;
+        if (allowedBreakSeconds > 0 && totalBreakSeconds > allowedBreakSeconds) {
+            const excess = totalBreakSeconds - allowedBreakSeconds;
+            breaks = Math.max(0, 100 - (excess / allowedBreakSeconds) * 100);
+        }
     }
 
     const appProductivity = totalAppSeconds > 0
         ? (productiveSeconds / totalAppSeconds) * 100
-        : 100;
+        : (hasWorked ? 100 : 0);
 
     const score = Math.round(
         attendance * 0.30 +
@@ -213,7 +218,7 @@ export const getProductivityScore = async (req, res) => {
     }
     const targetUserId = resolved.targetUserId;
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = await getOrgTodayDateString(orgId);
     const startDate = req.query.startDate || today;
     const endDate = req.query.endDate || today;
 
@@ -255,22 +260,23 @@ export const getTeamProductivity = async (req, res) => {
         return res.status(403).json({ error: 'Access denied: insufficient permissions' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = await getOrgTodayDateString(orgId);
     const startDate = req.query.startDate || today;
     const endDate = req.query.endDate || today;
 
     try {
         let usersResult;
         if (role === 'manager') {
+            const teamIds = await getManagerTeamIds(req.user.id, orgId);
             usersResult = await query(
                 `SELECT u.id, u.full_name, u.team_id, t.name as team_name
                  FROM users u
                  LEFT JOIN teams t ON u.team_id = t.id
                  WHERE u.org_id = $1 
-                   AND (u.team_id = $2 OR u.id = $3)
+                   AND (u.id = $2 OR u.team_id = ANY($3::uuid[]))
                    AND u.role != 'orgadmin'
                    AND u.is_active = true`,
-                [orgId, req.user.team_id, req.user.id]
+                [orgId, req.user.id, teamIds]
             );
         } else {
             usersResult = await query(
@@ -315,7 +321,7 @@ export const getTeamsProductivity = async (req, res) => {
         return res.status(403).json({ error: 'Access denied: only administrators can compare multiple teams' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = await getOrgTodayDateString(orgId);
     const startDate = req.query.startDate || today;
     const endDate = req.query.endDate || today;
 

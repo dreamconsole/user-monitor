@@ -1,11 +1,14 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 import useAuthStore from '@/lib/useAuthStore';
 import useWebSocket from '@/lib/useWebSocket';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Activity,
     Users as UsersIcon,
@@ -17,7 +20,9 @@ import {
     BarChart3,
     Calendar
 } from 'lucide-react';
-import { utcToLocal } from '@/lib/dateUtils';
+import { utcToLocal, getTodayInTimezone } from '@/lib/dateUtils';
+import { format, subDays, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 const KpiCard = ({ label, value, icon: Icon, desc, color }) => (
     <Card className="shadow-sm">
@@ -33,7 +38,7 @@ const KpiCard = ({ label, value, icon: Icon, desc, color }) => (
 );
 
 const AdminDashboard = ({ stats }) => {
-    // Normalize trend data to always render 7 bars.
+    // Normalize trend data to always render 7 bars (anchored to stats.statsDate from API).
     const trendMap = new Map(
         (stats.productivityTrend || []).map((item) => [
             String(item.date).slice(0, 10),
@@ -44,11 +49,13 @@ const AdminDashboard = ({ stats }) => {
             }
         ])
     );
+    const orgTz = stats.orgTimezone || 'UTC';
+    const anchorDay = stats.statsDate || getTodayInTimezone(orgTz);
+    const trendAnchor = parseISO(`${anchorDay}T12:00:00.000Z`);
+    const dayLabel = formatInTimeZone(parseISO(`${anchorDay}T12:00:00.000Z`), orgTz, 'MMM d, yyyy');
     const trendData = Array.from({ length: 7 }, (_, idx) => {
-        const d = new Date();
-        d.setHours(0, 0, 0, 0);
-        d.setDate(d.getDate() - (6 - idx));
-        const key = d.toISOString().slice(0, 10);
+        const d = subDays(trendAnchor, 6 - idx);
+        const key = format(d, 'yyyy-MM-dd');
         return trendMap.get(key) || { date: key, work_seconds: 0, idle_seconds: 0 };
     });
     const maxHours = Math.max(
@@ -78,22 +85,22 @@ const AdminDashboard = ({ stats }) => {
                         label="Active Now"
                         value={stats.activeUsers}
                         icon={Activity}
-                        desc="Agent sending heartbeats"
+                        desc={stats.isStatsToday === false ? 'Live now (not tied to selected date)' : 'Agent sending heartbeats'}
                         color="text-green-500 hover:bg-muted/50 transition-colors cursor-pointer"
                     />
                 </Link>
                 <KpiCard
-                    label="Work Hours Today"
+                    label="Work Hours"
                     value={`${stats.totalWorkHours}h`}
                     icon={Clock}
-                    desc="Cumulative across all users"
+                    desc={`All users · ${dayLabel}`}
                 />
                 <Link to="/users?status=offline">
                     <KpiCard
-                        label="Absent Today"
+                        label="Absent"
                         value={stats.notLoggedInCount}
                         icon={UserMinus}
-                        desc="Users with no session today"
+                        desc={`No session · ${dayLabel}`}
                         color="text-orange-500 hover:bg-muted/50 transition-colors cursor-pointer"
                     />
                 </Link>
@@ -104,7 +111,7 @@ const AdminDashboard = ({ stats }) => {
                 <Card className="shadow-sm col-span-1">
                     <CardHeader>
                         <CardTitle>Productivity Mix</CardTitle>
-                        <CardDescription>Work vs. Idle time today.</CardDescription>
+                        <CardDescription>Work vs. idle for {dayLabel}.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-6">
@@ -145,7 +152,7 @@ const AdminDashboard = ({ stats }) => {
                             <BarChart3 className="w-4 h-4" />
                             7-Day Productivity Trend
                         </CardTitle>
-                        <CardDescription>Daily active hours over the last week.</CardDescription>
+                        <CardDescription>Ending on {dayLabel} (organization calendar).</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="h-[240px] flex items-end justify-between gap-4 pt-4">
@@ -172,7 +179,9 @@ const AdminDashboard = ({ stats }) => {
                                             />
                                         </div>
                                         <div className="text-center">
-                                            <span className="text-[10px] text-muted-foreground uppercase block">{utcToLocal(day.date, stats.orgTimezone || 'UTC', 'EEE')}</span>
+                                            <span className="text-[10px] text-muted-foreground uppercase block">
+                                                {formatInTimeZone(parseISO(`${String(day.date).slice(0, 10)}T12:00:00.000Z`), orgTz, 'EEE')}
+                                            </span>
                                             <span className="text-[10px] font-bold">{totalH.toFixed(1)}h</span>
                                         </div>
                                     </div>
@@ -187,6 +196,11 @@ const AdminDashboard = ({ stats }) => {
             <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium">Real-time Workforce Status</CardTitle>
+                    {stats.isStatsToday === false && (
+                        <p className="text-xs text-muted-foreground font-normal mt-1">
+                            Based on live heartbeats — not the selected historical date.
+                        </p>
+                    )}
                 </CardHeader>
                 <CardContent>
                     <div className="h-8 w-full rounded-md overflow-hidden bg-muted/20 border">
@@ -222,6 +236,10 @@ const AdminDashboard = ({ stats }) => {
 }
 
 const ManagerDashboard = ({ stats }) => {
+    const displayTz = stats.orgTimezone || 'UTC';
+    const dayLabel = stats.statsDate
+        ? formatInTimeZone(parseISO(`${stats.statsDate}T12:00:00.000Z`), displayTz, 'MMM d, yyyy')
+        : '';
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-3">
@@ -250,7 +268,12 @@ const ManagerDashboard = ({ stats }) => {
             <Card className="shadow-sm">
                 <CardHeader>
                     <CardTitle>Team Activity Summary</CardTitle>
-                    <CardDescription>Real-time view of your team's work today.</CardDescription>
+                    <CardDescription>
+                        {dayLabel ? `Sessions and work for ${dayLabel} (org calendar).` : "Your team's work for the selected day."}
+                        {stats.isStatsToday === false && (
+                            <span className="block text-xs mt-1 text-muted-foreground">Online/offline counts below still reflect who is live now.</span>
+                        )}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="px-0">
                     <Table>
@@ -279,7 +302,7 @@ const ManagerDashboard = ({ stats }) => {
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-muted-foreground text-xs">
-                                            {member.start_time ? utcToLocal(member.start_time, member.timezone, 'HH:mm') : '---'}
+                                            {member.start_time ? utcToLocal(member.start_time, displayTz, 'HH:mm') : '---'}
                                         </TableCell>
                                         <TableCell className="pr-6 text-right">
                                             {member.start_time ? (
@@ -307,13 +330,17 @@ const UserDashboard = ({ stats }) => {
     const idleSecs = Number(today.total_idle_seconds || 0);
     const workHours = (workSecs / 3600).toFixed(1);
     const idleHours = (idleSecs / 3600).toFixed(1);
+    const tz = stats.orgTimezone || stats.userTimezone || 'UTC';
+    const dayLabel = stats.statsDate
+        ? formatInTimeZone(parseISO(`${stats.statsDate}T12:00:00.000Z`), tz, 'MMM d, yyyy')
+        : '';
 
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
                 <Card className="shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">My Work Today</CardTitle>
+                        <CardTitle className="text-sm font-medium">My Work {dayLabel ? `· ${dayLabel}` : ''}</CardTitle>
                         <Clock className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
@@ -340,7 +367,7 @@ const UserDashboard = ({ stats }) => {
                     <CardContent>
                         <div className="text-2xl font-bold capitalize">{today.status || 'No Active Session'}</div>
                         <p className="text-xs text-muted-foreground">
-                            {today.start_time ? `Started at ${utcToLocal(today.start_time, stats.userTimezone || 'UTC', 'HH:mm')}` : 'Please start the agent to track time'}
+                            {today.start_time ? `Started at ${utcToLocal(today.start_time, stats.orgTimezone || stats.userTimezone || 'UTC', 'HH:mm')}` : 'Please start the agent to track time'}
                         </p>
                     </CardContent>
                 </Card>
@@ -350,8 +377,10 @@ const UserDashboard = ({ stats }) => {
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle>Weekly Progress</CardTitle>
-                            <CardDescription>Your work hours for the last 7 days.</CardDescription>
+                            <CardTitle>7-Day Progress</CardTitle>
+                            <CardDescription>
+                                {dayLabel ? `Seven days ending ${dayLabel} (org calendar).` : 'Your work hours for the last 7 days.'}
+                            </CardDescription>
                         </div>
                         <BarChart3 className="h-5 w-5 text-muted-foreground" />
                     </div>
@@ -371,7 +400,9 @@ const UserDashboard = ({ stats }) => {
                                             {Number(day.hours).toFixed(1)}h
                                         </div>
                                     </div>
-                                    <span className="text-[10px] text-muted-foreground uppercase">{utcToLocal(day.date, stats.userTimezone || 'UTC', 'EEE')}</span>
+                                    <span className="text-[10px] text-muted-foreground uppercase">
+                                        {formatInTimeZone(parseISO(`${String(day.date).slice(0, 10)}T12:00:00.000Z`), stats.orgTimezone || stats.userTimezone || 'UTC', 'EEE')}
+                                    </span>
                                 </div>
                             ))
                         )}
@@ -384,30 +415,36 @@ const UserDashboard = ({ stats }) => {
 
 export default function Dashboard() {
     const { user } = useAuthStore();
+    const orgTz = user?.org_timezone || user?.timezone || 'UTC';
+    const [selectedDate, setSelectedDate] = useState(() => getTodayInTimezone(orgTz));
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [lastUpdate, setLastUpdate] = useState(null);
+    const loadedOnceRef = useRef(false);
 
     const fetchStats = useCallback(async () => {
+        if (!loadedOnceRef.current) setLoading(true);
         try {
             let endpoint = '/stats/user';
             if (user.role === 'orgadmin') endpoint = '/stats/admin';
             else if (user.role === 'manager') endpoint = '/stats/manager';
 
-            const { data } = await api.get(endpoint);
+            const { data } = await api.get(endpoint, {
+                params: selectedDate ? { date: selectedDate } : {},
+            });
             setStats(data);
             setLastUpdate(new Date());
+            loadedOnceRef.current = true;
         } catch (error) {
             console.error('Failed to fetch stats:', error);
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, selectedDate]);
 
     // WebSocket for real-time updates
     const handleWsMessage = useCallback((data) => {
         if (data.type === 'USER_HEARTBEAT' || data.type === 'ACTIVITY_UPDATE') {
-            // Refresh dashboard when we get real-time events
             fetchStats();
         }
     }, [fetchStats]);
@@ -417,6 +454,10 @@ export default function Dashboard() {
     useEffect(() => {
         if (user) fetchStats();
     }, [user, fetchStats]);
+
+    const maxSelectableDate = getTodayInTimezone(orgTz);
+
+    const goToOrgToday = () => setSelectedDate(maxSelectableDate);
 
     if (loading) return (
         <div className="flex items-center justify-center h-[50vh]">
@@ -431,14 +472,47 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex items-start justify-between">
-                <div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
                     <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.name}</h1>
-                    <p className="text-muted-foreground">Here's what's happening in {user.org_name || 'your organization'} today.</p>
+                    <p className="text-muted-foreground">
+                        Here&apos;s what&apos;s happening in {user.org_name || 'your organization'}
+                        {stats?.statsDate && stats?.isStatsToday === false
+                            ? ` for ${formatInTimeZone(parseISO(`${stats.statsDate}T12:00:00.000Z`), orgTz, 'MMM d, yyyy')}.`
+                            : '.'}
+                    </p>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-                    {connected ? 'Live' : 'Offline'}
+                <div className="flex flex-col gap-3 sm:items-end shrink-0 w-full sm:w-auto">
+                    <div className="flex flex-wrap items-end gap-3">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="dashboard-date" className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5" aria-hidden />
+                                Dashboard date (org calendar)
+                            </Label>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Input
+                                    id="dashboard-date"
+                                    type="date"
+                                    className="w-[160px] bg-background"
+                                    value={selectedDate}
+                                    max={maxSelectableDate}
+                                    onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+                                />
+                                <Button type="button" variant="outline" size="sm" onClick={goToOrgToday}>
+                                    Today
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground justify-end">
+                        <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+                        {connected ? 'Live' : 'Offline'}
+                        {lastUpdate && (
+                            <span className="hidden sm:inline opacity-70">
+                                · Updated {lastUpdate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 

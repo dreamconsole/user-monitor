@@ -4,6 +4,54 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { broadcastToManagers } from '../websocket.js';
 
+/** After org max shift hours from today's first check-in, force logout if idle this long (seconds). Applies during break. */
+const SHIFT_CAP_POST_MAX_IDLE_SEC = 30 * 60;
+
+/**
+ * Uses first heartbeat today (org TZ), else first work_session start today, else now.
+ * When past anchor + shift_duration hours and idleSeconds >= SHIFT_CAP_POST_MAX_IDLE_SEC, returns FORCE_LOGOUT.
+ */
+async function evaluateShiftDurationForceLogout(orgId, userId, state, statusField, idleSecondsRaw) {
+    if (idleSecondsRaw === undefined || idleSecondsRaw === null) return null;
+    const idleSeconds = Number(idleSecondsRaw);
+    if (!Number.isFinite(idleSeconds) || idleSeconds < SHIFT_CAP_POST_MAX_IDLE_SEC) return null;
+
+    const stateNorm = (state || statusField || '').toString().trim().toUpperCase();
+    if (stateNorm === 'OFFLINE') return null;
+
+    const meta = await query(
+        `SELECT o.timezone, o.shift_duration AS org_sd, u.shift_duration AS user_sd
+         FROM users u
+         JOIN organizations o ON o.id = u.org_id
+         WHERE u.id = $1 AND u.org_id = $2`,
+        [userId, orgId]
+    );
+    if (!meta.rows[0]) return null;
+    const tz = meta.rows[0].timezone || 'UTC';
+    const capHours = parseFloat(meta.rows[0].user_sd ?? meta.rows[0].org_sd);
+    if (!Number.isFinite(capHours) || capHours <= 0) return null;
+
+    const anchorRes = await query(
+        `SELECT COALESCE(
+            (SELECT MIN(h.last_seen_at) FROM heartbeats h
+             WHERE h.user_id = $1 AND h.org_id = $2
+               AND (h.last_seen_at AT TIME ZONE $3)::date = (CURRENT_TIMESTAMP AT TIME ZONE $3)::date),
+            (SELECT MIN(ws.start_time) FROM work_sessions ws
+             WHERE ws.user_id = $1 AND ws.org_id = $2
+               AND ws.work_date = (CURRENT_TIMESTAMP AT TIME ZONE $3)::date),
+            CURRENT_TIMESTAMP
+        ) AS anchor`,
+        [userId, orgId, tz]
+    );
+    const anchor = anchorRes.rows[0]?.anchor;
+    if (!anchor) return null;
+    const anchorMs = new Date(anchor).getTime();
+    if (!Number.isFinite(anchorMs)) return null;
+    const deadlineMs = anchorMs + capHours * 3600 * 1000;
+    if (Date.now() <= deadlineMs) return null;
+    return 'FORCE_LOGOUT';
+}
+
 export const getAssignedCampaigns = async (req, res) => {
     try {
         const { org_id, id: user_id } = req.user;
@@ -56,7 +104,7 @@ export const logHeartbeat = async (req, res) => {
         }
 
         // Update last_heartbeat_at in agent_sessions or insert if not exists
-        const { agent_version, device_name, state, current_idle_time } = req.body;
+        const { agent_version, device_name, state, current_idle_time, shift_cap_idle_seconds } = req.body;
         let { token } = req.body;
 
         // If token is missing in body, try to get it from context/headers
@@ -142,6 +190,13 @@ export const logHeartbeat = async (req, res) => {
                     }
                 }
             }
+        }
+
+        const idleForShiftCap = shift_cap_idle_seconds ?? current_idle_time;
+        const shiftCapCmd = await evaluateShiftDurationForceLogout(org_id, user_id, state, req.body.status, idleForShiftCap);
+        if (shiftCapCmd === 'FORCE_LOGOUT') {
+            console.log(`[logHeartbeat] Max shift duration + idle >= ${SHIFT_CAP_POST_MAX_IDLE_SEC}s; FORCE_LOGOUT user ${user_id}`);
+            return res.status(200).json({ success: true, command: 'FORCE_LOGOUT' });
         }
 
         // Broadcast heartbeat to managers for live dashboard updates
@@ -390,7 +445,13 @@ export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
     // Use passed orgId or fall back to user's org_id
     const finalOrgId = orgId || userOrgId;
 
-    // 2. Calculate Total Usage for Today
+    const orgTzRes = await query(
+        'SELECT COALESCE(timezone, \'UTC\') AS tz FROM organizations WHERE id = $1',
+        [finalOrgId]
+    );
+    const orgTz = orgTzRes.rows[0]?.tz || 'UTC';
+
+    // 2. Calculate Total Usage for Today (org-local calendar day)
     const usageRes = await query(
         `SELECT SUM(
             CASE 
@@ -402,8 +463,9 @@ export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
          FROM break_logs 
          WHERE user_id = $1 
            AND break_type_id = $2
-           AND start_time::DATE = CURRENT_DATE`,
-        [userId, breakTypeId]
+           AND org_id = $4
+           AND (start_time AT TIME ZONE $3)::date = (CURRENT_TIMESTAMP AT TIME ZONE $3)::date`,
+        [userId, breakTypeId, orgTz, finalOrgId]
     );
 
     const totalUsed = parseInt(usageRes.rows[0].total_used || 0);
@@ -435,8 +497,8 @@ export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
                        AND actor_id = $2 
                        AND type = 'BREAK_VIOLATION'
                        AND title LIKE $3
-                       AND created_at::DATE = CURRENT_DATE`,
-                    [manager_id, userId, `%${break_name}%`]
+                       AND (created_at AT TIME ZONE $4)::date = (CURRENT_TIMESTAMP AT TIME ZONE $4)::date`,
+                    [manager_id, userId, `%${break_name}%`, orgTz]
                 );
 
                 if (existingNotif.rows.length === 0) {

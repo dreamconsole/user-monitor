@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { query } from '../db.js';
+import { getManagerTeamIds, managerCanAccessTeamMember } from '../utils/managerTeamAccess.js';
 
 export const getUsers = async (req, res) => {
     try {
@@ -22,18 +23,12 @@ export const getUsers = async (req, res) => {
         let paramCount = 1;
 
         if (req.user.role === 'manager') {
-            // Exclude orgadmins from manager's view
             sql += ` AND u.role != 'orgadmin'`;
-            if (req.user.team_id) {
-                paramCount++;
-                sql += ` AND u.team_id = $${paramCount}`;
-                params.push(req.user.team_id);
-            } else {
-                // Manager has no team assigned — only show themselves
-                paramCount++;
-                sql += ` AND u.id = $${paramCount}`;
-                params.push(req.user.id);
-            }
+            const teamIds = await getManagerTeamIds(req.user.id, req.user.org_id);
+            paramCount++;
+            sql += ` AND (u.id = $${paramCount} OR u.team_id = ANY($${paramCount + 1}::uuid[]))`;
+            params.push(req.user.id, teamIds);
+            paramCount++;
         }
 
         if (search) {
@@ -130,7 +125,8 @@ export const updateUser = async (req, res) => {
             if (userCheck.rows.length === 0) {
                 return res.status(404).json({ error: 'User not found' });
             }
-            if (userCheck.rows[0].team_id !== req.user.team_id) {
+            const may = await managerCanAccessTeamMember(req.user.id, req.user.org_id, id);
+            if (!may) {
                 return res.status(403).json({ error: 'Unauthorized: You can only manage your team members.' });
             }
             // Prevent managers from changing roles or assigning new teams
@@ -238,8 +234,11 @@ export const resetUserPassword = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        if (req.user.role === 'manager' && userResult.rows[0].team_id !== req.user.team_id) {
-            return res.status(403).json({ error: 'You can only reset passwords for your team members' });
+        if (req.user.role === 'manager') {
+            const may = await managerCanAccessTeamMember(req.user.id, req.user.org_id, id);
+            if (!may) {
+                return res.status(403).json({ error: 'You can only reset passwords for your team members' });
+            }
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -256,6 +255,13 @@ export const forceLogoutUser = async (req, res) => {
     const { id } = req.params;
 
     try {
+        if (req.user.role === 'manager') {
+            const may = await managerCanAccessTeamMember(req.user.id, req.user.org_id, id);
+            if (!may) {
+                return res.status(403).json({ error: 'You can only force logout users on your teams' });
+            }
+        }
+
         // 1. Set force_logout flag and clear last_heartbeat to show offline immediately
         const userUpdate = await query(
             'UPDATE users SET force_logout = true, last_heartbeat = NULL WHERE id = $1 AND org_id = $2 RETURNING id',

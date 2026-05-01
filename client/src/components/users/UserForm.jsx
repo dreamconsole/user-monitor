@@ -119,23 +119,28 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
 
     const roleWatch = watch('role');
     const workDaysWatch = watch('work_days');
+    const teamIdWatch = watch('team_id');
 
     useEffect(() => {
         if (user) {
-            setValue('name', user.name);
-            setValue('role', user.role);
-            setValue('status', user.status);
-            setValue('team_id', user.team_id ? String(user.team_id) : '');
-            setValue('timezone', user.timezone || getBrowserTimezone());
-            setValue('emp_id', user.emp_id || '');
-            setValue('payroll_id', user.payroll_id || '');
-            setValue('site', user.site || '');
-            setValue('force_logout', user.force_logout || false);
-
-            // Shift settings
-            setValue('shift_start_time', user.shift_start_time || null);
-            setValue('shift_end_time', user.shift_end_time || null);
-            setValue('work_days', user.work_days || null);
+            // Reset the form in one shot so controlled Selects
+            // reliably reflect existing values when editing.
+            reset({
+                name: user.name || '',
+                email: user.email || '',
+                password: '',
+                role: user.role || 'user',
+                status: user.status || 'active',
+                team_id: user.team_id ? String(user.team_id) : '',
+                timezone: user.timezone || getBrowserTimezone(),
+                emp_id: user.emp_id || '',
+                payroll_id: user.payroll_id || '',
+                site: user.site || '',
+                force_logout: !!user.force_logout,
+                shift_start_time: user.shift_start_time || null,
+                shift_end_time: user.shift_end_time || null,
+                work_days: user.work_days || null
+            });
 
             setOverrides({
                 shift_start_time: !!user.shift_start_time,
@@ -159,7 +164,18 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                 work_days: null
             });
         }
-    }, [user, setValue, reset]);
+    }, [user, reset]);
+
+    // Teams load async; Radix Select won't render a label until the matching SelectItem exists.
+    // Once teams arrive, re-apply the current user's team_id so the trigger shows the selection.
+    useEffect(() => {
+        if (!isEdit || !user?.team_id) return;
+        if (!teams.length) return;
+        const teamId = String(user.team_id);
+        if (teamIdWatch !== teamId) {
+            setValue('team_id', teamId, { shouldDirty: false, shouldTouch: false, shouldValidate: false });
+        }
+    }, [isEdit, user?.team_id, teams.length, teamIdWatch, setValue]);
 
     const handleFormSubmit = async (data) => {
         // Prepare features data if edited
@@ -312,7 +328,11 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                 {roleWatch !== 'orgadmin' && (
                     <div className="space-y-2">
                         <Label>Team (Required)</Label>
-                        <Select onValueChange={(val) => setValue('team_id', val)} value={watch('team_id')}>
+                        <Select
+                            key={`${teamIdWatch || 'none'}-${teams.length}`}
+                            onValueChange={(val) => setValue('team_id', val)}
+                            value={teamIdWatch}
+                        >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select team" />
                             </SelectTrigger>

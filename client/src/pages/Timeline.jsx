@@ -10,8 +10,7 @@ import UserSearchSelect from '@/components/UserSearchSelect';
 import { CalendarDays } from 'lucide-react';
 import CalendarView from '@/components/timeline/CalendarView';
 import DailyTimeline from '@/components/timeline/DailyTimeline';
-
-const TODAY = new Date().toISOString().split('T')[0];
+import { getTodayInTimezone } from '@/lib/dateUtils';
 
 export default function Timeline() {
     const { user } = useAuthStore();
@@ -20,7 +19,7 @@ export default function Timeline() {
     const [year, setYear] = useState(new Date().getFullYear());
     const [month, setMonth] = useState(new Date().getMonth() + 1);
     const [monthData, setMonthData] = useState([]);
-    const [selectedDate, setSelectedDate] = useState(TODAY);
+    const [selectedDate, setSelectedDate] = useState(() => getTodayInTimezone('UTC'));
     const [dayData, setDayData] = useState(null);
     const [loadingMonth, setLoadingMonth] = useState(false);
     const [loadingDay, setLoadingDay] = useState(false);
@@ -29,6 +28,16 @@ export default function Timeline() {
     const isAdmin = user?.role === 'orgadmin';
     const isManager = user?.role === 'manager';
     const showPicker = isAdmin || isManager;
+
+    useEffect(() => {
+        if (!user) return;
+        const t = user.org_timezone || user.timezone || 'UTC';
+        const d = getTodayInTimezone(t);
+        setSelectedDate(d);
+        const [y, mo] = d.split('-');
+        setYear(Number(y));
+        setMonth(Number(mo));
+    }, [user?.org_timezone, user?.timezone]);
 
     // Fetch users for the picker
     useEffect(() => {
@@ -88,10 +97,12 @@ export default function Timeline() {
         else setMonth(m => m + 1);
     };
     const goToday = () => {
-        const now = new Date();
-        setYear(now.getFullYear());
-        setMonth(now.getMonth() + 1);
-        setSelectedDate(TODAY);
+        const t = user?.org_timezone || user?.timezone || 'UTC';
+        const d = getTodayInTimezone(t);
+        const [y, mo] = d.split('-');
+        setYear(Number(y));
+        setMonth(Number(mo));
+        setSelectedDate(d);
     };
 
     return (

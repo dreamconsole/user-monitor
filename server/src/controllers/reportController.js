@@ -1,4 +1,6 @@
 import { query } from '../db.js';
+import { getManagerTeamIds } from '../utils/managerTeamAccess.js';
+import { getOrgTimezone } from '../utils/orgTimezone.js';
 
 /**
  * Fetches daily summary data. Used by reports API and PDF export.
@@ -23,7 +25,8 @@ export async function fetchDailySummaryData(req) {
                 (SELECT COALESCE(SUM(duration_seconds), 0) 
                  FROM break_logs bl 
                  WHERE bl.user_id = u.id 
-                   AND DATE(bl.start_time) = ws.work_date
+                   AND bl.org_id = ws.org_id
+                   AND (bl.start_time AT TIME ZONE (SELECT COALESCE(o.timezone, 'UTC') FROM organizations o WHERE o.id = ws.org_id))::date = ws.work_date
                 ) as break_seconds
             FROM work_sessions ws
             JOIN users u ON ws.user_id = u.id
@@ -35,28 +38,22 @@ export async function fetchDailySummaryData(req) {
 
     if (startDate) {
         paramCount++;
-        sql += ` AND ws.start_time >= $${paramCount}`;
-        params.push(`${startDate} 00:00:00+00`);
+        sql += ` AND ws.work_date >= $${paramCount}::date`;
+        params.push(startDate);
     }
     if (endDate) {
         paramCount++;
-        sql += ` AND ws.start_time <= $${paramCount}`;
-        params.push(`${endDate} 23:59:59+00`);
+        sql += ` AND ws.work_date <= $${paramCount}::date`;
+        params.push(endDate);
     }
 
     if (role === 'manager') {
-        // Always exclude orgadmins from manager's view
         sql += ` AND u.role != 'orgadmin'`;
-        if (req.user.team_id) {
-            paramCount++;
-            sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
-            params.push(req.user.team_id, currentUserId);
-            paramCount++;
-        } else {
-            paramCount++;
-            sql += ` AND u.id = $${paramCount}`;
-            params.push(currentUserId);
-        }
+        const teamIds = await getManagerTeamIds(req.user.id, orgId);
+        paramCount++;
+        sql += ` AND (u.id = $${paramCount} OR u.team_id = ANY($${paramCount + 1}::uuid[]))`;
+        params.push(currentUserId, teamIds);
+        paramCount += 2;
     } else if (role === 'user') {
         paramCount++;
         sql += ` AND u.id = $${paramCount}`;
@@ -69,7 +66,7 @@ export async function fetchDailySummaryData(req) {
         params.push(userId);
     }
 
-    sql += ` GROUP BY ws.work_date, u.id, u.full_name, c.name ORDER BY ws.work_date DESC, u.full_name ASC`;
+    sql += ` GROUP BY ws.work_date, ws.org_id, u.id, u.full_name, c.name ORDER BY ws.work_date DESC, u.full_name ASC`;
 
     const result = await query(sql, params);
     return result.rows;
@@ -97,17 +94,23 @@ export async function fetchBreakUsageData(req) {
     const { startDate, endDate, userId } = req.query;
     const orgId = req.user.org_id;
     const { role, id: currentUserId } = req.user;
+    const orgTz = await getOrgTimezone(orgId);
 
     let sql = `
             SELECT 
                 bl.start_time,
                 bl.end_time,
                 u.full_name as user_name,
-                bm.name as break_type,
-                EXTRACT(EPOCH FROM (bl.end_time - bl.start_time)) / 60.0 as duration_minutes
+                COALESCE(bm.name, 'Unassigned') as break_type,
+                (
+                    COALESCE(
+                        bl.duration_seconds,
+                        EXTRACT(EPOCH FROM (COALESCE(bl.end_time, CURRENT_TIMESTAMP) - bl.start_time))
+                    ) / 60.0
+                ) as duration_minutes
             FROM break_logs bl
             JOIN users u ON bl.user_id = u.id
-            JOIN break_master bm ON bl.break_type_id = bm.id
+            LEFT JOIN break_master bm ON bl.break_type_id = bm.id
             WHERE bl.org_id = $1
         `;
     const params = [orgId];
@@ -115,28 +118,30 @@ export async function fetchBreakUsageData(req) {
 
     if (startDate) {
         paramCount++;
-        sql += ` AND bl.start_time >= $${paramCount}`;
-        params.push(`${startDate} 00:00:00+00`);
+        const tzP = paramCount;
+        params.push(orgTz);
+        paramCount++;
+        const dP = paramCount;
+        params.push(startDate);
+        sql += ` AND (bl.start_time AT TIME ZONE $${tzP})::date >= $${dP}::date`;
     }
     if (endDate) {
         paramCount++;
-        sql += ` AND bl.start_time <= $${paramCount}`;
-        params.push(`${endDate} 23:59:59+00`);
+        const tzP = paramCount;
+        params.push(orgTz);
+        paramCount++;
+        const dP = paramCount;
+        params.push(endDate);
+        sql += ` AND (bl.start_time AT TIME ZONE $${tzP})::date <= $${dP}::date`;
     }
 
     if (role === 'manager') {
-        // Always exclude orgadmins from manager's view
         sql += ` AND u.role != 'orgadmin'`;
-        if (req.user.team_id) {
-            paramCount++;
-            sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
-            params.push(req.user.team_id, currentUserId);
-            paramCount++;
-        } else {
-            paramCount++;
-            sql += ` AND u.id = $${paramCount}`;
-            params.push(currentUserId);
-        }
+        const teamIds = await getManagerTeamIds(req.user.id, orgId);
+        paramCount++;
+        sql += ` AND (u.id = $${paramCount} OR u.team_id = ANY($${paramCount + 1}::uuid[]))`;
+        params.push(currentUserId, teamIds);
+        paramCount += 2;
     } else if (role === 'user') {
         paramCount++;
         sql += ` AND u.id = $${paramCount}`;
@@ -176,6 +181,7 @@ export async function fetchScreenshotsData(req) {
     const { startDate, endDate, userId } = req.query;
     const orgId = req.user.org_id;
     const { role, id: currentUserId } = req.user;
+    const orgTz = await getOrgTimezone(orgId);
 
     let sql = `
             SELECT 
@@ -192,28 +198,30 @@ export async function fetchScreenshotsData(req) {
 
     if (startDate) {
         paramCount++;
-        sql += ` AND s.captured_at >= $${paramCount}`;
-        params.push(`${startDate} 00:00:00+00`);
+        const tzP = paramCount;
+        params.push(orgTz);
+        paramCount++;
+        const dP = paramCount;
+        params.push(startDate);
+        sql += ` AND (s.captured_at AT TIME ZONE $${tzP})::date >= $${dP}::date`;
     }
     if (endDate) {
         paramCount++;
-        sql += ` AND s.captured_at <= $${paramCount}`;
-        params.push(`${endDate} 23:59:59+00`);
+        const tzP = paramCount;
+        params.push(orgTz);
+        paramCount++;
+        const dP = paramCount;
+        params.push(endDate);
+        sql += ` AND (s.captured_at AT TIME ZONE $${tzP})::date <= $${dP}::date`;
     }
 
     if (role === 'manager') {
-        // Always exclude orgadmins from manager's view
         sql += ` AND u.role != 'orgadmin'`;
-        if (req.user.team_id) {
-            paramCount++;
-            sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
-            params.push(req.user.team_id, currentUserId);
-            paramCount++;
-        } else {
-            paramCount++;
-            sql += ` AND u.id = $${paramCount}`;
-            params.push(currentUserId);
-        }
+        const teamIds = await getManagerTeamIds(req.user.id, orgId);
+        paramCount++;
+        sql += ` AND (u.id = $${paramCount} OR u.team_id = ANY($${paramCount + 1}::uuid[]))`;
+        params.push(currentUserId, teamIds);
+        paramCount += 2;
     } else if (role === 'user') {
         paramCount++;
         sql += ` AND u.id = $${paramCount}`;
@@ -248,6 +256,7 @@ export const getIdleEvents = async (req, res) => {
     const { startDate, endDate, userId } = req.query;
     const orgId = req.user.org_id;
     const { role, id: currentUserId } = req.user;
+    const orgTz = await getOrgTimezone(orgId);
 
     try {
         let sql = `
@@ -265,28 +274,30 @@ export const getIdleEvents = async (req, res) => {
 
         if (startDate) {
             paramCount++;
-            sql += ` AND al.log_time >= $${paramCount}`;
-            params.push(`${startDate} 00:00:00+00`);
+            const tzP = paramCount;
+            params.push(orgTz);
+            paramCount++;
+            const dP = paramCount;
+            params.push(startDate);
+            sql += ` AND (al.log_time AT TIME ZONE $${tzP})::date >= $${dP}::date`;
         }
         if (endDate) {
             paramCount++;
-            sql += ` AND al.log_time <= $${paramCount}`;
-            params.push(`${endDate} 23:59:59+00`);
+            const tzP = paramCount;
+            params.push(orgTz);
+            paramCount++;
+            const dP = paramCount;
+            params.push(endDate);
+            sql += ` AND (al.log_time AT TIME ZONE $${tzP})::date <= $${dP}::date`;
         }
 
         if (role === 'manager') {
-            // Always exclude orgadmins from manager's view
             sql += ` AND u.role != 'orgadmin'`;
-            if (req.user.team_id) {
-                paramCount++;
-                sql += ` AND (u.team_id = $${paramCount} OR u.id = $${paramCount + 1})`;
-                params.push(req.user.team_id, currentUserId);
-                paramCount++;
-            } else {
-                paramCount++;
-                sql += ` AND u.id = $${paramCount}`;
-                params.push(currentUserId);
-            }
+            const teamIds = await getManagerTeamIds(req.user.id, orgId);
+            paramCount++;
+            sql += ` AND (u.id = $${paramCount} OR u.team_id = ANY($${paramCount + 1}::uuid[]))`;
+            params.push(currentUserId, teamIds);
+            paramCount += 2;
         } else if (role === 'user') {
             paramCount++;
             sql += ` AND u.id = $${paramCount}`;

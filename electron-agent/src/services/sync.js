@@ -306,6 +306,7 @@ class SyncService {
                 status: 'ONLINE',
                 state: monitorService.currentState,
                 current_idle_time: monitorService.getCurrentIdleTime(),
+                shift_cap_idle_seconds: monitorService.getShiftCapIdleSeconds(),
                 last_seen_at: Date.now()
             };
 

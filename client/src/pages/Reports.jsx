@@ -12,8 +12,19 @@ import UserSearchSelect from '@/components/UserSearchSelect';
 import { Download, Search, Filter, FileText, Coffee, Monitor, Image as ImageIcon } from 'lucide-react';
 import DateRangeFilter from '@/components/DateRangeFilter';
 import { Badge } from '@/components/ui/badge';
-import { utcToLocal } from '@/lib/dateUtils';
-import { format } from 'date-fns';
+import { utcToLocal, getTodayInTimezone } from '@/lib/dateUtils';
+import { format, subDays, parseISO } from 'date-fns';
+
+function defaultReportFilters(authUser) {
+    const t = authUser?.org_timezone || authUser?.timezone || 'UTC';
+    const end = getTodayInTimezone(t);
+    const anchor = parseISO(`${end}T12:00:00.000Z`);
+    return {
+        startDate: format(subDays(anchor, 7), 'yyyy-MM-dd'),
+        endDate: end,
+        userId: 'all'
+    };
+}
 
 const ExportButton = ({ data, filename, headers }) => {
     const exportToCSV = () => {
@@ -58,12 +69,11 @@ export default function Reports() {
     const [data, setData] = useState([]);
     const [users, setUsers] = useState([]);
 
-    // Filters
-    const [filters, setFilters] = useState({
-        startDate: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0],
-        userId: 'all'
-    });
+    const [filters, setFilters] = useState(() => defaultReportFilters(null));
+
+    useEffect(() => {
+        if (user) setFilters(defaultReportFilters(user));
+    }, [user?.org_id, user?.org_timezone, user?.timezone]);
 
     useEffect(() => {
         if (user.role !== 'user') {
