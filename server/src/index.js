@@ -44,7 +44,7 @@ app.use((req, res, next) => {
 // Rate limiting - general
 const generalLimiter = rateLimit({
     windowMs: 30 * 60 * 1000, // 30 min
-    max: 1000,
+    max: 20000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' }

@@ -4,6 +4,7 @@ All updates to the server application are tracked here.
 
 ## 1.2.1 - 2026-05-01
 ### Changes
+- [Config] Global `express-rate-limit`: raised `max` from 1000 to **20000** requests per IP per 30 minutes (`generalLimiter` in `index.js`).
 - [Feature] Dashboard date filter: optional query `GET /stats/admin|manager|user?date=YYYY-MM-DD` (org calendar day). Responses include `statsDate` and `isStatsToday`. Work/absent/KPIs and 7-day trend end on that date; agent “active now” and online/offline remain live.
 - [Bugfix] Timeline month view: screenshot counts per `work_date` use org TZ on `captured_at` (not `captured_at::date` in DB session TZ). Manager dashboard late-login uses org-local wall time (`Intl`), not server timezone.
 - [Bugfix] Reports daily summary (`fetchDailySummaryData`): include `ws.org_id` in `GROUP BY` so the break-seconds correlated subquery no longer triggers PostgreSQL error `column ws.org_id must appear in the GROUP BY clause` (500 on `/reports/summary`).
