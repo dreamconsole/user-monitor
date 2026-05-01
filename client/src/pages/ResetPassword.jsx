@@ -79,7 +79,7 @@ export default function ResetPassword() {
                         </CardFooter>
                     </Card>
                     <div className="absolute bottom-6 w-full text-center text-sm text-muted-foreground z-10">
-                        copyright 2026 sourcecodekart.com
+                        copyright 2026 preqservices.com
                     </div>
                 </div>
             </div>
@@ -118,7 +118,7 @@ export default function ResetPassword() {
                         </CardFooter>
                     </Card>
                     <div className="absolute bottom-6 w-full text-center text-sm text-muted-foreground z-10">
-                        copyright 2026 sourcecodekart.com
+                        copyright 2026 preqservices.com
                     </div>
                 </div>
             </div>
@@ -176,7 +176,7 @@ export default function ResetPassword() {
                     </CardFooter>
                 </Card>
                 <div className="absolute bottom-6 w-full text-center text-sm text-muted-foreground z-10">
-                    copyright 2026 sourcecodekart.com
+                    copyright 2026 preqservices.com
                 </div>
             </div>
         </div>

@@ -150,7 +150,7 @@ export default function Register() {
                 </Card>
 
                 <div className="absolute bottom-6 w-full text-center text-sm text-muted-foreground z-10">
-                    copyright 2026 sourcecodekart.com
+                    copyright 2026 preqservices.com
                 </div>
             </div>
         </div>
