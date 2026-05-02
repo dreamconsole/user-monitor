@@ -45,6 +45,17 @@ let sessionStartTime = null;
 let isTracking = false;
 let selectedCampaignId = null;
 let hasCampaigns = false;
+/** False until get-campaigns finishes (prevents starting shift while hasCampaigns is still false). */
+let campaignsLoaded = false;
+
+function updateStartShiftButtonState() {
+    const mustPickCampaign = campaignsLoaded && hasCampaigns;
+    const canStart = campaignsLoaded && (!mustPickCampaign || selectedCampaignId != null);
+    startShiftBtn.disabled = !canStart;
+    startShiftBtn.classList.toggle('opacity-50', !canStart);
+    startShiftBtn.classList.toggle('cursor-not-allowed', !canStart);
+    startShiftBtn.setAttribute('aria-disabled', String(!canStart));
+}
 
 // Break Timer Variables
 let breakTimerInterval = null;
@@ -148,6 +159,7 @@ async function fetchAndPopulateCampaigns() {
                     // Highlight
                     Array.from(campaignList.children).forEach(child => child.classList.remove('selected'));
                     li.classList.add('selected');
+                    updateStartShiftButtonState();
                 };
                 campaignList.appendChild(li);
             });
@@ -162,6 +174,9 @@ async function fetchAndPopulateCampaigns() {
     } catch (e) {
         console.error('Failed to load campaigns:', e);
         hasCampaigns = false;
+    } finally {
+        campaignsLoaded = true;
+        updateStartShiftButtonState();
     }
 }
 
@@ -314,6 +329,14 @@ function showTracking(user) {
     roleBadge.innerText = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Standard User';
     updateLastSync();
 
+    selectedCampaignId = null;
+    selectedCampaignText.innerText = 'Choose a campaign...';
+    selectedCampaignText.classList.add('text-slate-500');
+    selectedCampaignText.classList.remove('text-slate-900');
+    hasCampaigns = false;
+    campaignsLoaded = false;
+    updateStartShiftButtonState();
+
     // Load breaks and campaigns
     fetchAndPopulateBreaks();
     fetchAndPopulateCampaigns();
@@ -329,7 +352,7 @@ loginForm.addEventListener('submit', async (e) => {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
 
-    errorMsg.style.display = 'none';
+    errorMsg.classList.add('hidden');
     submitBtn.disabled = true;
     const originalContent = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Logging in...';
@@ -341,7 +364,18 @@ loginForm.addEventListener('submit', async (e) => {
         showTracking(user);
     } catch (error) {
         console.error(error);
-        errorMsg.textContent = error.response?.data?.error || 'Login failed. Please check credentials.';
+        const data = error.response?.data;
+        let msg =
+            (typeof data === 'string' && data) ||
+            data?.error ||
+            data?.message ||
+            null;
+        if (!msg) {
+            msg = error.response
+                ? 'Login failed. Please check credentials.'
+                : (error.message || 'Cannot reach server. Check your network and API URL in config.');
+        }
+        errorMsg.textContent = msg;
         errorMsg.classList.remove('hidden');
         submitBtn.innerHTML = originalContent;
         if (window.lucide) window.lucide.createIcons();

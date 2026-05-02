@@ -298,6 +298,11 @@ class SyncService {
         const user = authService.getUser();
         if (!user) return;
 
+        // Heartbeats only while on shift; end-shift clears currentWorkSessionId so managers see user offline.
+        if (!monitorService.getCurrentWorkSessionId()) {
+            return;
+        }
+
         try {
             const payload = {
                 org_id: user.org_id,
