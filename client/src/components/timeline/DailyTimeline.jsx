@@ -117,7 +117,7 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
                 />
                 <SummaryCard
                     icon={<Pause className="w-4 h-4 text-gray-500" />}
-                    label="Idle Time"
+                    label="Idle Time / AFK Time"
                     value={formatSeconds(totals.idle_seconds)}
                     color="gray"
                 />
