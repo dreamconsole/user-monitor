@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -31,23 +31,25 @@ const schema = z.object({
 });
 
 export default function BreakForm({ breakItem, onSubmit, isSubmitting }) {
+    console.log("BreakForm render - breakItem:", breakItem);
     const isEdit = !!breakItem;
 
     const [groups, setGroups] = useState([]);
+    console.log("BreakForm render - groups:", groups);
     const [loadingGroups, setLoadingGroups] = useState(true);
 
-    const { register, handleSubmit, setValue, reset, watch, formState: { errors } } = useForm({
+    const { register, handleSubmit, setValue, reset, watch, control, formState: { errors } } = useForm({
         resolver: zodResolver(schema),
         defaultValues: {
-            name: '',
-            break_group_id: '',
-            break_type: 'flexible',
-            fixed_start_time: '',
-            fixed_end_time: '',
-            max_duration_minutes: 30,
-            daily_limit: null,
-            is_paid: false,
-            is_active: true,
+            name: breakItem?.name || '',
+            break_group_id: breakItem?.break_group_id ? String(breakItem.break_group_id) : '',
+            break_type: breakItem?.break_type || 'flexible',
+            fixed_start_time: breakItem?.fixed_start_time ? breakItem.fixed_start_time.substring(0, 5) : '',
+            fixed_end_time: breakItem?.fixed_end_time ? breakItem.fixed_end_time.substring(0, 5) : '',
+            max_duration_minutes: breakItem?.max_duration_seconds ? breakItem.max_duration_seconds / 60 : 30,
+            daily_limit: breakItem?.daily_limit || null,
+            is_paid: breakItem ? breakItem.is_paid : false,
+            is_active: breakItem ? breakItem.is_active : true,
         }
     });
 
@@ -62,8 +64,8 @@ export default function BreakForm({ breakItem, onSubmit, isSubmitting }) {
                 // Preselect default group if drafting new break
                 if (!breakItem && data.length > 0) {
                     const defaultGrp = data.find(g => g.is_default);
-                    if (defaultGrp) setValue('break_group_id', defaultGrp.id);
-                    else setValue('break_group_id', data[0].id);
+                    if (defaultGrp) setValue('break_group_id', String(defaultGrp.id));
+                    else setValue('break_group_id', String(data[0].id));
                 }
             } catch (error) {
                 console.error('Failed to load groups', error);
@@ -78,7 +80,7 @@ export default function BreakForm({ breakItem, onSubmit, isSubmitting }) {
         if (breakItem) {
             reset({
                 name: breakItem.name,
-                break_group_id: breakItem.break_group_id || '',
+                break_group_id: breakItem.break_group_id ? String(breakItem.break_group_id) : '',
                 break_type: breakItem.break_type || 'flexible',
                 fixed_start_time: breakItem.fixed_start_time ? breakItem.fixed_start_time.substring(0, 5) : '',
                 fixed_end_time: breakItem.fixed_end_time ? breakItem.fixed_end_time.substring(0, 5) : '',
@@ -101,13 +103,18 @@ export default function BreakForm({ breakItem, onSubmit, isSubmitting }) {
 
                 <div className="space-y-2">
                     <Label>Assign to Break Group</Label>
-                    <Select disabled={loadingGroups} value={breakGroupId} onValueChange={(val) => setValue('break_group_id', val, { shouldValidate: true })}>
+                    <Select 
+                        key={`bg-${groups.length}-${breakItem?.id || 'new'}`}
+                        disabled={loadingGroups} 
+                        value={watch('break_group_id') || undefined} 
+                        onValueChange={(val) => setValue('break_group_id', val)}
+                    >
                         <SelectTrigger>
                             <SelectValue placeholder={loadingGroups ? "Loading groups..." : "Select a break group"} />
                         </SelectTrigger>
                         <SelectContent className="max-h-56">
                             {groups.map(g => (
-                                <SelectItem key={g.id} value={g.id}>
+                                <SelectItem key={g.id} value={String(g.id)}>
                                     {g.name} {g.is_default && '(Default)'}
                                 </SelectItem>
                             ))}

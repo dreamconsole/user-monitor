@@ -380,7 +380,13 @@ startShiftBtn.addEventListener('click', () => {
     updateLastSync();
 });
 
-endShiftBtn.addEventListener('click', () => {
+endShiftBtn.addEventListener('click', async () => {
+    const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'End Shift',
+        message: 'Are you sure you want to end the shift?'
+    });
+    if (!confirmed) return;
+
     isTracking = false;
     ipcRenderer.send('end-shift');
     activeActions.classList.add('hidden');

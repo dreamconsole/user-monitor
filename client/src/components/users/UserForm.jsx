@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -97,23 +97,23 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
         fetchData();
     }, [user, isEdit]);
 
-    const { register, handleSubmit, setValue, reset, watch, formState: { errors } } = useForm({
+    const { register, handleSubmit, setValue, reset, watch, control, formState: { errors } } = useForm({
         resolver: zodResolver(schema),
         defaultValues: {
-            name: '',
-            email: '',
+            name: user?.name || '',
+            email: user?.email || '',
             password: '',
-            role: 'user',
-            status: 'active',
-            team_id: '',
-            timezone: getBrowserTimezone(),
-            emp_id: '',
-            payroll_id: '',
-            site: '',
-            force_logout: false,
-            shift_start_time: null,
-            shift_end_time: null,
-            work_days: null
+            role: user?.role || 'user',
+            status: user?.status || 'active',
+            team_id: user?.team_id ? String(user?.team_id) : '',
+            timezone: user?.timezone || getBrowserTimezone(),
+            emp_id: user?.emp_id || '',
+            payroll_id: user?.payroll_id || '',
+            site: user?.site || '',
+            force_logout: !!user?.force_logout,
+            shift_start_time: user?.shift_start_time || null,
+            shift_end_time: user?.shift_end_time || null,
+            work_days: user?.work_days || null
         }
     });
 
@@ -141,6 +141,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                 shift_end_time: user.shift_end_time || null,
                 work_days: user.work_days || null
             });
+            console.log("UserForm RESET", { role: user.role || 'user', team_id: user.team_id });
 
             setOverrides({
                 shift_start_time: !!user.shift_start_time,
@@ -296,7 +297,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label>Role</Label>
-                        <Select onValueChange={(val) => setValue('role', val)} value={watch('role')}>
+                        <Select key={`role-${user?.id || 'new'}`} onValueChange={(val) => setValue('role', val)} value={watch('role')}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select role" />
                             </SelectTrigger>
@@ -312,7 +313,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                     {isEdit && (
                         <div className="space-y-2">
                             <Label>Status</Label>
-                            <Select onValueChange={(val) => setValue('status', val)} value={watch('status')}>
+                            <Select key={`status-${user?.id || 'new'}`} onValueChange={(val) => setValue('status', val)} value={watch('status')}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select status" />
                                 </SelectTrigger>
@@ -329,7 +330,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                     <div className="space-y-2">
                         <Label>Team (Required)</Label>
                         <Select
-                            key={`${teamIdWatch || 'none'}-${teams.length}`}
+                            key={`team-${user?.id || 'new'}-${teams.length}`}
                             onValueChange={(val) => setValue('team_id', val)}
                             value={teamIdWatch}
                         >
@@ -338,7 +339,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
                             </SelectTrigger>
                             <SelectContent>
                                 {teams.map(t => (
-                                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                    <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -348,7 +349,7 @@ export default function UserForm({ user, onSubmit, isSubmitting }) {
 
                 <div className="space-y-2">
                     <Label>Timezone</Label>
-                    <Select onValueChange={(val) => setValue('timezone', val)} value={watch('timezone')}>
+                    <Select key={`tz-${user?.id || 'new'}`} onValueChange={(val) => setValue('timezone', val)} value={watch('timezone')}>
                         <SelectTrigger>
                             <SelectValue placeholder="Select timezone" />
                         </SelectTrigger>

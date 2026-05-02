@@ -253,6 +253,20 @@ ipcMain.on('show-notification', (event, { title, body }) => {
     }
 });
 
+const { dialog } = require('electron');
+ipcMain.handle('show-confirm-dialog', async (event, options) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const { response } = await dialog.showMessageBox(window, {
+        type: 'question',
+        buttons: ['Yes', 'No'],
+        defaultId: 1,
+        cancelId: 1,
+        title: options.title || 'Confirm',
+        message: options.message || 'Are you sure?'
+    });
+    return response === 0; // Returns true if 'Yes' (index 0) is clicked
+});
+
 function performLogout() {
     console.log('Logging out...');
 

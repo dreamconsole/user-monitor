@@ -126,19 +126,89 @@ export const getUserDashboard = async (req, res) => {
             [userId, orgId, start_date, end_date]
         );
 
-        // Get live productivity breakdown from logs (for real-time pie chart)
-        const liveProductivity = await query(
-            `SELECT 
-                ac.productivity_type,
-            SUM(aul.duration_seconds) as total_seconds
-             FROM app_usage_logs aul
-             JOIN tracked_apps ta ON aul.app_id = ta.id
-             LEFT JOIN app_categories ac ON ta.category_id = ac.id
-             WHERE aul.user_id = $1 AND aul.org_id = $2
-             AND aul.log_date >= $3 AND aul.log_date <= $4
-             GROUP BY ac.productivity_type`,
-            [userId, orgId, start_date, end_date]
+        // TLD-stripping regex
+        const tldRegex = '\\.[a-z]{2,6}(\\.[a-z]{2,3})?$';
+        const browserExclusion = `LOWER(ta.executable_name) NOT IN ('chrome.exe', 'msedge.exe', 'brave.exe', 'opera.exe', 'firefox.exe', 'vivaldi.exe', 'arc.exe', 'chromium.exe', 'waterfox.exe', 'librewolf.exe', 'duckduckgo.exe', 'whale.exe', 'browser.exe', 'maxthon.exe', 'samsung internet', 'chrome', 'msedge', 'firefox')`;
+
+        const uncatResult = await query(
+            `SELECT name, productivity_type FROM app_categories WHERE org_id = $1 AND name = 'Uncategorized' LIMIT 1`,
+            [orgId]
         );
+        const uncatCategory = uncatResult.rows[0] || { name: 'Uncategorized', productivity_type: 'neutral' };
+
+        let liveProductivity;
+        try {
+            liveProductivity = await query(
+                `WITH app_stats AS (
+                    SELECT 
+                        ac.productivity_type,
+                        SUM(aul.duration_seconds) as total_seconds
+                    FROM app_usage_logs aul
+                    JOIN tracked_apps ta ON aul.app_id = ta.id
+                    LEFT JOIN app_categories ac ON ta.category_id = ac.id
+                    WHERE aul.user_id = $1 AND aul.org_id = $2
+                    AND aul.log_date >= $3 AND aul.log_date <= $4
+                    AND ${browserExclusion}
+                    GROUP BY ac.productivity_type
+                 ),
+                 browser_stats AS (
+                     SELECT 
+                         COALESCE(matched_dp.productivity_type, $5) as productivity_type,
+                         SUM(bal.duration_seconds) as total_seconds
+                     FROM browser_activity_logs bal
+                     LEFT JOIN LATERAL (
+                         SELECT ac.productivity_type
+                         FROM domain_productivity dp
+                         LEFT JOIN app_categories ac ON dp.category_id = ac.id
+                         WHERE dp.org_id = $2
+                           AND LENGTH(dp.domain) > 2
+                           AND (
+                                 (bal.domain IS NOT NULL AND bal.domain != '' AND LOWER(bal.domain) LIKE '%' || LOWER(dp.domain) || '%')
+                              OR (bal.domain IS NOT NULL AND bal.domain != '' AND LOWER(dp.domain) LIKE '%' || LOWER(bal.domain) || '%')
+                              OR (LOWER(COALESCE(bal.title, '')) LIKE '%' || LOWER(dp.domain) || '%')
+                              OR (LENGTH(REGEXP_REPLACE(dp.domain, '` + tldRegex + `', '')) > 2
+                                  AND LOWER(COALESCE(bal.title, '')) LIKE '%' || LOWER(REGEXP_REPLACE(dp.domain, '` + tldRegex + `', '')) || '%')
+                           )
+                         ORDER BY
+                             CASE WHEN bal.domain IS NOT NULL AND LOWER(bal.domain) = LOWER(dp.domain) THEN 0
+                                  WHEN bal.domain IS NOT NULL AND LOWER(bal.domain) LIKE '%' || LOWER(dp.domain) || '%' THEN 1
+                                  WHEN LOWER(COALESCE(bal.title, '')) LIKE '%' || LOWER(dp.domain) || '%' THEN 2
+                                  ELSE 3 END,
+                             LENGTH(dp.domain) DESC
+                         LIMIT 1
+                     ) matched_dp ON TRUE
+                     WHERE bal.user_id = $1 AND bal.org_id = $2
+                     AND bal.start_time::date >= $3::date AND bal.start_time::date <= $4::date
+                     GROUP BY COALESCE(matched_dp.productivity_type, $5)
+                 )
+                 SELECT productivity_type, SUM(total_seconds) as total_seconds
+                 FROM (
+                     SELECT * FROM app_stats
+                     UNION ALL
+                     SELECT * FROM browser_stats
+                 ) combined
+                 GROUP BY productivity_type`,
+                [userId, orgId, start_date, end_date, uncatCategory.productivity_type]
+            );
+        } catch (err) {
+            if (err?.code === '42P01') {
+                // Fallback if browser_activity_logs doesn't exist
+                liveProductivity = await query(
+                    `SELECT 
+                        ac.productivity_type,
+                        SUM(aul.duration_seconds) as total_seconds
+                     FROM app_usage_logs aul
+                     JOIN tracked_apps ta ON aul.app_id = ta.id
+                     LEFT JOIN app_categories ac ON ta.category_id = ac.id
+                     WHERE aul.user_id = $1 AND aul.org_id = $2
+                     AND aul.log_date >= $3 AND aul.log_date <= $4
+                     GROUP BY ac.productivity_type`,
+                    [userId, orgId, start_date, end_date]
+                );
+            } else {
+                throw err;
+            }
+        }
 
         res.json({
             summary: summary.rows,
@@ -191,6 +261,14 @@ export const getBrowserActivityDetails = async (req, res) => {
         // Written as a plain string (not template literal) to avoid JS template interpolation of $
         const tldRegex = '\\.[a-z]{2,6}(\\.[a-z]{2,3})?$';
 
+        // Fetch the org's Uncategorized category so we can fall back to its productivity_type
+        // for browser domains that have no matching domain_productivity rule.
+        const uncatResult = await query(
+            `SELECT name, productivity_type FROM app_categories WHERE org_id = $1 AND name = 'Uncategorized' LIMIT 1`,
+            [orgId]
+        );
+        const uncatCategory = uncatResult.rows[0] || { name: 'Uncategorized', productivity_type: 'neutral' };
+
         const domainBreakdown = await query(
             `SELECT 
                 COALESCE(bal.domain, bal.title) as domain,
@@ -199,8 +277,8 @@ export const getBrowserActivityDetails = async (req, res) => {
                 COUNT(*) as visit_count,
                 SUM(bal.duration_seconds) as total_seconds,
                 MAX(bal.title) as last_title,
-                matched_dp.category_name,
-                matched_dp.productivity_type
+                COALESCE(matched_dp.category_name, $${params.length + 1}) as category_name,
+                COALESCE(matched_dp.productivity_type, $${params.length + 2}) as productivity_type
              FROM browser_activity_logs bal
              LEFT JOIN LATERAL (
                  SELECT dp.category_id, ac.name as category_name, ac.productivity_type
@@ -229,7 +307,7 @@ export const getBrowserActivityDetails = async (req, res) => {
              GROUP BY COALESCE(bal.domain, bal.title), bal.browser${sourceGroupBy}, matched_dp.category_name, matched_dp.productivity_type
              ORDER BY total_seconds DESC
              LIMIT 50`,
-            params
+            [...params, uncatCategory.name, uncatCategory.productivity_type]
         );
 
         const browserSummary = await query(
@@ -283,21 +361,95 @@ export const getProductivitySummary = async (req, res) => {
     }
 
     try {
-        // Get category-wise breakdown
-        const result = await query(
-            `SELECT 
-                ac.name as category_name,
-            ac.productivity_type,
-            SUM(aul.duration_seconds) as total_seconds
-             FROM app_usage_logs aul
-             JOIN tracked_apps ta ON aul.app_id = ta.id
-             LEFT JOIN app_categories ac ON ta.category_id = ac.id
-             WHERE aul.user_id = $1 AND aul.org_id = $2
-             AND aul.log_date >= $3 AND aul.log_date <= $4
-             GROUP BY ac.id, ac.name, ac.productivity_type
-             ORDER BY total_seconds DESC`,
-            [userId, orgId, start_date, end_date]
+        // TLD-stripping regex
+        const tldRegex = '\\.[a-z]{2,6}(\\.[a-z]{2,3})?$';
+        const browserExclusion = `LOWER(ta.executable_name) NOT IN ('chrome.exe', 'msedge.exe', 'brave.exe', 'opera.exe', 'firefox.exe', 'vivaldi.exe', 'arc.exe', 'chromium.exe', 'waterfox.exe', 'librewolf.exe', 'duckduckgo.exe', 'whale.exe', 'browser.exe', 'maxthon.exe', 'samsung internet', 'chrome', 'msedge', 'firefox')`;
+
+        const uncatResult = await query(
+            `SELECT name, productivity_type FROM app_categories WHERE org_id = $1 AND name = 'Uncategorized' LIMIT 1`,
+            [orgId]
         );
+        const uncatCategory = uncatResult.rows[0] || { name: 'Uncategorized', productivity_type: 'neutral' };
+
+        let result;
+        try {
+            // Get category-wise breakdown (blended apps and browser domains)
+            result = await query(
+                `WITH app_stats AS (
+                    SELECT 
+                        ac.name as category_name,
+                        ac.productivity_type,
+                        SUM(aul.duration_seconds) as total_seconds
+                    FROM app_usage_logs aul
+                    JOIN tracked_apps ta ON aul.app_id = ta.id
+                    LEFT JOIN app_categories ac ON ta.category_id = ac.id
+                    WHERE aul.user_id = $1 AND aul.org_id = $2
+                    AND aul.log_date >= $3 AND aul.log_date <= $4
+                    AND ${browserExclusion}
+                    GROUP BY ac.id, ac.name, ac.productivity_type
+                 ),
+                 browser_stats AS (
+                     SELECT 
+                         COALESCE(matched_dp.category_name, $5) as category_name,
+                         COALESCE(matched_dp.productivity_type, $6) as productivity_type,
+                         SUM(bal.duration_seconds) as total_seconds
+                     FROM browser_activity_logs bal
+                     LEFT JOIN LATERAL (
+                         SELECT ac.name as category_name, ac.productivity_type
+                         FROM domain_productivity dp
+                         LEFT JOIN app_categories ac ON dp.category_id = ac.id
+                         WHERE dp.org_id = $2
+                           AND LENGTH(dp.domain) > 2
+                           AND (
+                                 (bal.domain IS NOT NULL AND bal.domain != '' AND LOWER(bal.domain) LIKE '%' || LOWER(dp.domain) || '%')
+                              OR (bal.domain IS NOT NULL AND bal.domain != '' AND LOWER(dp.domain) LIKE '%' || LOWER(bal.domain) || '%')
+                              OR (LOWER(COALESCE(bal.title, '')) LIKE '%' || LOWER(dp.domain) || '%')
+                              OR (LENGTH(REGEXP_REPLACE(dp.domain, '` + tldRegex + `', '')) > 2
+                                  AND LOWER(COALESCE(bal.title, '')) LIKE '%' || LOWER(REGEXP_REPLACE(dp.domain, '` + tldRegex + `', '')) || '%')
+                           )
+                         ORDER BY
+                             CASE WHEN bal.domain IS NOT NULL AND LOWER(bal.domain) = LOWER(dp.domain) THEN 0
+                                  WHEN bal.domain IS NOT NULL AND LOWER(bal.domain) LIKE '%' || LOWER(dp.domain) || '%' THEN 1
+                                  WHEN LOWER(COALESCE(bal.title, '')) LIKE '%' || LOWER(dp.domain) || '%' THEN 2
+                                  ELSE 3 END,
+                             LENGTH(dp.domain) DESC
+                         LIMIT 1
+                     ) matched_dp ON TRUE
+                     WHERE bal.user_id = $1 AND bal.org_id = $2
+                     AND bal.start_time::date >= $3::date AND bal.start_time::date <= $4::date
+                     GROUP BY COALESCE(matched_dp.category_name, $5), COALESCE(matched_dp.productivity_type, $6)
+                 )
+                 SELECT category_name, productivity_type, SUM(total_seconds) as total_seconds
+                 FROM (
+                     SELECT * FROM app_stats
+                     UNION ALL
+                     SELECT * FROM browser_stats
+                 ) combined
+                 GROUP BY category_name, productivity_type
+                 ORDER BY total_seconds DESC`,
+                [userId, orgId, start_date, end_date, uncatCategory.name, uncatCategory.productivity_type]
+            );
+        } catch (err) {
+            if (err?.code === '42P01') {
+                // Fallback if browser_activity_logs doesn't exist
+                result = await query(
+                    `SELECT 
+                        ac.name as category_name,
+                        ac.productivity_type,
+                        SUM(aul.duration_seconds) as total_seconds
+                     FROM app_usage_logs aul
+                     JOIN tracked_apps ta ON aul.app_id = ta.id
+                     LEFT JOIN app_categories ac ON ta.category_id = ac.id
+                     WHERE aul.user_id = $1 AND aul.org_id = $2
+                     AND aul.log_date >= $3 AND aul.log_date <= $4
+                     GROUP BY ac.id, ac.name, ac.productivity_type
+                     ORDER BY total_seconds DESC`,
+                    [userId, orgId, start_date, end_date]
+                );
+            } else {
+                throw err;
+            }
+        }
 
         res.json(result.rows);
     } catch (error) {
