@@ -109,18 +109,20 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
 
             {/* Summary Cards Row 1: Time */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+
+                <SummaryCard
+                    icon={<Monitor className="w-4 h-4 text-indigo-600" />}
+                    label="Available for the day"
+                    value={formatSeconds((totals.work_seconds || 0) + (totals.idle_seconds || 0) + (totals.break_seconds || 0))}
+                    color="indigo"
+                />
                 <SummaryCard
                     icon={<Timer className="w-4 h-4 text-green-600" />}
-                    label="Active Work"
+                    label="Work Session"
                     value={formatSeconds(totals.work_seconds)}
                     color="green"
                 />
-                <SummaryCard
-                    icon={<Pause className="w-4 h-4 text-gray-500" />}
-                    label="Idle Time / AFK Time"
-                    value={formatSeconds(totals.idle_seconds)}
-                    color="gray"
-                />
+
                 <SummaryCard
                     icon={<Coffee className="w-4 h-4 text-orange-500" />}
                     label="Break Time"
