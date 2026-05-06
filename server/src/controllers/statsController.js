@@ -83,11 +83,12 @@ export const getAdminStats = async (req, res) => {
         );
 
         // 2. Status Distribution (Online vs Offline)
-        // Online = heartbeat < 2 mins ago
+        // Use the same 5-minute window as activeUsers (agent_sessions) and default agent heartbeat;
+        // a 2-minute window made most agents "offline" here while still counted in Active Now.
         const statusDist = await query(
             `SELECT
-                COUNT(*) FILTER (WHERE last_heartbeat > NOW() - INTERVAL '2 minutes') as online,
-                COUNT(*) FILTER (WHERE last_heartbeat <= NOW() - INTERVAL '2 minutes' OR last_heartbeat IS NULL) as offline
+                COUNT(*) FILTER (WHERE last_heartbeat > NOW() - INTERVAL '5 minutes') as online,
+                COUNT(*) FILTER (WHERE last_heartbeat <= NOW() - INTERVAL '5 minutes' OR last_heartbeat IS NULL) as offline
              FROM users
              WHERE org_id = $1 AND is_active = true AND deleted_at IS NULL`,
             [orgId]
@@ -171,16 +172,16 @@ export const getManagerStats = async (req, res) => {
             [orgId, req.user.id, teamIds, refDate]
         );
 
-        // 2. Team Status Distribution
+        // 2. Team Status Distribution (same 5-minute presence window as admin stats / Active Now)
         const now = new Date();
-        const twoMinsAgo = new Date(now.getTime() - 2 * 60000);
+        const fiveMinsAgo = new Date(now.getTime() - 5 * 60000);
 
         // Calculate from teamStats which basically has the user rows
         let onlineCount = 0;
         let offlineCount = 0;
 
         teamStats.rows.forEach(user => {
-            if (user.last_heartbeat && new Date(user.last_heartbeat) > twoMinsAgo) {
+            if (user.last_heartbeat && new Date(user.last_heartbeat) > fiveMinsAgo) {
                 onlineCount++;
             } else {
                 offlineCount++;

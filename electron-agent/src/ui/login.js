@@ -23,6 +23,13 @@ const endShiftBtn = document.getElementById('endShiftBtn');
 const breakBtn = document.getElementById('breakBtn');
 const resumeBtn = document.getElementById('resumeBtn');
 const logoutBtn = document.getElementById('logoutBtn');
+const captionMinimizeBtn = document.getElementById('captionMinimizeBtn');
+const captionUpdateBtn = document.getElementById('captionUpdateBtn');
+const captionUpdateLabel = document.getElementById('captionUpdateLabel');
+const captionUpdateIcon = document.getElementById('captionUpdateIcon');
+const appVersionLabel = document.getElementById('appVersionLabel');
+
+let updateUiResetTimer = null;
 
 // Custom Dropdowns
 const campaignTrigger = document.getElementById('campaignTrigger');
@@ -47,6 +54,7 @@ let selectedCampaignId = null;
 let hasCampaigns = false;
 /** False until get-campaigns finishes (prevents starting shift while hasCampaigns is still false). */
 let campaignsLoaded = false;
+let selectedBreakName = null;
 
 function updateStartShiftButtonState() {
     const mustPickCampaign = campaignsLoaded && hasCampaigns;
@@ -443,7 +451,7 @@ endShiftBtn.addEventListener('click', async () => {
     updateLastSync();
 });
 
-breakBtn.addEventListener('click', () => {
+breakBtn.addEventListener('click', async () => {
     const breakName = selectedBreakName;
     if (!breakName) {
         breakTrigger.classList.add('ring-2', 'ring-amber-500/50');
@@ -451,7 +459,18 @@ breakBtn.addEventListener('click', () => {
     }
     breakTrigger.classList.remove('ring-2', 'ring-amber-500/50');
 
-    ipcRenderer.send('pause-tracking', breakName);
+    const pauseResult = await ipcRenderer.invoke('pause-tracking', breakName);
+    if (!pauseResult || !pauseResult.ok) {
+        const msg =
+            pauseResult?.reason === 'already_on_break'
+                ? 'You are already on a break. Resume work before starting another.'
+                : pauseResult?.reason === 'no_session'
+                    ? 'Start your shift before taking a break.'
+                    : 'Could not start break. Try again.';
+        showOSNotification('Break', msg);
+        return;
+    }
+
     activeActions.classList.add('hidden');
     activeActions.classList.remove('flex');
     breakActions.classList.remove('hidden');
@@ -499,6 +518,116 @@ logoutBtn.addEventListener('click', () => {
     stopTimer();
     stopBreakTimer();
 });
+
+if (captionMinimizeBtn) {
+    captionMinimizeBtn.addEventListener('click', () => {
+        ipcRenderer.send('window-minimize');
+    });
+}
+
+function setCaptionUpdateUi(payload) {
+    if (!captionUpdateBtn || !captionUpdateLabel || !captionUpdateIcon) return;
+    const phase = payload.phase;
+    captionUpdateBtn.classList.remove('ready');
+    captionUpdateIcon.classList.remove('spin-icon');
+
+    if (updateUiResetTimer) {
+        clearTimeout(updateUiResetTimer);
+        updateUiResetTimer = null;
+    }
+
+    switch (phase) {
+        case 'checking':
+            captionUpdateBtn.disabled = true;
+            captionUpdateLabel.textContent = '…';
+            captionUpdateIcon.classList.add('spin-icon');
+            captionUpdateBtn.title = 'Checking for updates…';
+            break;
+        case 'available':
+            captionUpdateBtn.disabled = true;
+            captionUpdateLabel.textContent = '0%';
+            captionUpdateBtn.title = 'Downloading update…';
+            break;
+        case 'downloaded':
+            captionUpdateBtn.disabled = false;
+            captionUpdateBtn.classList.add('ready');
+            captionUpdateLabel.textContent = 'Restart';
+            captionUpdateBtn.title = `Restart to install v${payload.version || ''}`;
+            break;
+        case 'error':
+            captionUpdateBtn.disabled = false;
+            captionUpdateLabel.textContent = 'Update';
+            captionUpdateBtn.title = payload.message || 'Update check failed';
+            showOSNotification('Update', payload.message || 'Could not check for updates.');
+            break;
+        case 'current':
+            captionUpdateBtn.disabled = false;
+            captionUpdateLabel.textContent = 'Up to date';
+            captionUpdateBtn.title = 'Latest version installed';
+            updateUiResetTimer = setTimeout(() => {
+                captionUpdateLabel.textContent = 'Update';
+                captionUpdateBtn.title = 'Check for updates';
+            }, 3500);
+            break;
+        case 'dev':
+            captionUpdateBtn.disabled = false;
+            captionUpdateLabel.textContent = 'Update';
+            captionUpdateBtn.title = 'Updates apply after installing a release build';
+            break;
+        default:
+            captionUpdateBtn.disabled = false;
+            captionUpdateLabel.textContent = 'Update';
+            captionUpdateBtn.title = 'Check for updates';
+    }
+}
+
+ipcRenderer.on('update-status', (_e, payload) => {
+    setCaptionUpdateUi(payload);
+});
+
+ipcRenderer.on('update-download-progress', (_e, p) => {
+    if (!captionUpdateLabel || !captionUpdateBtn || typeof p.percent !== 'number') return;
+    captionUpdateBtn.disabled = true;
+    captionUpdateLabel.textContent = `${Math.round(p.percent)}%`;
+    captionUpdateIcon.classList.remove('spin-icon');
+    captionUpdateBtn.title = 'Downloading update…';
+});
+
+if (captionUpdateBtn) {
+    captionUpdateBtn.addEventListener('click', async () => {
+        const isRestart = captionUpdateBtn.classList.contains('ready') || captionUpdateLabel.textContent === 'Restart';
+        if (isRestart) {
+            await ipcRenderer.invoke('updater-install');
+            return;
+        }
+        const r = await ipcRenderer.invoke('updater-check');
+        if (r && r.reason === 'dev') {
+            showOSNotification('Updates', r.message || 'Install the released app to receive updates.');
+            setCaptionUpdateUi({ phase: 'dev' });
+            return;
+        }
+        if (r && !r.ok && r.message) {
+            showOSNotification('Update', r.message);
+        }
+    });
+}
+
+(async function initVersionAndUpdaterUi() {
+    try {
+        const v = await ipcRenderer.invoke('get-app-version');
+        if (appVersionLabel && v) {
+            appVersionLabel.textContent = `v${v}`;
+        }
+        const st = await ipcRenderer.invoke('updater-get-state');
+        if (st && st.phase === 'downloaded' && st.remoteVersion) {
+            setCaptionUpdateUi({ phase: 'downloaded', version: st.remoteVersion });
+        } else if (st && st.phase === 'dev') {
+            setCaptionUpdateUi({ phase: 'dev' });
+        }
+    } catch (e) {
+        console.warn('[UI] version/updater init:', e);
+    }
+})();
 
 // Auto-login listener
 ipcRenderer.on('auto-login-success', (event, { user, token }) => {

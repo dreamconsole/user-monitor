@@ -72,6 +72,44 @@ npm run dist:linux
 
 The output files will be in the `dist/` folder.
 
+### Auto-update (Windows)
+
+The installed agent checks **GitHub Releases** on this repo (`dreamconsole/user-monitor`) for a newer version than `package.json` / the built app.
+
+- **How it works**: `electron-updater` downloads updates using the **NSIS** installer metadata (`latest.yml` + `.exe`). The **MSI** is optional for manual / IT installs; in-place auto-update follows the NSIS channel.
+- **Who gets updates**: Users who installed from the published **Setup .exe** (NSIS). Bump `electron-agent/package.json` `version`, build, and publish a GitHub Release containing the new artifacts.
+- **Development**: `npm start` is **not** packaged — the Update button explains that updates apply only to installed builds.
+
+### Publishing a Windows release (CI)
+
+1. Bump the agent version in `electron-agent/package.json` (or rely on the workflow overwrite — see below).
+2. Create and push an annotated tag (recommended):
+
+   ```bash
+   cd electron-agent
+   npm version patch   # or set version manually, then:
+   git tag agent-v$(node -p "require('./package.json').version")
+   git push origin main --tags
+   ```
+
+   Tag format must be **`agent-v1.2.3`** (workflow extracts `1.2.3`).
+
+3. GitHub Actions workflow **`Electron Agent (Windows) Release`** (`.github/workflows/electron-agent-release.yml`) builds on **windows-latest**, runs `electron-builder --win --publish always`, and uploads **NSIS**, **MSI**, and update metadata to the Release.
+
+**Manual publish from a Windows machine** (requires `GH_TOKEN` with `repo` scope if the repo is private):
+
+```bash
+cd electron-agent
+set GH_TOKEN=ghp_xxxx   # Windows CMD; use export on Git/Linux
+npm run release:win
+```
+
+### In-app behavior
+
+- Top caption bar **Update** runs a manual check; progress shows as a percentage while downloading.
+- After download, the button becomes **Restart** (green) — click to install and relaunch.
+- OS notifications fire when an update is **available** and when it is **ready to install**.
+
 ## Troubleshooting
 
 ### "invalid ELF header" / better_sqlite3.node / "Database not initialized" after login

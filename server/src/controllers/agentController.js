@@ -7,6 +7,61 @@ import { broadcastToManagers } from '../websocket.js';
 /** After org max shift hours from today's first check-in, force logout if idle this long (seconds). Applies during break. */
 const SHIFT_CAP_POST_MAX_IDLE_SEC = 30 * 60;
 
+async function setForceLogoutFlag(userId) {
+    await query('UPDATE users SET force_logout = true WHERE id = $1', [userId]);
+}
+
+/**
+ * Daily break usage over max_duration_seconds for a break type, then idle this long → force logout (when org break_exceeded_action is logout).
+ */
+async function evaluateBreakExceededIdleForceLogout(orgId, userId, idleSecondsRaw) {
+    if (idleSecondsRaw === undefined || idleSecondsRaw === null) return null;
+    const idleSeconds = Number(idleSecondsRaw);
+    if (!Number.isFinite(idleSeconds) || idleSeconds < SHIFT_CAP_POST_MAX_IDLE_SEC) return null;
+
+    const orgFeat = await query(
+        'SELECT break_exceeded_action FROM org_features WHERE org_id = $1',
+        [orgId]
+    );
+    const breakAction = orgFeat.rows[0]?.break_exceeded_action || 'notification';
+    if (breakAction !== 'logout') return null;
+
+    const orgTzRes = await query(
+        'SELECT COALESCE(timezone, \'UTC\') AS tz FROM organizations WHERE id = $1',
+        [orgId]
+    );
+    const orgTz = orgTzRes.rows[0]?.tz || 'UTC';
+
+    const typesRes = await query(
+        `SELECT id, max_duration_seconds FROM break_master
+         WHERE org_id = $1 AND is_active = true AND max_duration_seconds IS NOT NULL`,
+        [orgId]
+    );
+
+    for (const bt of typesRes.rows) {
+        const usageRes = await query(
+            `SELECT COALESCE(SUM(
+                CASE
+                    WHEN duration_seconds IS NOT NULL THEN duration_seconds
+                    WHEN end_time IS NULL THEN EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - start_time))
+                    ELSE 0
+                END
+            ), 0) AS total_used
+             FROM break_logs
+             WHERE user_id = $1
+               AND break_type_id = $2
+               AND org_id = $3
+               AND (start_time AT TIME ZONE $4)::date = (CURRENT_TIMESTAMP AT TIME ZONE $4)::date`,
+            [userId, bt.id, orgId, orgTz]
+        );
+        const totalUsed = parseInt(usageRes.rows[0]?.total_used || 0, 10);
+        if (totalUsed > bt.max_duration_seconds) {
+            return 'FORCE_LOGOUT';
+        }
+    }
+    return null;
+}
+
 /**
  * Uses first heartbeat today (org TZ), else first work_session start today, else now.
  * When past anchor + shift_duration hours and idleSeconds >= SHIFT_CAP_POST_MAX_IDLE_SEC, returns FORCE_LOGOUT.
@@ -171,6 +226,7 @@ export const logHeartbeat = async (req, res) => {
             if (idleMins >= (orgFeatures.idle_action_duration_minutes || 60)) {
                 if (orgFeatures.idle_action === 'logout') {
                     console.log(`[logHeartbeat] Triggering Auto-Logout for User ${user_id} due to inactivity (${idleMins} mins)`);
+                    await setForceLogoutFlag(user_id);
                     return res.status(200).json({ success: true, command: 'FORCE_LOGOUT' });
                 } else if (orgFeatures.idle_action === 'notification') {
                     const managerId = user.manager_id || (await query('SELECT manager_id FROM users WHERE id = $1', [user_id])).rows[0]?.manager_id;
@@ -196,6 +252,14 @@ export const logHeartbeat = async (req, res) => {
         const shiftCapCmd = await evaluateShiftDurationForceLogout(org_id, user_id, state, req.body.status, idleForShiftCap);
         if (shiftCapCmd === 'FORCE_LOGOUT') {
             console.log(`[logHeartbeat] Max shift duration + idle >= ${SHIFT_CAP_POST_MAX_IDLE_SEC}s; FORCE_LOGOUT user ${user_id}`);
+            await setForceLogoutFlag(user_id);
+            return res.status(200).json({ success: true, command: 'FORCE_LOGOUT' });
+        }
+
+        const breakExceededCmd = await evaluateBreakExceededIdleForceLogout(org_id, user_id, idleForShiftCap);
+        if (breakExceededCmd === 'FORCE_LOGOUT') {
+            console.log(`[logHeartbeat] Break limit exceeded + idle >= ${SHIFT_CAP_POST_MAX_IDLE_SEC}s; FORCE_LOGOUT user ${user_id}`);
+            await setForceLogoutFlag(user_id);
             return res.status(200).json({ success: true, command: 'FORCE_LOGOUT' });
         }
 
@@ -479,8 +543,9 @@ export async function checkAndNotifyBreakViolation(orgId, userId, breakTypeId) {
         const breakAction = orgFeaturesRes.rows[0]?.break_exceeded_action || 'notification';
 
         if (breakAction === 'logout') {
-            await query('UPDATE users SET force_logout = true WHERE id = $1', [userId]);
-            console.log(`[Notification] Auto-logout triggered for User ${userId} due to break violation`);
+            // force_logout is set from logHeartbeat after daily break limit is exceeded AND user is idle
+            // SHIFT_CAP_POST_MAX_IDLE_SEC (see evaluateBreakExceededIdleForceLogout), so CRM flag stays in sync with agent kick.
+            console.log(`[BreakViolation] User ${userId} exceeded ${break_name} limit; logout will apply after idle threshold on next heartbeats`);
         } else if (breakAction === 'notification') {
             // Find managers of the team
             const managersRes = await query(

@@ -2,6 +2,15 @@
 
 All updates to the server application are tracked here.
 
+## 1.2.3 - 2026-05-06
+### Changes
+- [Feature] `logHeartbeat`: set `users.force_logout` when enforcing max shift + 30m idle, daily **break** limit exceeded + 30m idle (`break_exceeded_action = logout`), and org idle-action logout—so CRM `force_logout` matches agent kick.
+- [Bugfix] Break limit with org action **logout**: removed immediate `force_logout` from `checkAndNotifyBreakViolation`; logout now follows the same **idle ≥ 30 minutes** rule via heartbeat as shift cap.
+
+## 1.2.2 - 2026-05-05
+### Changes
+- [Bugfix] Admin/manager dashboard `statusDistribution` online/offline: use the same **5-minute** `last_heartbeat` window as `activeUsers` (agent session heartbeats). The previous 2-minute window made “Real-time Workforce Status” show far fewer online users than the “Active Now” KPI when the agent heartbeat interval is 5 minutes.
+
 ## 1.2.1 - 2026-05-01
 ### Changes
 - [Config] Global `express-rate-limit`: raised `max` from 1000 to **20000** requests per IP per 30 minutes (`generalLimiter` in `index.js`).

@@ -1,7 +1,7 @@
 {
   "name": "user-monitor-agent",
   "productName": "User Monitor Agent",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Desktop Agent for User Activity Monitoring",
   "main": "src/main.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "postinstall": "electron-builder install-app-deps",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
+    "release:win": "electron-builder --win --publish always",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac"
   },
@@ -21,6 +22,7 @@
     "better-sqlite3": "11.3.0",
     "dotenv": "^16.3.1",
     "electron-store": "^8.1.0",
+    "electron-updater": "^6.8.3",
     "form-data": "^4.0.0",
     "jsonwebtoken": "^9.0.0",
     "luxon": "^3.4.0",
@@ -40,11 +42,33 @@
     "asarUnpack": [
       "**/node_modules/screenshot-desktop/**/*"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "dreamconsole",
+        "repo": "user-monitor"
+      }
+    ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     },
     "linux": {
       "target": [

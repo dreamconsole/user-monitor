@@ -198,8 +198,41 @@ class MonitorService {
         console.log('Monitor Service stopped.');
     }
 
+    /**
+     * Start a break. Only one open break at a time; closes orphaned local open breaks (e.g. after crash) before starting.
+     * @returns {{ ok: true } | { ok: false, reason: string }}
+     */
     pause(breakType) {
+        if (!this.currentWorkSessionId) {
+            console.warn('MonitorService.pause: No active work session; start shift first.');
+            return { ok: false, reason: 'no_session' };
+        }
+        if (this.isPaused) {
+            console.warn('MonitorService.pause: Already on break; end break with Resume first.');
+            return { ok: false, reason: 'already_on_break' };
+        }
+
         console.log(`Monitor Service: Pausing for ${breakType}`);
+
+        if (db.isInitialized()) {
+            try {
+                const orphans = db.getDB().prepare(
+                    `SELECT id, start_time FROM break_logs
+                     WHERE org_id = ? AND user_id = ? AND end_time IS NULL`
+                ).all(this.orgId, this.userId);
+                const nowClose = Date.now();
+                for (const row of orphans) {
+                    const duration = Math.max(0, Math.floor((nowClose - row.start_time) / 1000));
+                    db.getDB().prepare(
+                        `UPDATE break_logs SET end_time = ?, duration_seconds = ?, sync_status = 'pending' WHERE id = ?`
+                    ).run(nowClose, duration, row.id);
+                    console.warn(`[MonitorService] Closed orphaned open break ${row.id} (${duration}s) before starting a new break.`);
+                }
+            } catch (e) {
+                console.error('Failed to close orphaned breaks:', e);
+            }
+        }
+
         this.currentBreakId = uuidv4();
         this.isPaused = true;
         this.breakType = breakType;
@@ -227,12 +260,25 @@ class MonitorService {
                 require('./sync').forceSync();
             } catch (e) {
                 console.error('Failed to log break start:', e);
+                this.isPaused = false;
+                this.currentBreakId = null;
+                this.breakType = null;
+                this.currentState = 'ACTIVE';
+                if (global.statusUpdateCallback) global.statusUpdateCallback('ACTIVE');
+                return { ok: false, reason: 'db_error' };
             }
         } else {
             console.warn('DB not initialized; break start not persisted. Start tracking first.');
+            this.isPaused = false;
+            this.currentBreakId = null;
+            this.breakType = null;
+            this.currentState = 'ACTIVE';
+            if (global.statusUpdateCallback) global.statusUpdateCallback('ACTIVE');
+            return { ok: false, reason: 'db_not_initialized' };
         }
 
         screenshotService.setCurrentState('BREAK');
+        return { ok: true };
     }
 
     resume() {

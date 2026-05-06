@@ -205,15 +205,87 @@
         .no-drag {
             -webkit-app-region: no-drag;
         }
+
+        /* Frameless window: OS-style caption, minimize only (no close / no maximize) */
+        .window-caption {
+            height: 32px;
+            flex-shrink: 0;
+        }
+        .caption-min-btn {
+            width: 46px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            color: #334155;
+            cursor: default;
+            transition: background 0.12s ease;
+        }
+        .caption-min-btn:hover {
+            background: rgba(15, 23, 42, 0.08);
+        }
+        .caption-min-btn:active {
+            background: rgba(15, 23, 42, 0.14);
+        }
+        .caption-update-btn {
+            min-width: 72px;
+            height: 100%;
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            border: none;
+            border-right: 1px solid rgba(15, 23, 42, 0.12);
+            background: transparent;
+            color: #475569;
+            cursor: default;
+            transition: background 0.12s ease, color 0.12s ease;
+        }
+        .caption-update-btn:hover:not(:disabled) {
+            background: rgba(222, 23, 63, 0.08);
+            color: #de173f;
+        }
+        .caption-update-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .caption-update-btn.ready {
+            background: rgba(16, 185, 129, 0.15);
+            color: #047857;
+        }
+        @keyframes caption-spin {
+            to { transform: rotate(360deg); }
+        }
+        .caption-update-btn .spin-icon {
+            animation: caption-spin 0.9s linear infinite;
+        }
     </style>
 </head>
 
 <body>
     <div class="mesh-bg"></div>
 
+    <div class="window-caption flex items-stretch bg-[#e2e8f0] border-b border-slate-300">
+        <div class="drag-region flex flex-1 items-center min-w-0 px-3">
+            <span class="text-xs font-semibold text-slate-600 truncate">User Monitor Agent</span>
+        </div>
+        <div class="no-drag flex items-stretch border-l border-slate-300">
+            <button type="button" id="captionUpdateBtn" class="caption-update-btn" title="Check for updates">
+                <i data-lucide="refresh-cw" id="captionUpdateIcon" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                <span id="captionUpdateLabel" class="text-[10px] font-semibold leading-none whitespace-nowrap">Update</span>
+            </button>
+            <button type="button" id="captionMinimizeBtn" class="caption-min-btn border-l border-slate-300" title="Minimize" aria-label="Minimize">
+                <i data-lucide="minus" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- Header / Title Bar -->
-    <header class="drag-region flex items-center justify-between px-5 py-4 bg-white/40 border-b border-slate-200 backdrop-blur-md">
-        <div class="flex items-center gap-3">
+    <header class="flex items-center justify-between px-5 py-4 bg-white/40 border-b border-slate-200 backdrop-blur-md">
+        <div class="drag-region flex items-center gap-3 flex-1 min-w-0">
             <div class="p-1.5 bg-primary/10 rounded-lg">
                 <i data-lucide="shield-check" class="text-primary w-5 h-5"></i>
             </div>
@@ -368,7 +440,7 @@
         </div>
         <div class="flex flex-col items-end">
             <span id="lastSyncText" class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter italic">Never Synced</span>
-            <span class="text-[8px] text-slate-600">v1.1.0</span>
+            <span id="appVersionLabel" class="text-[8px] text-slate-600">—</span>
         </div>
     </footer>
 

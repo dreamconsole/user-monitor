@@ -8,6 +8,7 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 // const { machineIdSync } = require('node-machine-id'); // Will use later
 const db = require('./db');
+const { initUpdater } = require('./services/updater');
 
 // Set AppUserModelId for Windows Notifications
 if (process.platform === 'win32') {
@@ -33,6 +34,8 @@ function stopPowerBlocker() {
 let mainWindow;
 let tray = null;
 let isQuitting = false;
+/** @type {ReturnType<typeof initUpdater> | null} */
+let updaterCtl = null;
 
 global.statusUpdateCallback = (status) => {
     if (mainWindow && !mainWindow.webContents.isDestroyed()) {
@@ -49,6 +52,10 @@ function createWindow() {
         height: 600,
         resizable: false,
         maximizable: false,
+        minimizable: true,
+        closable: false,
+        // Linux (and some setups) ignore closable:false on a framed window — frameless + in-page caption is the reliable “minimize only, no X” layout.
+        frame: false,
         icon: path.join(__dirname, '../assets/icon.png'),
         webPreferences: {
             nodeIntegration: true,
@@ -96,6 +103,7 @@ function createTray() {
 app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
     createWindow();
+    updaterCtl = initUpdater(mainWindow);
     // createTray(); // Commented out until we have an icon
 
     // Check for auto-login
@@ -209,11 +217,14 @@ ipcMain.on('start-tracking', (event, data) => {
     startPowerBlocker();
 });
 
-ipcMain.on('pause-tracking', (event, breakType) => {
+ipcMain.handle('pause-tracking', (event, breakType) => {
     console.log(`Pausing tracking for break: ${breakType}`);
     const monitorService = require('./services/monitor');
-    monitorService.pause(breakType);
-    stopPowerBlocker();
+    const result = monitorService.pause(breakType);
+    if (result.ok) {
+        stopPowerBlocker();
+    }
+    return result;
 });
 
 ipcMain.on('resume-tracking', () => {
@@ -314,6 +325,36 @@ app.on('force-logout', () => {
 ipcMain.on('get-user-data-path', (event) => {
     event.returnValue = app.getPath('userData');
 });
+
+ipcMain.on('window-minimize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.minimize();
+    }
+});
+
+ipcMain.handle('updater-check', async () => {
+    if (!app.isPackaged) {
+        return { ok: false, reason: 'dev', message: 'Updates apply to installed builds only (not npm start).' };
+    }
+    try {
+        await updaterCtl.checkForUpdates();
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, message: e.message || String(e) };
+    }
+});
+
+ipcMain.handle('updater-install', async () => {
+    if (!app.isPackaged) {
+        return { ok: false, reason: 'dev' };
+    }
+    updaterCtl.quitAndInstall();
+    return { ok: true };
+});
+
+ipcMain.handle('updater-get-state', () => (updaterCtl ? updaterCtl.getState() : { phase: 'unknown' }));
+
+ipcMain.handle('get-app-version', () => app.getVersion());
 
 ipcMain.handle('get-breaks', async () => {
     const authService = require('./services/auth');
