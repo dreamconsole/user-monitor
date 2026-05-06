@@ -333,9 +333,7 @@ ipcMain.on('window-minimize', () => {
 });
 
 ipcMain.handle('updater-check', async () => {
-    if (!app.isPackaged) {
-        return { ok: false, reason: 'dev', message: 'Updates apply to installed builds only (not npm start).' };
-    }
+    if (!updaterCtl) return { ok: false, message: 'Updater not ready' };
     try {
         await updaterCtl.checkForUpdates();
         return { ok: true };
@@ -345,11 +343,8 @@ ipcMain.handle('updater-check', async () => {
 });
 
 ipcMain.handle('updater-install', async () => {
-    if (!app.isPackaged) {
-        return { ok: false, reason: 'dev' };
-    }
-    updaterCtl.quitAndInstall();
-    return { ok: true };
+    if (!updaterCtl) return { ok: false };
+    return updaterCtl.downloadAndInstall();
 });
 
 ipcMain.handle('updater-get-state', () => (updaterCtl ? updaterCtl.getState() : { phase: 'unknown' }));

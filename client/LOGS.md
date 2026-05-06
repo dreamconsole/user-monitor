@@ -2,6 +2,10 @@
 
 All updates to the client application are tracked here.
 
+## 1.1.2 - 2026-05-06
+### Changes
+- [Feature] **Super Admin → Global Settings**: dedicated **Desktop agent (Windows)** card with **`agent_latest_version`**, **`agent_windows_download_url`**, optional MSI URL and release notes; wider inputs / textarea; friendly labels. SSO toggles remain under **Configuration flags**.
+
 ## 1.1.1 - 2026-05-01
 ### Changes
 - [Bugfix] **Dashboard** (`/` orgadmin): **7-Day Productivity Trend** footer showed **work + idle** as one number (`totalH`) while **Work Hours** / **Productivity Mix** show **work only** — clarified copy and label each day as **`X.Xh work`** + **`Y.Yh idle`** so totals align with KPIs (e.g. 64.9h vs 71.2h was work vs work+idle).

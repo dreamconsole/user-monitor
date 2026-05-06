@@ -86,15 +86,32 @@ npm start           # Launch tracking agent
 
 ## 📦 Production Builds
 
-### Desktop Agent
-```bash
-# Generate platform-specific installers
-npm run dist:win    # For Windows
-npm run dist:linux  # For Linux
-```
+### Desktop Agent (`electron-agent/`)
 
-### Web Dashboard
+Run commands **inside** `electron-agent` after `npm install` (and `npx electron-rebuild -f` if native modules complain):
+
+| Script | Output | Use on |
+|--------|--------|--------|
+| `npm run dist:win` | **Setup `.exe`** (NSIS) + `latest.yml` / blockmap | **Linux or Windows** |
+| `npm run dist:win:nsis` | Same as `dist:win` | Linux or Windows |
+| `npm run dist:win:msi` | **`.msi`** installer only | **Windows** (WiX; unreliable on Linux/Wine) |
+| `npm run dist:win:all` | **`.exe` + `.msi`** | **Windows** only |
+| `npm run dist:linux` | Linux `.AppImage` | Linux |
+
+Artifacts land in `electron-agent/dist/`.
+
+**Updates for installed agents** use **`global_settings`** (Super Admin → **Global Settings**): **Agent latest version**, **Windows installer URL (.exe)**, optional MSI URL and release notes. Those feed **`GET /agent/update-info`** (legacy **`AGENT_UPDATE_*`** env vars still apply only when a DB field is empty). Host the **`.exe`** on your CDN (**HTTPS**). On **Windows**, the agent downloads in-app and runs the installer; elsewhere it opens the URL in the browser.
+
+**CI build (Windows installers as artifacts)**
+
+1. Push tag **`agent-v*`** (e.g. `agent-v1.2.0`) so **`.github/workflows/electron-agent-release.yml`** builds **NSIS + MSI** (`--publish never`) and uploads **`dist/*.exe`** and **`latest.yml`** as workflow artifacts.
+2. Or build locally from `electron-agent/` and distribute installers yourself.
+
+More detail: [`electron-agent/README.md`](electron-agent/README.md) and [`docs/reports/electron-agent-msi-build-notes.md`](docs/reports/electron-agent-msi-build-notes.md).
+
+### Web Dashboard (`client/`)
 ```bash
+cd client
 npm run build       # Optimized production bundle
 ```
 

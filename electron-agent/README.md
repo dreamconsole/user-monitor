@@ -56,14 +56,17 @@ npm start
 
 ## Building Executables
 
-### Windows (.exe)
-To build a Windows installer and executable:
+### Windows
+
+**On Linux (Ubuntu, etc.):** `npm run dist:win` builds **NSIS only** (`.exe` + `latest.yml`) so Wine does not run the WiX MSI step that breaks with `LGHT0001`.
 
 ```bash
 npm run dist:win
 ```
 
-*Note: You can run this command on Linux to cross-compile for Windows (requires Wine to be installed), but it is recommended to run this on a Windows machine for best compatibility.*
+Same as `npm run dist:win:nsis`. Output: `dist/User Monitor Agent Setup <version>.exe` plus `latest.yml` (auto-update).
+
+**MSI (`.msi`):** Not part of default `dist:win` on purpose. On **Windows**: `npm run dist:win:msi` or `npm run dist:win:all` (NSIS + MSI). **GitHub Actions** publishes both — see `.github/workflows/electron-agent-release.yml`. Details: `docs/reports/electron-agent-msi-build-notes.md`.
 
 ### Linux (.AppImage)
 ```bash
@@ -74,11 +77,9 @@ The output files will be in the `dist/` folder.
 
 ### Auto-update (Windows)
 
-The installed agent checks **GitHub Releases** on this repo (`dreamconsole/user-monitor`) for a newer version than `package.json` / the built app.
+The agent compares its **semver** (`app.getVersion()`) to **`GET {API_URL}/agent/update-info`** on your API server (same base URL as login). Values come from **Super Admin → Global Settings** (`global_settings`): **Agent latest version**, **Windows installer URL**, optional MSI URL and release notes. Legacy **`AGENT_UPDATE_*`** env vars on the API server only apply when the matching DB field is empty.
 
-- **How it works**: `electron-updater` downloads updates using the **NSIS** installer metadata (`latest.yml` + `.exe`). The **MSI** is optional for manual / IT installs; in-place auto-update follows the NSIS channel.
-- **Who gets updates**: Users who installed from the published **Setup .exe** (NSIS). Bump `electron-agent/package.json` `version`, build, and publish a GitHub Release containing the new artifacts.
-- **Development**: `npm start` is **not** packaged — the Update button explains that updates apply only to installed builds.
+If the server version is newer, the caption bar shows **Download**. On **Windows**, the agent downloads the **HTTPS** installer to a temp file (progress shown), then **starts the installer** so the user can complete setup (NSIS may ask to close the running app). On **Linux/macOS**, the download URL opens in the browser. There is no GitHub Releases requirement for this flow.
 
 ### Publishing a Windows release (CI)
 
@@ -94,21 +95,21 @@ The installed agent checks **GitHub Releases** on this repo (`dreamconsole/user-
 
    Tag format must be **`agent-v1.2.3`** (workflow extracts `1.2.3`).
 
-3. GitHub Actions workflow **`Electron Agent (Windows) Release`** (`.github/workflows/electron-agent-release.yml`) builds on **windows-latest**, runs `electron-builder --win --publish always`, and uploads **NSIS**, **MSI**, and update metadata to the Release.
+3. GitHub Actions workflow **`Electron Agent (Windows) Release`** (`.github/workflows/electron-agent-release.yml`) builds on **windows-latest**, runs `electron-builder` (**NSIS + MSI**, `--publish never`), and uploads **`dist/*.exe`** and **`latest.yml`** as workflow artifacts. Host the installer on your CDN, then enter version + URLs in **Super Admin → Global Settings**.
 
-**Manual publish from a Windows machine** (requires `GH_TOKEN` with `repo` scope if the repo is private):
+**Local Windows build** (no artifact upload):
 
 ```bash
 cd electron-agent
-set GH_TOKEN=ghp_xxxx   # Windows CMD; use export on Git/Linux
 npm run release:win
 ```
 
 ### In-app behavior
 
-- Top caption bar **Update** runs a manual check; progress shows as a percentage while downloading.
-- After download, the button becomes **Restart** (green) — click to install and relaunch.
-- OS notifications fire when an update is **available** and when it is **ready to install**.
+- Top caption bar **Update** checks **`/agent/update-info`**; when a newer **`latestVersion`** is configured, the button becomes **Download** (green).
+- **Windows**: **Download** streams the **`.exe`** in-app, shows **%**, then launches the installer.
+- **Other OS**: **Download** opens **`downloadUrl`** in the default browser.
+- OS notifications fire once per remote version when an update is **available**, and when the installer process is started on Windows.
 
 ## Troubleshooting
 

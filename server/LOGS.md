@@ -2,6 +2,27 @@
 
 All updates to the server application are tracked here.
 
+## 1.2.8 - 2026-05-06
+### Changes
+- [Feature] Agent update manifest (**`GET /agent/update-info`**, **`GET /update`** → **`agentUpdate`**) reads **`global_settings`**: **`agent_latest_version`**, **`agent_windows_download_url`**, optional **`agent_windows_download_url_msi`**, **`agent_update_release_notes`**. Legacy **`AGENT_UPDATE_*`** env vars still override when a DB value is empty. Migration **`013_agent_update_global_settings.js`** inserts new keys.
+- [Refactor] **`fetchAgentUpdateManifest()`** async in **`agentUpdateInfoController.js`**; **`configurationHint`** references Super Admin UI.
+
+## 1.2.7 - 2026-05-06
+### Changes
+- [Feature] **`agentUpdate.configurationHint`** — when **`configured`** is false, explains missing **`AGENT_UPDATE_*`** env vars (requires non-empty **`AGENT_UPDATE_LATEST_VERSION`** and **`AGENT_UPDATE_DOWNLOAD_URL`**).
+
+## 1.2.6 - 2026-05-06
+### Changes
+- [Feature] **`GET /update`** — response now includes **`agentUpdate`**: same installer metadata as **`GET /agent/update-info`** (`configured`, `latestVersion`, `downloadUrl`, optional **`downloadUrlMsi`** from **`AGENT_UPDATE_DOWNLOAD_URL_MSI`**). Shared helper `getAgentUpdateManifest()` in `agentUpdateInfoController.js`.
+
+## 1.2.5 - 2026-05-06
+### Changes
+- [Feature] **`GET /agent/update-info`** — public JSON for desktop agents: `latestVersion`, `downloadUrl`, optional `releaseNotes` from **`AGENT_UPDATE_LATEST_VERSION`**, **`AGENT_UPDATE_DOWNLOAD_URL`**, **`AGENT_UPDATE_RELEASE_NOTES`**. Registered before authenticated `/agent` routes. Controller: `server/src/controllers/agentUpdateInfoController.js`.
+
+## 1.2.4 - 2026-05-06
+### Changes
+- [Feature] **`GET /update`** — deployment / update diagnostics: API `package.json` version, Node/OS uptime details, **sanitized** `process.env` (secrets/tokens/DB URLs redacted), filesystem paths (`serverRoot`, `.env`, `uploads`, entry script), optional **`electron-agent`** version when `../electron-agent/package.json` exists. Router: `server/src/routes/update.js`.
+
 ## 1.2.3 - 2026-05-06
 ### Changes
 - [Feature] `logHeartbeat`: set `users.force_logout` when enforcing max shift + 30m idle, daily **break** limit exceeded + 30m idle (`break_exceeded_action = logout`), and org idle-action logout—so CRM `force_logout` matches agent kick.

@@ -2,6 +2,31 @@
 
 All updates to the electron-agent are tracked here.
 
+## 1.2.6 - 2026-05-06
+### Changes
+- [Config] README: agent **`downloadUrl`** source is **Super Admin `global_settings`** (not env-only); optional legacy **`AGENT_UPDATE_*`** fallback documented.
+
+## 1.2.5 - 2026-05-06
+### Changes
+- [Feature] **In-app installer download (Windows)**: **`Download`** saves **`AGENT_UPDATE_DOWNLOAD_URL`** to temp, shows **%** progress, then **runs the `.exe`** (detached). Non-Windows still opens the URL in the browser. HTTPS required for download; **`install_launched`** UI state after spawn.
+
+## 1.2.4 - 2026-05-06
+### Changes
+- [Feature] **Updates via server API**: removed **`electron-updater`** / GitHub Releases. Agent calls **`GET {API_URL}/agent/update-info`**, compares semver with **`semver`**, caption bar shows **Download** for newer **`latestVersion`**. Periodic check ~12s after startup + every 6h. **`release:win`** / **`build.publish`** no longer target GitHub; CI workflow uploads **`dist/*.exe`** + **`latest.yml`** as artifacts.
+- [Config] **`server/.env.example`**: documented **`AGENT_UPDATE_*`** vars for the update manifest endpoint.
+
+## 1.2.3 - 2026-05-06
+### Changes
+- [Config] Root [`README.md`](../README.md): Desktop Agent production builds — script table (`dist:win`, `dist:win:msi`, `dist:win:all`), run from `electron-agent/`, GitHub Release / tag / Actions notes; links to `electron-agent/README.md` and MSI/Wine doc.
+
+## 1.2.2 - 2026-05-06
+### Changes
+- [Config] Default **`dist:win`** / **`release:win`** build **NSIS only** (`package.json` `win.target` NSIS-only). Dual NSIS+MSI in config caused WiX/MSI to run on Linux and fail (`LGHT0001`), aborting the whole command so no new `.exe` was produced. **`dist:win:all`** = NSIS+MSI (Windows). CI workflow builds **`nsis:x64` + `msi:x64`** explicitly on `windows-latest`.
+
+## 1.2.1 - 2026-05-06
+### Changes
+- [Config] Scripts `dist:win:nsis` and explicit `dist:win:msi`; README + `docs/reports/electron-agent-msi-build-notes.md`: MSI via WiX fails on Ubuntu/Wine (`LGHT0001`); use NSIS on Linux or build MSI on Windows / GitHub Actions.
+
 ## 1.2.0 - 2026-05-06
 ### Changes
 - [Feature] **Auto-update**: `electron-updater` + GitHub Releases (`publish`: dreamconsole/user-monitor). Caption bar **Update** button (check / progress / **Restart** when downloaded); OS notifications when an update is available and when ready to install. Periodic check after startup + every 6h (packaged builds only).

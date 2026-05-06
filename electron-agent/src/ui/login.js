@@ -544,15 +544,28 @@ function setCaptionUpdateUi(payload) {
             captionUpdateBtn.title = 'Checking for updates…';
             break;
         case 'available':
-            captionUpdateBtn.disabled = true;
-            captionUpdateLabel.textContent = '0%';
-            captionUpdateBtn.title = 'Downloading update…';
-            break;
-        case 'downloaded':
             captionUpdateBtn.disabled = false;
             captionUpdateBtn.classList.add('ready');
-            captionUpdateLabel.textContent = 'Restart';
-            captionUpdateBtn.title = `Restart to install v${payload.version || ''}`;
+            captionUpdateLabel.textContent = 'Download';
+            captionUpdateBtn.title =
+                process.platform === 'win32'
+                    ? `Download v${payload.version || ''} and run installer`
+                    : `Open download v${payload.version || ''} in browser`;
+            break;
+        case 'downloading':
+            captionUpdateBtn.disabled = true;
+            captionUpdateLabel.textContent = '0%';
+            captionUpdateIcon.classList.add('spin-icon');
+            captionUpdateBtn.title = 'Downloading installer…';
+            break;
+        case 'install_launched':
+            captionUpdateBtn.disabled = false;
+            captionUpdateLabel.textContent = 'Setup';
+            captionUpdateBtn.title = 'Complete the installer window when it appears';
+            if (updateUiResetTimer) clearTimeout(updateUiResetTimer);
+            updateUiResetTimer = setTimeout(() => {
+                setCaptionUpdateUi({ phase: 'available', version: payload.version });
+            }, 5000);
             break;
         case 'error':
             captionUpdateBtn.disabled = false;
@@ -572,7 +585,7 @@ function setCaptionUpdateUi(payload) {
         case 'dev':
             captionUpdateBtn.disabled = false;
             captionUpdateLabel.textContent = 'Update';
-            captionUpdateBtn.title = 'Updates apply after installing a release build';
+            captionUpdateBtn.title = 'Check server for updates';
             break;
         default:
             captionUpdateBtn.disabled = false;
@@ -586,26 +599,26 @@ ipcRenderer.on('update-status', (_e, payload) => {
 });
 
 ipcRenderer.on('update-download-progress', (_e, p) => {
-    if (!captionUpdateLabel || !captionUpdateBtn || typeof p.percent !== 'number') return;
-    captionUpdateBtn.disabled = true;
-    captionUpdateLabel.textContent = `${Math.round(p.percent)}%`;
-    captionUpdateIcon.classList.remove('spin-icon');
-    captionUpdateBtn.title = 'Downloading update…';
+    if (!captionUpdateLabel || !captionUpdateBtn || !captionUpdateIcon) return;
+    if (typeof p.percent === 'number') {
+        captionUpdateBtn.disabled = true;
+        captionUpdateLabel.textContent = `${Math.round(p.percent)}%`;
+        captionUpdateIcon.classList.add('spin-icon');
+        captionUpdateBtn.title = 'Downloading installer…';
+    }
 });
 
 if (captionUpdateBtn) {
     captionUpdateBtn.addEventListener('click', async () => {
-        const isRestart = captionUpdateBtn.classList.contains('ready') || captionUpdateLabel.textContent === 'Restart';
-        if (isRestart) {
-            await ipcRenderer.invoke('updater-install');
+        const isDownload = captionUpdateBtn.classList.contains('ready') && captionUpdateLabel.textContent === 'Download';
+        if (isDownload) {
+            const result = await ipcRenderer.invoke('updater-install');
+            if (result && !result.ok && result.message) {
+                showOSNotification('Update', result.message);
+            }
             return;
         }
         const r = await ipcRenderer.invoke('updater-check');
-        if (r && r.reason === 'dev') {
-            showOSNotification('Updates', r.message || 'Install the released app to receive updates.');
-            setCaptionUpdateUi({ phase: 'dev' });
-            return;
-        }
         if (r && !r.ok && r.message) {
             showOSNotification('Update', r.message);
         }
@@ -619,10 +632,8 @@ if (captionUpdateBtn) {
             appVersionLabel.textContent = `v${v}`;
         }
         const st = await ipcRenderer.invoke('updater-get-state');
-        if (st && st.phase === 'downloaded' && st.remoteVersion) {
-            setCaptionUpdateUi({ phase: 'downloaded', version: st.remoteVersion });
-        } else if (st && st.phase === 'dev') {
-            setCaptionUpdateUi({ phase: 'dev' });
+        if (st && st.phase === 'available' && st.remoteVersion) {
+            setCaptionUpdateUi({ phase: 'available', version: st.remoteVersion });
         }
     } catch (e) {
         console.warn('[UI] version/updater init:', e);

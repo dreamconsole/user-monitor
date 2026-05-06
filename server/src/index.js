@@ -21,6 +21,8 @@ import auditRoutes from './routes/audit.js';
 import superadminRoutes from './routes/superadmin.js';
 import teamRoutes from './routes/teams.js';
 import campaignRoutes from './routes/campaigns.js';
+import updateRoutes from './routes/update.js';
+import { getAgentUpdateInfo } from './controllers/agentUpdateInfoController.js';
 
 dotenv.config();
 
@@ -61,6 +63,9 @@ const authLimiter = rateLimit({
 // Secure uploads route - require auth to access screenshots
 app.use('/uploads', authenticateToken, express.static('uploads'));
 
+/** Must be before app.use('/agent', …) so it is not behind agent JWT */
+app.get('/agent/update-info', getAgentUpdateInfo);
+
 // Routes
 app.use('/auth', authLimiter, authRoutes);
 app.use('/users', userRoutes);
@@ -92,6 +97,9 @@ app.get('/health', async (req, res) => {
         res.status(503).json({ status: 'error', message: 'Database connection failed' });
     }
 });
+
+/** Deploy / agent update diagnostics: server version, sanitized env, paths (secrets redacted) */
+app.use('/update', updateRoutes);
 
 // Error handling - do NOT expose internal error details to clients
 app.use((err, req, res, next) => {

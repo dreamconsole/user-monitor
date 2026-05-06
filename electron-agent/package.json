@@ -9,8 +9,11 @@
     "dev": "electron . --no-sandbox",
     "postinstall": "electron-builder install-app-deps",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "release:win": "electron-builder --win --publish always",
+    "dist:win": "electron-builder --win nsis:x64",
+    "dist:win:nsis": "electron-builder --win nsis:x64",
+    "dist:win:msi": "electron-builder --win msi:x64",
+    "dist:win:all": "electron-builder --win nsis:x64 --win msi:x64",
+    "release:win": "electron-builder --win nsis:x64",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac"
   },
@@ -22,12 +25,12 @@
     "better-sqlite3": "11.3.0",
     "dotenv": "^16.3.1",
     "electron-store": "^8.1.0",
-    "electron-updater": "^6.8.3",
     "form-data": "^4.0.0",
     "jsonwebtoken": "^9.0.0",
     "luxon": "^3.4.0",
     "node-machine-id": "^1.1.12",
     "screenshot-desktop": "^1.15.0",
+    "semver": "^7.7.3",
     "uiohook-napi": "^1.5.4",
     "uuid": "^9.0.1",
     "winston": "^3.10.0"
@@ -42,23 +45,10 @@
     "asarUnpack": [
       "**/node_modules/screenshot-desktop/**/*"
     ],
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "dreamconsole",
-        "repo": "user-monitor"
-      }
-    ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "msi",
           "arch": [
             "x64"
           ]
