@@ -2,6 +2,10 @@
 
 All updates to the server application are tracked here.
 
+## 1.2.9 - 2026-05-12
+### Changes
+- [Bugfix] **`GET /agent/update-info`** is registered on **`routes/agent.js`** **before** **`router.use(authenticateToken)`**, so it stays public even when only the **`/agent`** mount is used (avoids 401 **`Null token`**). Removed duplicate **`app.get`** from **`index.js`**.
+
 ## 1.2.8 - 2026-05-06
 ### Changes
 - [Feature] Agent update manifest (**`GET /agent/update-info`**, **`GET /update`** → **`agentUpdate`**) reads **`global_settings`**: **`agent_latest_version`**, **`agent_windows_download_url`**, optional **`agent_windows_download_url_msi`**, **`agent_update_release_notes`**. Legacy **`AGENT_UPDATE_*`** env vars still override when a DB value is empty. Migration **`013_agent_update_global_settings.js`** inserts new keys.

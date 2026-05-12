@@ -3,6 +3,19 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { app, BrowserWindow, Tray, Menu, ipcMain, powerSaveBlocker, Notification } = require('electron');
 
+function envTruthy(name) {
+    const v = process.env[name];
+    return v != null && /^(1|true|yes)$/i.test(String(v).trim());
+}
+
+function shouldOpenDevToolsOnLaunch() {
+    return (
+        !app.isPackaged ||
+        process.env.NODE_ENV === 'development' ||
+        envTruthy('USER_MONITOR_DEVTOOLS')
+    );
+}
+
 // Prevent timer throttling and renderer backgrounding
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
@@ -60,13 +73,25 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false, // TODO: migrate to contextIsolation: true with preload script
-            backgroundThrottling: false
+            backgroundThrottling: false,
+            devTools: true
         },
         show: false // Don't show until ready
     });
 
-    // Only open DevTools in development
-    if (process.env.NODE_ENV === 'development') {
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        const k = String(input.key || '').toLowerCase();
+        const toggleKeys =
+            k === 'f12' ||
+            (input.control && input.shift && k === 'i') ||
+            (process.platform === 'darwin' && input.meta && input.alt && k === 'i');
+        if (toggleKeys) {
+            event.preventDefault();
+            mainWindow.webContents.toggleDevTools();
+        }
+    });
+
+    if (shouldOpenDevToolsOnLaunch()) {
         mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
 

@@ -22,7 +22,6 @@ import superadminRoutes from './routes/superadmin.js';
 import teamRoutes from './routes/teams.js';
 import campaignRoutes from './routes/campaigns.js';
 import updateRoutes from './routes/update.js';
-import { getAgentUpdateInfo } from './controllers/agentUpdateInfoController.js';
 
 dotenv.config();
 
@@ -62,9 +61,6 @@ const authLimiter = rateLimit({
 
 // Secure uploads route - require auth to access screenshots
 app.use('/uploads', authenticateToken, express.static('uploads'));
-
-/** Must be before app.use('/agent', …) so it is not behind agent JWT */
-app.get('/agent/update-info', getAgentUpdateInfo);
 
 // Routes
 app.use('/auth', authLimiter, authRoutes);

@@ -168,8 +168,10 @@ function initUpdater(mainWindow) {
     const runCheck = async () => {
         if (downloadInProgress) return;
 
-        lastState = { phase: 'checking', appVersion: app.getVersion() };
-        send('update-status', { phase: 'checking', appVersion: app.getVersion() });
+        const manifestUrl = `${API_URL.replace(/\/$/, '')}/agent/update-info`;
+        console.info('[Updater] GET', manifestUrl);
+        lastState = { phase: 'checking', appVersion: app.getVersion(), manifestUrl };
+        send('update-status', { phase: 'checking', appVersion: app.getVersion(), manifestUrl });
 
         try {
             const data = await fetchUpdateManifest();
@@ -186,7 +188,12 @@ function initUpdater(mainWindow) {
             if (!semver.valid(remote)) {
                 console.warn('[Updater] Invalid semver from server:', remote);
                 lastState = { phase: 'error', message: 'Invalid version from server', appVersion: local };
-                send('update-status', { phase: 'error', message: lastState.message, appVersion: local });
+                send('update-status', {
+                    phase: 'error',
+                    message: lastState.message,
+                    appVersion: local,
+                    manifestUrl
+                });
                 return;
             }
 
@@ -235,7 +242,8 @@ function initUpdater(mainWindow) {
             send('update-status', {
                 phase: 'error',
                 message: lastState.message,
-                appVersion: app.getVersion()
+                appVersion: app.getVersion(),
+                manifestUrl
             });
         }
     };

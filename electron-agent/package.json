@@ -1,7 +1,7 @@
 {
   "name": "user-monitor-agent",
   "productName": "User Monitor Agent",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Desktop Agent for User Activity Monitoring",
   "main": "src/main.js",
   "scripts": {
@@ -59,6 +59,11 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "msi": {
+      "perMachine": false,
+      "oneClick": false,
+      "warningsAsErrors": false
     },
     "linux": {
       "target": [

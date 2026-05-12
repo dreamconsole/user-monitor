@@ -30,6 +30,16 @@ const captionUpdateIcon = document.getElementById('captionUpdateIcon');
 const appVersionLabel = document.getElementById('appVersionLabel');
 
 let updateUiResetTimer = null;
+/** Last download % logged to Console (main-process axios does not appear under Network). */
+let lastUpdaterProgressLog = -1;
+
+function logUpdaterForDevTools(payload, source) {
+    const p = { ...payload, _from: source };
+    if (typeof p.downloadUrl === 'string' && p.downloadUrl.length > 120) {
+        p.downloadUrl = `${p.downloadUrl.slice(0, 120)}…`;
+    }
+    console.info('[Updater]', p.phase || 'event', p);
+}
 
 // Custom Dropdowns
 const campaignTrigger = document.getElementById('campaignTrigger');
@@ -595,6 +605,10 @@ function setCaptionUpdateUi(payload) {
 }
 
 ipcRenderer.on('update-status', (_e, payload) => {
+    if (payload.phase === 'checking' || payload.phase === 'downloading') {
+        lastUpdaterProgressLog = -1;
+    }
+    logUpdaterForDevTools(payload, 'ipc:update-status');
     setCaptionUpdateUi(payload);
 });
 
@@ -605,20 +619,28 @@ ipcRenderer.on('update-download-progress', (_e, p) => {
         captionUpdateLabel.textContent = `${Math.round(p.percent)}%`;
         captionUpdateIcon.classList.add('spin-icon');
         captionUpdateBtn.title = 'Downloading installer…';
+        const rounded = Math.round(p.percent);
+        if (rounded <= 0 || rounded >= 100 || rounded - lastUpdaterProgressLog >= 10) {
+            lastUpdaterProgressLog = rounded;
+            console.info('[Updater]', 'download', `${rounded}%`);
+        }
     }
 });
 
 if (captionUpdateBtn) {
     captionUpdateBtn.addEventListener('click', async () => {
         const isDownload = captionUpdateBtn.classList.contains('ready') && captionUpdateLabel.textContent === 'Download';
+        console.info('[Updater]', 'button-click', { action: isDownload ? 'install' : 'check' });
         if (isDownload) {
             const result = await ipcRenderer.invoke('updater-install');
+            console.info('[Updater]', 'updater-install result', result);
             if (result && !result.ok && result.message) {
                 showOSNotification('Update', result.message);
             }
             return;
         }
         const r = await ipcRenderer.invoke('updater-check');
+        console.info('[Updater]', 'updater-check invoke finished', r);
         if (r && !r.ok && r.message) {
             showOSNotification('Update', r.message);
         }

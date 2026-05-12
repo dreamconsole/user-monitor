@@ -2,12 +2,15 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { query } from '../db.js';
 import { logHeartbeat, syncActivitySession, uploadScreenshot, logActivity, logBreak, getBreaks, logBrowserActivity, getAssignedCampaigns } from '../controllers/agentController.js';
+import { getAgentUpdateInfo } from '../controllers/agentUpdateInfoController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-import { query } from '../db.js';
+/** Public: desktop agent update manifest (no JWT). Must stay above `authenticateToken`. */
+router.get('/update-info', getAgentUpdateInfo);
 
 // Middleware to fetch user and org names for the custom upload path
 const fetchUploadMetadata = async (req, res, next) => {
@@ -70,7 +73,7 @@ const upload = multer({
     }
 });
 
-// All agent routes require authentication
+// All other /agent/* routes require authentication
 router.use(authenticateToken);
 
 router.post('/heartbeat', logHeartbeat);

@@ -2,6 +2,14 @@
 
 All updates to the electron-agent are tracked here.
 
+## 1.2.8 - 2026-05-12
+### Changes
+- [Feature] **Updater DevTools visibility**: `GET …/agent/update-info` runs in the **main process** (axios), so it does **not** appear under the renderer **Network** tab. The UI now logs **`[Updater]`** lines to the **Console** (button click, IPC status, throttled download %). Update IPC payloads include **`manifestUrl`** while checking / on errors so you can confirm the target URL.
+
+## 1.2.7 - 2026-05-12
+### Changes
+- [Feature] **Developer Tools**: open detached DevTools on launch when running **from source** (`!app.isPackaged`), when `NODE_ENV=development`, or when `USER_MONITOR_DEVTOOLS=1`. **F12**, **Ctrl+Shift+I** (Linux/Windows), or **Cmd+Option+I** (macOS) toggles DevTools in the main window (useful for Network tab / update IPC while the app menu is hidden).
+
 ## 1.2.6 - 2026-05-06
 ### Changes
 - [Config] README: agent **`downloadUrl`** source is **Super Admin `global_settings`** (not env-only); optional legacy **`AGENT_UPDATE_*`** fallback documented.
