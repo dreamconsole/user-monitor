@@ -2,6 +2,16 @@
 
 All updates to the client application are tracked here.
 
+## 1.1.5 - 2026-05-21
+### Changes
+- [Bugfix] Sidebar **Break Management** hidden when `user.features.is_breaks_enabled` is false (aligned with campaigns).
+- [Bugfix] Break pages show disabled message if breaks are off; auth **`/me`** and login include **`is_breaks_enabled`**.
+
+## 1.1.4 - 2026-05-21
+### Changes
+- [Feature] **Settings**: when breaks are off, org admin configures grace period, max absence, and action (logout / notify manager).
+- [Feature] **Super Admin → Organizations**: per-org **Breaks** toggle (like Campaigns).
+
 ## 1.1.3 - 2026-05-21
 ### Changes
 - [Feature] **`DateFromToPicker`** — separate **From date** / **To date** inputs (replaces preset dropdown on **Reports** and **App Usage** that always showed “Today”).

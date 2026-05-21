@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import useAuthStore from '@/lib/useAuthStore';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,6 +10,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import BreakForm from '@/components/breaks/BreakForm';
 
 export default function Breaks() {
+    const { user } = useAuthStore();
     const [breaks, setBreaks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -87,6 +89,15 @@ export default function Breaks() {
                         </div>
                     ))}
                 </div>
+            </div>
+        );
+    }
+
+    if (user?.features?.is_breaks_enabled === false) {
+        return (
+            <div className="p-8 max-w-lg mx-auto text-center mt-12 bg-card rounded-lg shadow border py-16">
+                <h2 className="text-xl font-bold mb-2">Break Management Disabled</h2>
+                <p className="text-muted-foreground">Break management is disabled for your organization.</p>
             </div>
         );
     }

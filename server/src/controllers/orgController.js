@@ -87,8 +87,11 @@ export const updateOrgSettings = async (req, res) => {
                     idle_action = COALESCE($9, idle_action),
                     idle_action_duration_minutes = COALESCE($10, idle_action_duration_minutes),
                     break_exceeded_action = COALESCE($11, break_exceeded_action),
+                    shift_grace_minutes = COALESCE($12, shift_grace_minutes),
+                    shift_absence_minutes = COALESCE($13, shift_absence_minutes),
+                    shift_absence_action = COALESCE($14, shift_absence_action),
                     updated_at = CURRENT_TIMESTAMP
-                WHERE org_id = $12
+                WHERE org_id = $15
                 RETURNING *`,
                 [
                     features.is_activity_tracking_enabled,
@@ -102,6 +105,9 @@ export const updateOrgSettings = async (req, res) => {
                     features.idle_action,
                     features.idle_action_duration_minutes,
                     features.break_exceeded_action,
+                    features.shift_grace_minutes,
+                    features.shift_absence_minutes,
+                    features.shift_absence_action,
                     orgId
                 ]
             );
@@ -120,8 +126,11 @@ export const updateOrgSettings = async (req, res) => {
                         heartbeat_interval_seconds,
                         idle_action,
                         idle_action_duration_minutes,
-                        break_exceeded_action
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                        break_exceeded_action,
+                        shift_grace_minutes,
+                        shift_absence_minutes,
+                        shift_absence_action
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
                     [
                         orgId,
                         features.is_activity_tracking_enabled ?? true,
@@ -134,7 +143,10 @@ export const updateOrgSettings = async (req, res) => {
                         features.heartbeat_interval_seconds ?? 300,
                         features.idle_action ?? 'none',
                         features.idle_action_duration_minutes ?? 60,
-                        features.break_exceeded_action ?? 'notification'
+                        features.break_exceeded_action ?? 'notification',
+                        features.shift_grace_minutes ?? 5,
+                        features.shift_absence_minutes ?? 120,
+                        features.shift_absence_action ?? 'logout'
                     ]
                 );
             }

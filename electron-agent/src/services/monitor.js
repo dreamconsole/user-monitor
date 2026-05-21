@@ -33,15 +33,17 @@ class MonitorService {
         this.lastCheckTime = 0;
 
         // Dynamic Config Values
-        this.afkThresholdSeconds = configService.get('afk_threshold_seconds') || 300;
-        this.isAfkTrackingEnabled = configService.get('is_afk_tracking_enabled') !== false;
+        this._applyPolicyConfig();
 
         // Listen for config changes
         configService.on('config-updated', (config) => {
             console.log('[MonitorService] Config updated, applying new settings...');
-            this.afkThresholdSeconds = config.afk_threshold_seconds || 300;
-            this.isAfkTrackingEnabled = config.is_afk_tracking_enabled !== false;
+            this._applyPolicyConfig(config);
         });
+
+        this.shiftClockPaused = false;
+        this.shiftPausedAt = 0;
+        this.idleSinceAt = 0;
 
         // Start uIOhook
         uIOhook.on('keydown', () => { this.keyboardEvents++; this.lastInputTime = Date.now(); });
@@ -76,6 +78,82 @@ class MonitorService {
         return Math.min(systemIdleTime, inputIdleTime);
     }
 
+    _applyPolicyConfig(config) {
+        const c = config || configService.getAll();
+        this.afkThresholdSeconds = c.afk_threshold_seconds || 300;
+        this.isAfkTrackingEnabled = c.is_afk_tracking_enabled !== false;
+        this.isBreaksEnabled = c.is_breaks_enabled !== false;
+        this.shiftGraceMinutes = parseInt(c.shift_grace_minutes, 10) || 5;
+        this.shiftAbsenceMinutes = parseInt(c.shift_absence_minutes, 10) || 120;
+        this.shiftAbsenceAction = c.shift_absence_action || 'logout';
+    }
+
+    getShiftPausedSeconds() {
+        if (!this.shiftClockPaused || !this.shiftPausedAt) return 0;
+        return Math.floor((Date.now() - this.shiftPausedAt) / 1000);
+    }
+
+    isShiftTimerPaused() {
+        return this.shiftClockPaused === true;
+    }
+
+    _getIdleSeconds() {
+        const systemIdleTime = powerMonitor.getSystemIdleTime();
+        const inputIdleTime = Math.floor((Date.now() - this.lastInputTime) / 1000);
+        return Math.min(systemIdleTime, inputIdleTime);
+    }
+
+    _pauseShiftClock() {
+        if (this.shiftClockPaused) return;
+        this.shiftClockPaused = true;
+        this.shiftPausedAt = Date.now();
+        console.log('[MonitorService] Shift clock paused (grace expired, still idle)');
+        this.currentState = 'SHIFT_PAUSED';
+        if (global.statusUpdateCallback) global.statusUpdateCallback('SHIFT_PAUSED');
+        screenshotService.setCurrentState('AFK');
+    }
+
+    _resumeShiftClock() {
+        if (!this.shiftClockPaused) return;
+        this.shiftClockPaused = false;
+        this.shiftPausedAt = 0;
+        this.idleSinceAt = 0;
+        console.log('[MonitorService] Shift clock resumed (user active)');
+        this.currentState = 'ACTIVE';
+        if (global.statusUpdateCallback) global.statusUpdateCallback('ACTIVE');
+        screenshotService.setCurrentState('ACTIVE');
+    }
+
+    _evaluateNoBreaksPolicy(idleTime) {
+        if (this.isBreaksEnabled || !this.isAfkTrackingEnabled || !this.currentWorkSessionId) return;
+
+        const graceSec = this.shiftGraceMinutes * 60;
+        const absenceSec = this.shiftAbsenceMinutes * 60;
+        const isIdle = idleTime >= this.afkThresholdSeconds;
+
+        if (!isIdle) {
+            if (this.shiftClockPaused) this._resumeShiftClock();
+            this.idleSinceAt = 0;
+            return;
+        }
+
+        if (!this.idleSinceAt) this.idleSinceAt = Date.now();
+
+        const idleDurationSec = Math.floor((Date.now() - this.idleSinceAt) / 1000);
+
+        if (!this.shiftClockPaused && idleDurationSec >= graceSec) {
+            this._pauseShiftClock();
+        }
+
+        if (this.shiftClockPaused) {
+            const pausedSec = this.getShiftPausedSeconds();
+            if (pausedSec >= absenceSec) {
+                console.log(`[MonitorService] Shift absence limit (${this.shiftAbsenceMinutes}m) reached`);
+                if (global.forceEndShiftCallback) global.forceEndShiftCallback(this.shiftAbsenceAction);
+            }
+        }
+    }
+
     start(campaignId = null) {
         console.log('Starting Monitor Service...');
         try {
@@ -95,12 +173,13 @@ class MonitorService {
             this.campaignId = campaignId || null;
             this.isPaused = false;
             this.breakType = null;
+            this.shiftClockPaused = false;
+            this.shiftPausedAt = 0;
+            this.idleSinceAt = 0;
             this.lastCheckTime = Date.now();
             this.lastInputTime = Date.now();
 
-            // Refresh config on start
-            this.afkThresholdSeconds = configService.get('afk_threshold_seconds') || 300;
-            this.isAfkTrackingEnabled = configService.get('is_afk_tracking_enabled') !== false;
+            this._applyPolicyConfig();
 
             // Session Recovery: Close old sessions/breaks in local DB
             try {
@@ -186,6 +265,9 @@ class MonitorService {
             require('./sync').forceSync();
         }
 
+        this.shiftClockPaused = false;
+        this.shiftPausedAt = 0;
+        this.idleSinceAt = 0;
         this.currentState = 'OFFLINE';
         if (global.statusUpdateCallback) global.statusUpdateCallback('OFFLINE');
 
@@ -322,20 +404,18 @@ class MonitorService {
     checkAndLogActivity() {
         if (this.isPaused || !this.currentWorkSessionId) return;
 
-        const systemIdleTime = powerMonitor.getSystemIdleTime();
-        // Fallback: Check time since last uIOhook event
-        const inputIdleTime = Math.floor((Date.now() - this.lastInputTime) / 1000);
-        // Use the minimum of both to be generous to the user
-        const idleTime = Math.min(systemIdleTime, inputIdleTime);
+        const idleTime = this._getIdleSeconds();
 
         const now = Date.now();
         const secondsElapsed = Math.floor((now - this.lastCheckTime) / 1000);
         this.lastCheckTime = now;
 
-        console.log(`[checkAndLogActivity] Idle: ${idleTime}s (Sys: ${systemIdleTime}s, Input: ${inputIdleTime}s), Elapsed: ${secondsElapsed}s, Threshold: ${this.afkThresholdSeconds}s`);
+        console.log(`[checkAndLogActivity] Idle: ${idleTime}s, Elapsed: ${secondsElapsed}s, Threshold: ${this.afkThresholdSeconds}s, ShiftPaused: ${this.shiftClockPaused}`);
+
+        this._evaluateNoBreaksPolicy(idleTime);
 
         let state = 'active';
-        const wasActive = this.currentState === 'ACTIVE';
+        const wasActive = this.currentState === 'ACTIVE' || this.currentState === 'SHIFT_PAUSED';
 
         // Check if AFK tracking is enabled
         if (this.isAfkTrackingEnabled) {
@@ -367,13 +447,15 @@ class MonitorService {
         // 2. Update Work Session Totals
         this.updateWorkSessionInDB();
 
-        // Let screenshot service know current state
-        const newState = state === 'idle' ? 'AFK' : 'ACTIVE';
-        if (this.currentState !== newState) {
-            this.currentState = newState;
-            if (global.statusUpdateCallback) global.statusUpdateCallback(newState);
+        // Let screenshot service know current state (preserve SHIFT_PAUSED for UI timer)
+        if (!this.shiftClockPaused) {
+            const newState = state === 'idle' ? 'AFK' : 'ACTIVE';
+            if (this.currentState !== 'SHIFT_PAUSED' && this.currentState !== newState) {
+                this.currentState = newState;
+                if (global.statusUpdateCallback) global.statusUpdateCallback(newState);
+            }
+            screenshotService.setCurrentState(newState);
         }
-        screenshotService.setCurrentState(newState);
     }
 
     logActivityChunk(state) {

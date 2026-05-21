@@ -7,6 +7,50 @@ import { broadcastToManagers } from '../websocket.js';
 /** After org max shift hours from today's first check-in, force logout if idle this long (seconds). Applies during break. */
 const SHIFT_CAP_POST_MAX_IDLE_SEC = 30 * 60;
 
+/**
+ * When breaks are disabled: after shift timer paused (grace expired), if still idle past shift_absence_minutes → logout or notify admin.
+ */
+async function evaluateShiftAbsencePolicy(orgId, userId, orgFeatures, body) {
+    if (orgFeatures.is_breaks_enabled ?? true) return null;
+
+    if (!body.shift_timer_paused) return null;
+
+    const pausedSec = Number(body.shift_paused_seconds);
+    if (!Number.isFinite(pausedSec) || pausedSec < 0) return null;
+
+    const absenceMins = parseInt(orgFeatures.shift_absence_minutes, 10) || 120;
+    if (pausedSec < absenceMins * 60) return null;
+
+    const idleSec = Number(body.shift_cap_idle_seconds ?? body.current_idle_time ?? 0);
+    const afkThreshold = parseInt(orgFeatures.afk_threshold_seconds, 10) || 300;
+    if (!Number.isFinite(idleSec) || idleSec < afkThreshold) return null;
+
+    const action = orgFeatures.shift_absence_action || 'logout';
+
+    if (action === 'notify_admin') {
+        const managerId = (await query('SELECT manager_id FROM users WHERE id = $1', [userId])).rows[0]?.manager_id;
+        if (managerId) {
+            const recentNotif = await query(
+                `SELECT id FROM notifications WHERE recipient_id = $1 AND actor_id = $2 AND type = 'SHIFT_ABSENCE' AND created_at > NOW() - INTERVAL '2 hours'`,
+                [managerId, userId]
+            );
+            if (recentNotif.rows.length === 0) {
+                const uName = (await query('SELECT full_name FROM users WHERE id = $1', [userId])).rows[0]?.full_name || 'User';
+                const pausedMins = Math.floor(pausedSec / 60);
+                await query(
+                    `INSERT INTO notifications (org_id, recipient_id, actor_id, type, title, message)
+                     VALUES ($1, $2, $3, 'SHIFT_ABSENCE', $4, $5)`,
+                    [orgId, managerId, userId, 'Shift Absence Alert',
+                        `${uName} has been away from the desk for ${pausedMins} minutes (shift timer paused).`]
+                );
+            }
+        }
+        return 'FORCE_LOGOUT';
+    }
+
+    return 'FORCE_LOGOUT';
+}
+
 async function setForceLogoutFlag(userId) {
     await query('UPDATE users SET force_logout = true WHERE id = $1', [userId]);
 }
@@ -210,18 +254,31 @@ export const logHeartbeat = async (req, res) => {
 
         // Merge Features: User > Org > Defaults
         // If user setting is NULL, fall back to Org. If Org is missing, use code defaults (handled by Agent, but good to send explicit nulls/values)
+        const breaksEnabled = userFeatures.is_breaks_enabled ?? orgFeatures.is_breaks_enabled ?? true;
+
         const features = {
             is_activity_tracking_enabled: userFeatures.is_activity_tracking_enabled ?? orgFeatures.is_activity_tracking_enabled ?? true,
             is_screenshots_enabled: userFeatures.is_screenshots_enabled ?? orgFeatures.is_screenshots_enabled ?? true,
             screenshot_interval_seconds: userFeatures.screenshot_interval_seconds || orgFeatures.screenshot_interval_seconds || 600,
             is_afk_tracking_enabled: userFeatures.is_afk_tracking_enabled ?? orgFeatures.is_afk_tracking_enabled ?? true,
             afk_threshold_seconds: userFeatures.afk_threshold_seconds || orgFeatures.afk_threshold_seconds || 300,
-            is_breaks_enabled: userFeatures.is_breaks_enabled ?? orgFeatures.is_breaks_enabled ?? true,
+            is_breaks_enabled: breaksEnabled,
+            shift_grace_minutes: orgFeatures.shift_grace_minutes ?? 5,
+            shift_absence_minutes: orgFeatures.shift_absence_minutes ?? 120,
+            shift_absence_action: orgFeatures.shift_absence_action || 'logout',
             heartbeat_interval_seconds: userFeatures.heartbeat_interval_seconds || orgFeatures.heartbeat_interval_seconds || 300
         };
 
-        // Check Idle Actions
-        if (current_idle_time !== undefined && orgFeatures.idle_action && orgFeatures.idle_action !== 'none') {
+        // Shift absence policy (breaks disabled only)
+        const absenceCmd = await evaluateShiftAbsencePolicy(org_id, user_id, orgFeatures, req.body);
+        if (absenceCmd === 'FORCE_LOGOUT') {
+            console.log(`[logHeartbeat] Shift absence policy; FORCE_LOGOUT user ${user_id}`);
+            await setForceLogoutFlag(user_id);
+            return res.status(200).json({ success: true, command: 'FORCE_LOGOUT', features });
+        }
+
+        // Check Idle Actions (when breaks enabled — avoid duplicate policy when breaks off)
+        if (breaksEnabled && current_idle_time !== undefined && orgFeatures.idle_action && orgFeatures.idle_action !== 'none') {
             const idleMins = Math.floor(current_idle_time / 60);
             if (idleMins >= (orgFeatures.idle_action_duration_minutes || 60)) {
                 if (orgFeatures.idle_action === 'logout') {
@@ -256,7 +313,9 @@ export const logHeartbeat = async (req, res) => {
             return res.status(200).json({ success: true, command: 'FORCE_LOGOUT' });
         }
 
-        const breakExceededCmd = await evaluateBreakExceededIdleForceLogout(org_id, user_id, idleForShiftCap);
+        const breakExceededCmd = breaksEnabled
+            ? await evaluateBreakExceededIdleForceLogout(org_id, user_id, idleForShiftCap)
+            : null;
         if (breakExceededCmd === 'FORCE_LOGOUT') {
             console.log(`[logHeartbeat] Break limit exceeded + idle >= ${SHIFT_CAP_POST_MAX_IDLE_SEC}s; FORCE_LOGOUT user ${user_id}`);
             await setForceLogoutFlag(user_id);

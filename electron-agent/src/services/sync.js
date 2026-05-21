@@ -312,6 +312,8 @@ class SyncService {
                 state: monitorService.currentState,
                 current_idle_time: monitorService.getCurrentIdleTime(),
                 shift_cap_idle_seconds: monitorService.getShiftCapIdleSeconds(),
+                shift_timer_paused: monitorService.isShiftTimerPaused(),
+                shift_paused_seconds: monitorService.getShiftPausedSeconds(),
                 last_seen_at: Date.now()
             };
 
@@ -325,6 +327,11 @@ class SyncService {
             if (response.data && response.data.features) {
                 const configService = require('./config');
                 configService.update(response.data.features);
+                try {
+                    const { BrowserWindow } = require('electron');
+                    const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+                    if (win) win.webContents.send('agent-features-updated');
+                } catch (_) { /* non-critical */ }
 
                 // Update Sync Interval if heartbeat_interval_seconds changed
                 const newInterval = (response.data.features.heartbeat_interval_seconds || 300) * 1000;

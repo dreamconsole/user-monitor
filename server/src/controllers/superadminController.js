@@ -69,7 +69,8 @@ export const getOrgs = async (req, res) => {
                 o.is_active, 
                 o.created_at,
                 (SELECT COUNT(*) FROM users u WHERE u.org_id = o.id) as current_users,
-                COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled
+                COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled,
+                COALESCE(of.is_breaks_enabled, true) as is_breaks_enabled
             FROM organizations o
             LEFT JOIN org_features of ON of.org_id = o.id
             ORDER BY o.name ASC
@@ -84,7 +85,7 @@ export const getOrgs = async (req, res) => {
 // Update an organization (subscription limit, active status etc)
 export const updateOrg = async (req, res) => {
     const { id } = req.params;
-    const { name, domain, timezone, max_users_limit, is_active, is_campaigns_enabled } = req.body;
+    const { name, domain, timezone, max_users_limit, is_active, is_campaigns_enabled, is_breaks_enabled } = req.body;
 
     try {
         const result = await query(`
@@ -110,6 +111,14 @@ export const updateOrg = async (req, res) => {
                 VALUES ($1, $2)
                 ON CONFLICT (org_id) DO UPDATE SET is_campaigns_enabled = $2
             `, [id, is_campaigns_enabled]);
+        }
+
+        if (is_breaks_enabled !== undefined) {
+            await query(`
+                INSERT INTO org_features (org_id, is_breaks_enabled)
+                VALUES ($1, $2)
+                ON CONFLICT (org_id) DO UPDATE SET is_breaks_enabled = $2
+            `, [id, is_breaks_enabled]);
         }
 
         res.json(result.rows[0]);

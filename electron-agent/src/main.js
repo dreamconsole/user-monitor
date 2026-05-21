@@ -141,6 +141,20 @@ ipcMain.on('login-success', (event, { user, token }) => {
     handleLoginSuccess(user, token);
 });
 
+global.forceEndShiftCallback = (action) => {
+    console.log('[Policy] Force end shift due to absence policy:', action);
+    try {
+        const monitorService = require('./services/monitor');
+        monitorService.stop();
+        stopPowerBlocker();
+    } catch (e) {
+        console.error('forceEndShiftCallback monitor stop:', e);
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('force-end-shift', { action: action || 'logout' });
+    }
+};
+
 function handleLoginSuccess(user, token) {
     console.log('--- handleLoginSuccess START ---');
     try {
@@ -360,8 +374,17 @@ ipcMain.handle('updater-get-state', () => (updaterCtl ? updaterCtl.getState() : 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
 ipcMain.handle('get-breaks', async () => {
+    const configService = require('./services/config');
+    if (configService.get('is_breaks_enabled') === false) {
+        return [];
+    }
     const authService = require('./services/auth');
     return await authService.fetchBreaks();
+});
+
+ipcMain.handle('get-agent-features', () => {
+    const configService = require('./services/config');
+    return configService.getAll();
 });
 
 ipcMain.handle('get-campaigns', async () => {

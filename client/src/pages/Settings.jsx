@@ -44,6 +44,9 @@ export default function Settings() {
             is_breaks_enabled: true,
             is_force_logout_enabled: true,
             is_campaigns_enabled: false,
+            shift_grace_minutes: 5,
+            shift_absence_minutes: 120,
+            shift_absence_action: 'logout',
         }
     });
 
@@ -531,14 +534,16 @@ export default function Settings() {
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
                                 <Label>Enable Breaks</Label>
-                                <p className="text-sm text-muted-foreground text-sm">Allow users to record breaks during shifts.</p>
+                                <p className="text-sm text-muted-foreground text-sm">
+                                    Allow users to record breaks during shifts. Super admin can also disable breaks for your organization.
+                                </p>
                             </div>
                             <Switch
                                 checked={settings.features.is_breaks_enabled}
                                 onCheckedChange={() => handleToggle('is_breaks_enabled')}
                             />
                         </div>
-                        {settings.features.is_breaks_enabled && (
+                        {settings.features.is_breaks_enabled ? (
                             <div className="flex items-center justify-between pl-6 border-l-2 mt-4">
                                 <Label>Action on Break Limit Exceeded</Label>
                                 <Select
@@ -554,6 +559,65 @@ export default function Settings() {
                                         <SelectItem value="logout">Auto Logout User</SelectItem>
                                     </SelectContent>
                                 </Select>
+                            </div>
+                        ) : (
+                            <div className="pl-6 border-l-2 space-y-4 mt-2">
+                                <p className="text-sm text-muted-foreground">
+                                    With breaks off, idle users get a grace period, then the shift timer pauses. Extended absence ends the shift.
+                                </p>
+                                <div className="flex items-center justify-between">
+                                    <Label>Grace period (minutes)</Label>
+                                    <Select
+                                        value={String(settings.features.shift_grace_minutes ?? 5)}
+                                        onValueChange={(v) => handleSelectChange('shift_grace_minutes', v)}
+                                    >
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="3">3 Minutes</SelectItem>
+                                            <SelectItem value="5">5 Minutes</SelectItem>
+                                            <SelectItem value="10">10 Minutes</SelectItem>
+                                            <SelectItem value="15">15 Minutes</SelectItem>
+                                            <SelectItem value="30">30 Minutes</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <Label>Max absence before action (minutes)</Label>
+                                    <Select
+                                        value={String(settings.features.shift_absence_minutes ?? 120)}
+                                        onValueChange={(v) => handleSelectChange('shift_absence_minutes', v)}
+                                    >
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="60">1 Hour</SelectItem>
+                                            <SelectItem value="120">2 Hours</SelectItem>
+                                            <SelectItem value="180">3 Hours</SelectItem>
+                                            <SelectItem value="240">4 Hours</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <Label>Action after max absence</Label>
+                                    <Select
+                                        value={settings.features.shift_absence_action || 'logout'}
+                                        onValueChange={(v) => setSettings(prev => ({
+                                            ...prev,
+                                            features: { ...prev.features, shift_absence_action: v }
+                                        }))}
+                                    >
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="logout">End shift &amp; logout (default)</SelectItem>
+                                            <SelectItem value="notify_admin">Notify manager, then end shift</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         )}
                     </div>

@@ -80,7 +80,7 @@ const Sidebar = ({ className, onLinkClick }) => {
                         { href: '/app-mapping', label: 'App Mapping', roles: ['orgadmin'] }
                     ]
                 },
-                {
+                ...(user?.features?.is_breaks_enabled !== false ? [{
                     label: 'Break Management',
                     icon: Coffee,
                     roles: ['orgadmin'],
@@ -88,7 +88,7 @@ const Sidebar = ({ className, onLinkClick }) => {
                         { href: '/break-groups', label: 'Break Groups' },
                         { href: '/breaks', label: 'Break Policies' }
                     ]
-                },
+                }] : []),
                 ...(user?.features?.is_campaigns_enabled ? [
                     { href: '/campaigns', label: 'Campaigns', icon: Megaphone, roles: ['orgadmin', 'manager'] },
                 ] : []),

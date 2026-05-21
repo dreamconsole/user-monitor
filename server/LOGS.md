@@ -2,6 +2,16 @@
 
 All updates to the server application are tracked here.
 
+## 1.2.12 - 2026-05-21
+### Changes
+- [Bugfix] Login, SSO, and **`GET /auth/me`** expose **`features.is_breaks_enabled`** so the CRM sidebar can hide break management.
+
+## 1.2.11 - 2026-05-21
+### Changes
+- [Feature] **Shift grace policy** (breaks off): `org_features.shift_grace_minutes`, `shift_absence_minutes`, `shift_absence_action`; heartbeat evaluates absence when `shift_timer_paused` + idle; agent receives settings in `features`.
+- [Feature] **Super admin**: per-org **`is_breaks_enabled`** toggle (like campaigns).
+- [Migration] **`014_shift_grace_policy.js`** — grace/absence columns on `org_features`.
+
 ## 1.2.10 - 2026-05-21
 ### Changes
 - [Bugfix] **`POST /auth/login`**, **`POST /auth/register-org`**, **`POST /auth/sso/verify`** — include **`org_name`** in the user payload (sidebar showed org name only after refresh via `/auth/me`).

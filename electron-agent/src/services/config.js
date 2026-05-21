@@ -11,7 +11,10 @@ class ConfigService extends EventEmitter {
             screenshot_interval_seconds: 600, // 10 minutes default
             is_afk_tracking_enabled: true,
             afk_threshold_seconds: 300, // 5 minutes default
-            is_breaks_enabled: true
+            is_breaks_enabled: true,
+            shift_grace_minutes: 5,
+            shift_absence_minutes: 120,
+            shift_absence_action: 'logout'
         };
         this.loadFromStore();
     }

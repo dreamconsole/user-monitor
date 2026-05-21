@@ -2,6 +2,11 @@
 
 All updates to the electron-agent are tracked here.
 
+## 1.2.11 - 2026-05-21
+### Changes
+- [Feature] **No-breaks shift policy**: after org **grace** minutes idle, shift UI timer pauses (`SHIFT_PAUSED`); after **absence** minutes, shift ends + optional notify; config from heartbeat `features`.
+- [Feature] Hide break controls when `is_breaks_enabled` is false; `get-breaks` returns empty; `get-agent-features` IPC.
+
 ## 1.2.10 - 2026-05-21
 ### Changes
 - [Bugfix] Main window height **600 → 660** so **End Shift** is fully visible on the active-shift screen.

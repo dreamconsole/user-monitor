@@ -89,6 +89,8 @@ let shiftLimitNotified = false;
 let breakWarningNotified = false;
 let breakLimitNotified = false;
 let idleAlertNotified = false;
+let shiftTimerPaused = false;
+let breaksEnabled = true;
 
 function showOSNotification(title, body) {
     if (ipcRenderer) {
@@ -210,7 +212,32 @@ function updateStatus(status) {
         statusText.innerText = 'Shift Active';
         timerDisplay.classList.add('tracking-pulse');
         timerDisplay.classList.add('text-slate-900');
-        idleAlertNotified = false; // Reset when active
+        timerDisplay.classList.remove('text-amber-600');
+        idleAlertNotified = false;
+        if (shiftTimerPaused && isTracking) {
+            shiftTimerPaused = false;
+            startTimer();
+        }
+    } else if (status === 'SHIFT_PAUSED') {
+        statusBadge.classList.add('bg-amber-500/10', 'border-amber-500/20', 'text-amber-600');
+        dot.classList.add('bg-amber-500');
+        statusText.innerText = 'Shift Paused';
+        timerDisplay.classList.remove('tracking-pulse');
+        timerDisplay.classList.add('text-amber-600');
+        if (!shiftTimerPaused && isTracking) {
+            shiftTimerPaused = true;
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+        if (!idleAlertNotified) {
+            idleAlertNotified = true;
+            const msg = breaksEnabled
+                ? 'You appear to be idle.'
+                : 'Shift timer paused. Return to resume, or your shift may end automatically.';
+            showOSNotification('Inactivity', msg);
+        }
     } else if (status === 'BREAK' || status === 'AFK') {
         const isAFK = status === 'AFK';
         statusBadge.classList.add('bg-amber-500/10', 'border-amber-500/20', 'text-amber-600');
@@ -219,9 +246,9 @@ function updateStatus(status) {
         timerDisplay.classList.remove('tracking-pulse');
         timerDisplay.classList.add('text-amber-600');
 
-        if (isAFK && !idleAlertNotified) {
+        if (isAFK && breaksEnabled && !idleAlertNotified) {
             idleAlertNotified = true;
-            showOSNotification("Inactivity Detected", "You appear to be idle. Would you like to start a break or resume work?");
+            showOSNotification('Inactivity Detected', 'You appear to be idle. Would you like to start a break or resume work?');
         }
     } else {
         statusBadge.classList.add('bg-red-500/10', 'border-red-500/20', 'text-red-500');
@@ -272,8 +299,23 @@ function stopTimer() {
         timerInterval = null;
     }
     sessionStartTime = null;
-    shiftLimitNotified = false; // Reset for next session
+    shiftTimerPaused = false;
+    shiftLimitNotified = false;
     updateStatus('OFFLINE');
+}
+
+async function applyBreaksUiFromFeatures() {
+    try {
+        const features = await ipcRenderer.invoke('get-agent-features');
+        breaksEnabled = features?.is_breaks_enabled !== false;
+    } catch (_) {
+        breaksEnabled = true;
+    }
+
+    const breakRow = document.querySelector('#activeActions .space-y-2');
+    const breakBtnEl = document.getElementById('breakBtn');
+    if (breakRow) breakRow.style.display = breaksEnabled ? '' : 'none';
+    if (breakBtnEl) breakBtnEl.style.display = breaksEnabled ? '' : 'none';
 }
 
 function startBreakTimer(durationLimit) {
@@ -355,7 +397,7 @@ function showTracking(user) {
     campaignsLoaded = false;
     updateStartShiftButtonState();
 
-    // Load breaks and campaigns
+    applyBreaksUiFromFeatures();
     fetchAndPopulateBreaks();
     fetchAndPopulateCampaigns();
 
@@ -428,7 +470,33 @@ startShiftBtn.addEventListener('click', () => {
     document.querySelector('main').classList.add('overflow-hidden');
     document.querySelector('main').classList.remove('overflow-y-auto');
 
+    applyBreaksUiFromFeatures();
     startTimer();
+    updateLastSync();
+});
+
+ipcRenderer.on('force-end-shift', (event, { action } = {}) => {
+    if (!isTracking) return;
+    isTracking = false;
+    shiftTimerPaused = false;
+    ipcRenderer.send('end-shift');
+    activeActions.classList.add('hidden');
+    activeActions.classList.remove('flex');
+    breakActions.classList.add('hidden');
+    breakActions.classList.remove('flex');
+    startActions.classList.remove('hidden');
+    startActions.classList.add('flex');
+    document.querySelector('main')?.classList.add('overflow-y-auto');
+    document.querySelector('main')?.classList.remove('overflow-hidden');
+    stopTimer();
+    stopBreakTimer();
+    secondsElapsed = 0;
+    timerDisplay.innerText = '00:00:00';
+    campaignBadge.innerHTML = '';
+    campaignBadge.className = 'hidden';
+    const title = action === 'notify_admin' ? 'Shift Ended' : 'Shift Ended';
+    const body = 'Your shift was ended due to extended absence.';
+    showOSNotification(title, body);
     updateLastSync();
 });
 
@@ -661,6 +729,10 @@ if (captionUpdateBtn) {
         console.warn('[UI] version/updater init:', e);
     }
 })();
+
+ipcRenderer.on('agent-features-updated', () => {
+    applyBreaksUiFromFeatures();
+});
 
 // Auto-login listener
 ipcRenderer.on('auto-login-success', (event, { user, token }) => {

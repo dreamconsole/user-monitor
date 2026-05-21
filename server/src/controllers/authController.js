@@ -88,7 +88,8 @@ export const registerOrg = async (req, res) => {
                 org_name: orgName.trim(),
                 timezone: user.timezone,
                 features: {
-                    is_campaigns_enabled: false // Default for new orgs
+                    is_campaigns_enabled: false,
+                    is_breaks_enabled: true
                 }
             } 
         });
@@ -115,7 +116,8 @@ export const login = async (req, res) => {
                    o.primary_color_light as org_primary_color_light, 
                    o.primary_color_dark as org_primary_color_dark, 
                    o.timezone as org_timezone,
-                   COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled
+                   COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled,
+                   COALESCE(of.is_breaks_enabled, true) as is_breaks_enabled
             FROM users u
             LEFT JOIN organizations o ON u.org_id = o.id
             LEFT JOIN org_features of ON of.org_id = o.id
@@ -182,7 +184,8 @@ export const login = async (req, res) => {
                 org_primary_color_light: user.org_primary_color_light, 
                 org_primary_color_dark: user.org_primary_color_dark,
                 features: {
-                    is_campaigns_enabled: user.is_campaigns_enabled
+                    is_campaigns_enabled: user.is_campaigns_enabled,
+                    is_breaks_enabled: user.is_breaks_enabled
                 }
             } 
         });
@@ -310,7 +313,8 @@ export const getMe = async (req, res) => {
                     o.name as org_name, o.timezone as org_timezone, 
                     o.primary_color_light as org_primary_color_light, 
                     o.primary_color_dark as org_primary_color_dark,
-                    COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled
+                    COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled,
+                    COALESCE(of.is_breaks_enabled, true) as is_breaks_enabled
              FROM users u 
              JOIN organizations o ON u.org_id = o.id 
              LEFT JOIN org_features of ON of.org_id = o.id
@@ -323,10 +327,12 @@ export const getMe = async (req, res) => {
         const response = {
             ...userData,
             features: {
-                is_campaigns_enabled: userData.is_campaigns_enabled
+                is_campaigns_enabled: userData.is_campaigns_enabled,
+                is_breaks_enabled: userData.is_breaks_enabled
             }
         };
         delete response.is_campaigns_enabled;
+        delete response.is_breaks_enabled;
         
         res.json(response);
     } catch (error) {
@@ -400,9 +406,12 @@ export const verifySSO = async (req, res) => {
 
         // Login user if they exist
         const result = await query(`
-            SELECT u.*, o.name as org_name, o.primary_color_light as org_primary_color_light, o.primary_color_dark as org_primary_color_dark, o.timezone as org_timezone
+            SELECT u.*, o.name as org_name, o.primary_color_light as org_primary_color_light, o.primary_color_dark as org_primary_color_dark, o.timezone as org_timezone,
+                   COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled,
+                   COALESCE(of.is_breaks_enabled, true) as is_breaks_enabled
             FROM users u
             LEFT JOIN organizations o ON u.org_id = o.id
+            LEFT JOIN org_features of ON of.org_id = o.id
             WHERE u.email = $1
         `, [email]);
         if (result.rows.length === 0) {
@@ -429,7 +438,7 @@ export const verifySSO = async (req, res) => {
         );
 
         const userName = user.full_name ?? user.name;
-        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, org_name: user.org_name, team_id: user.team_id || null, timezone: user.timezone, org_timezone: user.org_timezone, org_primary_color_light: user.org_primary_color_light, org_primary_color_dark: user.org_primary_color_dark } });
+        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, org_name: user.org_name, team_id: user.team_id || null, timezone: user.timezone, org_timezone: user.org_timezone, org_primary_color_light: user.org_primary_color_light, org_primary_color_dark: user.org_primary_color_dark, features: { is_campaigns_enabled: user.is_campaigns_enabled, is_breaks_enabled: user.is_breaks_enabled } } });
 
     } catch (error) {
         console.error('verifySSO error:', error);

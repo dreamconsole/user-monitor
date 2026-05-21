@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Plus, Pencil, Trash2, Power, PowerOff, Megaphone } from 'lucide-react';
+import { MoreHorizontal, Plus, Pencil, Trash2, Power, PowerOff, Megaphone, Coffee } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import api from '@/lib/api';
@@ -94,6 +94,16 @@ export default function SuperAdminOrgs() {
             fetchData();
         } catch (error) {
             toast.error('Failed to update campaigns feature');
+        }
+    };
+
+    const toggleBreaks = async (org) => {
+        try {
+            await api.put(`/superadmin/orgs/${org.id}`, { is_breaks_enabled: !org.is_breaks_enabled });
+            toast.success(`Breaks ${org.is_breaks_enabled ? 'disabled' : 'enabled'} for ${org.name}`);
+            fetchData();
+        } catch (error) {
+            toast.error('Failed to update breaks feature');
         }
     };
 
@@ -190,6 +200,7 @@ export default function SuperAdminOrgs() {
                                 <TableHead>Current Users</TableHead>
                                 <TableHead>Max Users Limit</TableHead>
                                 <TableHead>Campaigns</TableHead>
+                                <TableHead>Breaks</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="w-[100px]">Actions</TableHead>
                             </TableRow>
@@ -205,6 +216,12 @@ export default function SuperAdminOrgs() {
                                         <Badge variant={org.is_campaigns_enabled ? 'default' : 'secondary'} className="text-xs gap-1">
                                             <Megaphone className="w-3 h-3" />
                                             {org.is_campaigns_enabled ? 'On' : 'Off'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={org.is_breaks_enabled ? 'default' : 'secondary'} className="text-xs gap-1">
+                                            <Coffee className="w-3 h-3" />
+                                            {org.is_breaks_enabled ? 'On' : 'Off'}
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
@@ -233,6 +250,13 @@ export default function SuperAdminOrgs() {
                                                 >
                                                     <Megaphone className="mr-2 h-4 w-4" />
                                                     {org.is_campaigns_enabled ? 'Disable Campaigns' : 'Enable Campaigns'}
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => toggleBreaks(org)}
+                                                    className={org.is_breaks_enabled ? 'text-orange-600' : 'text-violet-600'}
+                                                >
+                                                    <Coffee className="mr-2 h-4 w-4" />
+                                                    {org.is_breaks_enabled ? 'Disable Breaks' : 'Enable Breaks'}
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem
