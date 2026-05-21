@@ -22,9 +22,13 @@ This is the desktop agent for the User Monitor system. It tracks user activity (
 
 3. **Rebuild native modules for Electron** (required after install; fixes "invalid ELF header" / better_sqlite3.node errors):
    ```bash
+   npm run rebuild:sqlite
+   ```
+   Or rebuild all native addons (needs Linux X11 dev libs for `uiohook-napi`):
+   ```bash
+   sudo apt-get install -y build-essential libxtst-dev libpng++-dev libx11-dev libxrandr-dev pkg-config
    npx electron-rebuild -f
    ```
-   Wait for it to finish (2–5 minutes); it compiles `better-sqlite3` and other native addons for Electron’s Node runtime.
 
 ## Running the Agent
 

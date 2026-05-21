@@ -2,6 +2,17 @@
 
 All updates to the electron-agent are tracked here.
 
+## 1.2.10 - 2026-05-21
+### Changes
+- [Bugfix] Main window height **600 → 660** so **End Shift** is fully visible on the active-shift screen.
+- [Config] **`npm run rebuild:sqlite`** — rebuilds `better-sqlite3` for the installed Electron version (fixes `invalid ELF header` / `ERR_DLOPEN_FAILED` after `npm install`).
+- [Config] README: document targeted sqlite rebuild and X11 deps (`libxrandr-dev`) when full `electron-rebuild` is needed.
+
+## 1.2.9 - 2026-05-12
+### Changes
+- [Config] **`package.json` / `package-lock.json`**: app semver **1.2.9** (matches **`app.getVersion()`** for update checks and installers).
+- [Config] **DevTools**: no longer open automatically on startup (removed unpackaged / `NODE_ENV=development` / `USER_MONITOR_DEVTOOLS` auto-open). **F12**, **Ctrl+Shift+I**, and **Cmd+Option+I** still toggle DevTools when needed.
+
 ## 1.2.8 - 2026-05-12
 ### Changes
 - [Feature] **Updater DevTools visibility**: `GET …/agent/update-info` runs in the **main process** (axios), so it does **not** appear under the renderer **Network** tab. The UI now logs **`[Updater]`** lines to the **Console** (button click, IPC status, throttled download %). Update IPC payloads include **`manifestUrl`** while checking / on errors so you can confirm the target URL.

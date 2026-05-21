@@ -3,7 +3,9 @@ import api from '@/lib/api';
 import { toast } from 'sonner';
 import { TrendingUp, Clock, PieChart as PieChartIcon, Users as UsersIcon, Globe, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import UserSearchSelect from '@/components/UserSearchSelect';
-import DateRangeFilter from '@/components/DateRangeFilter';
+import DateFromToPicker from '@/components/DateFromToPicker';
+import { getTodayInTimezone } from '@/lib/dateUtils';
+import { format, subDays, parseISO } from 'date-fns';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import useAuthStore from '@/lib/useAuthStore';
 
@@ -53,10 +55,18 @@ function getBrowserKey(executableName) {
 export default function AppUsageDashboard() {
     const { user, isAuthenticated } = useAuthStore();
     const [loading, setLoading] = useState(true);
-    const [dateRange, setDateRange] = useState({
-        start_date: new Date().toISOString().split('T')[0],
-        end_date: new Date().toISOString().split('T')[0]
-    });
+    const [dateRange, setDateRange] = useState({ start_date: '', end_date: '' });
+
+    useEffect(() => {
+        if (!user) return;
+        const tz = user.org_timezone || user.timezone || 'UTC';
+        const end = getTodayInTimezone(tz);
+        const anchor = parseISO(`${end}T12:00:00.000Z`);
+        setDateRange({
+            start_date: format(subDays(anchor, 7), 'yyyy-MM-dd'),
+            end_date: end,
+        });
+    }, [user?.org_id, user?.org_timezone, user?.timezone]);
     const [dashboardData, setDashboardData] = useState(null);
     const [productivityData, setProductivityData] = useState([]);
     const [error, setError] = useState(null);
@@ -87,7 +97,7 @@ export default function AppUsageDashboard() {
     }, [user, isAuthenticated]);
 
     useEffect(() => {
-        if (selectedUserId) {
+        if (selectedUserId && dateRange.start_date && dateRange.end_date) {
             fetchDashboardData(selectedUserId);
         }
     }, [dateRange, selectedUserId]);
@@ -279,9 +289,10 @@ export default function AppUsageDashboard() {
                         </div>
                     )}
 
-                    <DateRangeFilter
+                    <DateFromToPicker
                         startDate={dateRange.start_date}
                         endDate={dateRange.end_date}
+                        maxDate={getTodayInTimezone(user?.org_timezone || user?.timezone || 'UTC')}
                         onChange={(start, end) => setDateRange({ start_date: start, end_date: end })}
                     />
                 </div>

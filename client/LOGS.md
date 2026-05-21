@@ -2,6 +2,11 @@
 
 All updates to the client application are tracked here.
 
+## 1.1.3 - 2026-05-21
+### Changes
+- [Feature] **`DateFromToPicker`** — separate **From date** / **To date** inputs (replaces preset dropdown on **Reports** and **App Usage** that always showed “Today”).
+- [Bugfix] **App Usage** default range: last 7 days through org timezone “today” (aligned with Reports).
+
 ## 1.1.2 - 2026-05-06
 ### Changes
 - [Feature] **Super Admin → Global Settings**: dedicated **Desktop agent (Windows)** card with **`agent_latest_version`**, **`agent_windows_download_url`**, optional MSI URL and release notes; wider inputs / textarea; friendly labels. SSO toggles remain under **Configuration flags**.

@@ -85,6 +85,7 @@ export const registerOrg = async (req, res) => {
                 email, 
                 role: user.role, 
                 org_id: orgId, 
+                org_name: orgName.trim(),
                 timezone: user.timezone,
                 features: {
                     is_campaigns_enabled: false // Default for new orgs
@@ -110,6 +111,7 @@ export const login = async (req, res) => {
     try {
         const result = await query(`
             SELECT u.*, 
+                   o.name as org_name,
                    o.primary_color_light as org_primary_color_light, 
                    o.primary_color_dark as org_primary_color_dark, 
                    o.timezone as org_timezone,
@@ -173,6 +175,7 @@ export const login = async (req, res) => {
                 email: user.email, 
                 role: user.role, 
                 org_id: user.org_id, 
+                org_name: user.org_name,
                 team_id: user.team_id || null, 
                 timezone: user.timezone, 
                 org_timezone: user.org_timezone, 
@@ -397,7 +400,7 @@ export const verifySSO = async (req, res) => {
 
         // Login user if they exist
         const result = await query(`
-            SELECT u.*, o.primary_color_light as org_primary_color_light, o.primary_color_dark as org_primary_color_dark, o.timezone as org_timezone
+            SELECT u.*, o.name as org_name, o.primary_color_light as org_primary_color_light, o.primary_color_dark as org_primary_color_dark, o.timezone as org_timezone
             FROM users u
             LEFT JOIN organizations o ON u.org_id = o.id
             WHERE u.email = $1
@@ -426,7 +429,7 @@ export const verifySSO = async (req, res) => {
         );
 
         const userName = user.full_name ?? user.name;
-        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, team_id: user.team_id || null, timezone: user.timezone, org_timezone: user.org_timezone, org_primary_color_light: user.org_primary_color_light, org_primary_color_dark: user.org_primary_color_dark } });
+        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, org_name: user.org_name, team_id: user.team_id || null, timezone: user.timezone, org_timezone: user.org_timezone, org_primary_color_light: user.org_primary_color_light, org_primary_color_dark: user.org_primary_color_dark } });
 
     } catch (error) {
         console.error('verifySSO error:', error);

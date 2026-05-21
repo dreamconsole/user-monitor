@@ -16,8 +16,15 @@ export const createOrg = async (req, res) => {
     }
 
     const client = await getClient();
+    const normalizedEmail = adminEmail.toLowerCase().trim();
     try {
         await client.query('BEGIN');
+
+        const existingUser = await client.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
+        if (existingUser.rows.length > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Email already exists' });
+        }
 
         // 1. Create Org
         const orgResult = await client.query(
@@ -35,8 +42,8 @@ export const createOrg = async (req, res) => {
         // 3. Create Org Admin User
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
         await client.query(
-            'INSERT INTO users (name, email, password, role, org_id) VALUES ($1, $2, $3, $4, $5)',
-            [adminName, adminEmail, hashedPassword, 'orgadmin', org.id]
+            'INSERT INTO users (org_id, full_name, email, password_hash, role, timezone) VALUES ($1, $2, $3, $4, $5, $6)',
+            [org.id, adminName.trim(), normalizedEmail, hashedPassword, 'orgadmin', timezone || 'UTC']
         );
 
         await client.query('COMMIT');
@@ -57,6 +64,7 @@ export const getOrgs = async (req, res) => {
                 o.id, 
                 o.name, 
                 o.domain, 
+                o.timezone,
                 o.max_users_limit, 
                 o.is_active, 
                 o.created_at,
@@ -76,17 +84,20 @@ export const getOrgs = async (req, res) => {
 // Update an organization (subscription limit, active status etc)
 export const updateOrg = async (req, res) => {
     const { id } = req.params;
-    const { max_users_limit, is_active, is_campaigns_enabled } = req.body;
+    const { name, domain, timezone, max_users_limit, is_active, is_campaigns_enabled } = req.body;
 
     try {
         const result = await query(`
             UPDATE organizations 
-            SET max_users_limit = COALESCE($1, max_users_limit),
-                is_active = COALESCE($2, is_active),
+            SET name = COALESCE($1, name),
+                domain = COALESCE($2, domain),
+                timezone = COALESCE($3, timezone),
+                max_users_limit = COALESCE($4, max_users_limit),
+                is_active = COALESCE($5, is_active),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3
-            RETURNING id, name, max_users_limit, is_active
-        `, [max_users_limit, is_active, id]);
+            WHERE id = $6
+            RETURNING id, name, domain, timezone, max_users_limit, is_active
+        `, [name, domain, timezone, max_users_limit, is_active, id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Organization not found' });

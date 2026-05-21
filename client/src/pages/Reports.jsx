@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import UserSearchSelect from '@/components/UserSearchSelect';
 import { Download, Search, Filter, FileText, Coffee, Monitor, Image as ImageIcon } from 'lucide-react';
-import DateRangeFilter from '@/components/DateRangeFilter';
+import DateFromToPicker from '@/components/DateFromToPicker';
 import { Badge } from '@/components/ui/badge';
 import { utcToLocal, getTodayInTimezone } from '@/lib/dateUtils';
 import { format, subDays, parseISO } from 'date-fns';
@@ -201,31 +201,31 @@ export default function Reports() {
             {/* Filter Bar */}
             <Card className="bg-muted/30 border-none">
                 <CardContent className="p-4">
-                    <div className="space-y-4">
-                        <DateRangeFilter
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        <DateFromToPicker
                             startDate={filters.startDate}
                             endDate={filters.endDate}
+                            maxDate={getTodayInTimezone(user?.org_timezone || user?.timezone || 'UTC')}
                             onChange={(start, end) => setFilters(f => ({ ...f, startDate: start, endDate: end }))}
+                            className="md:col-span-2"
                         />
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                            {user.role !== 'user' && (
-                                <div className="space-y-2">
-                                    <Label className="text-xs uppercase font-bold text-muted-foreground">Team Member</Label>
-                                    <UserSearchSelect
-                                        users={users}
-                                        value={filters.userId}
-                                        onChange={(v) => setFilters(f => ({ ...f, userId: v }))}
-                                        placeholder="All Users"
-                                        showAllOption
-                                        allOptionLabel="All Users"
-                                    />
-                                </div>
-                            )}
-                            <Button variant="secondary" className="h-9" onClick={fetchReport}>
-                                <Filter className="w-4 h-4 mr-2" />
-                                Apply Filters
-                            </Button>
-                        </div>
+                        {user.role !== 'user' && (
+                            <div className="space-y-2">
+                                <Label className="text-xs uppercase font-bold text-muted-foreground">Team Member</Label>
+                                <UserSearchSelect
+                                    users={users}
+                                    value={filters.userId}
+                                    onChange={(v) => setFilters(f => ({ ...f, userId: v }))}
+                                    placeholder="All Users"
+                                    showAllOption
+                                    allOptionLabel="All Users"
+                                />
+                            </div>
+                        )}
+                        <Button variant="secondary" className="h-9" onClick={fetchReport}>
+                            <Filter className="w-4 h-4 mr-2" />
+                            Apply Filters
+                        </Button>
                     </div>
                 </CardContent>
             </Card>

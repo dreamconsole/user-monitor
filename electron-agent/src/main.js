@@ -3,19 +3,6 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { app, BrowserWindow, Tray, Menu, ipcMain, powerSaveBlocker, Notification } = require('electron');
 
-function envTruthy(name) {
-    const v = process.env[name];
-    return v != null && /^(1|true|yes)$/i.test(String(v).trim());
-}
-
-function shouldOpenDevToolsOnLaunch() {
-    return (
-        !app.isPackaged ||
-        process.env.NODE_ENV === 'development' ||
-        envTruthy('USER_MONITOR_DEVTOOLS')
-    );
-}
-
 // Prevent timer throttling and renderer backgrounding
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
@@ -62,7 +49,7 @@ let currentUser = null;
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 450,
-        height: 600,
+        height: 660,
         resizable: false,
         maximizable: false,
         minimizable: true,
@@ -90,10 +77,6 @@ function createWindow() {
             mainWindow.webContents.toggleDevTools();
         }
     });
-
-    if (shouldOpenDevToolsOnLaunch()) {
-        mainWindow.webContents.openDevTools({ mode: 'detach' });
-    }
 
     mainWindow.loadFile(path.join(__dirname, 'ui/login.html'));
 

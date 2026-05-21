@@ -2,6 +2,13 @@
 
 All updates to the server application are tracked here.
 
+## 1.2.10 - 2026-05-21
+### Changes
+- [Bugfix] **`POST /auth/login`**, **`POST /auth/register-org`**, **`POST /auth/sso/verify`** — include **`org_name`** in the user payload (sidebar showed org name only after refresh via `/auth/me`).
+- [Bugfix] **`POST /superadmin/orgs`** — create org admin with `full_name` / `password_hash` (was legacy `name` / `password` columns, causing 500).
+- [Bugfix] **`PUT /superadmin/orgs/:id`** — update `name`, `domain`, and `timezone` (edit form fields were ignored).
+- [Bugfix] **`GET /superadmin/orgs`** — include `timezone` in list response for edit UI.
+
 ## 1.2.9 - 2026-05-12
 ### Changes
 - [Bugfix] **`GET /agent/update-info`** is registered on **`routes/agent.js`** **before** **`router.use(authenticateToken)`**, so it stays public even when only the **`/agent`** mount is used (avoids 401 **`Null token`**). Removed duplicate **`app.get`** from **`index.js`**.
