@@ -2,10 +2,11 @@ import express from 'express';
 import { getAdminStats, getManagerStats, getUserStats, getUserHourlyStats, getTimelineData } from '../controllers/statsController.js';
 import { getProductivityScore, getTeamProductivity, getTeamsProductivity } from '../controllers/productivityController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
+import { requireActiveSubscriptionForDashboard } from '../middleware/subscription.js';
 
 const router = express.Router();
 
-router.use(authenticateToken);
+router.use(authenticateToken, requireActiveSubscriptionForDashboard);
 
 router.get('/admin', authorizeRoles('orgadmin'), getAdminStats);
 router.get('/manager', authorizeRoles('orgadmin', 'manager'), getManagerStats);

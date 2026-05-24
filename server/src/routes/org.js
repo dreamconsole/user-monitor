@@ -1,6 +1,8 @@
 import express from 'express';
 import { getOrgSettings, updateOrgSettings } from '../controllers/orgController.js';
+import { getMyOrgSubscription } from '../controllers/subscriptionController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
+import { requireActiveSubscriptionForDashboard } from '../middleware/subscription.js';
 import { auditMiddleware } from '../middleware/auditLog.js';
 import { query } from '../db.js';
 
@@ -18,8 +20,9 @@ const fetchOrgOldValues = async (req) => {
     };
 };
 
+router.get('/subscription', authenticateToken, authorizeRoles('orgadmin'), getMyOrgSubscription);
 router.get('/settings', authenticateToken, authorizeRoles('orgadmin'), getOrgSettings);
-router.patch('/settings', authenticateToken, authorizeRoles('orgadmin'),
+router.patch('/settings', authenticateToken, authorizeRoles('orgadmin'), requireActiveSubscriptionForDashboard,
     auditMiddleware('ORG_SETTINGS_UPDATED', { entityType: 'org_settings', fetchOldValues: fetchOrgOldValues, getTargetName: (old) => old?.org?.name || 'Organization' }),
     updateOrgSettings
 );

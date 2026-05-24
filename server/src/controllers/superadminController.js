@@ -1,4 +1,5 @@
 import { query, getClient } from '../db.js';
+import { createManualSubscription } from '../services/subscriptionService.js';
 import os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -9,7 +10,10 @@ const execAsync = promisify(exec);
 
 // Get all organizations with some additional stats
 export const createOrg = async (req, res) => {
-    const { name, domain, max_users_limit, timezone, adminName, adminEmail, adminPassword } = req.body;
+    const {
+        name, domain, max_users_limit, timezone, adminName, adminEmail, adminPassword,
+        subscription_required, plan_id, licensed_seats,
+    } = req.body;
 
     if (!name || !adminName || !adminEmail || !adminPassword) {
         return res.status(400).json({ error: 'Org Name, Admin Name, Email and Password are required' });
@@ -20,23 +24,30 @@ export const createOrg = async (req, res) => {
         await client.query('BEGIN');
 
         // 1. Create Org
+        const seats = licensed_seats ?? max_users_limit ?? 10;
+        const subRequired = subscription_required !== false;
+
         const orgResult = await client.query(
-            'INSERT INTO organizations (name, domain, max_users_limit, timezone) VALUES ($1, $2, $3, $4) RETURNING *',
-            [name, domain || null, max_users_limit || 10, timezone || 'UTC']
+            `INSERT INTO organizations (name, domain, max_users_limit, timezone, subscription_required)
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [name, domain || null, seats, timezone || 'UTC', subRequired]
         );
         const org = orgResult.rows[0];
 
-        // 2. Initialize Org Features
-        await client.query(
-            'INSERT INTO org_features (org_id) VALUES ($1)',
-            [org.id]
-        );
+        await client.query('INSERT INTO org_features (org_id) VALUES ($1)', [org.id]);
 
-        // 3. Create Org Admin User
+        await createManualSubscription(client, org.id, {
+            planId: plan_id || 'starter',
+            licensedSeats: seats,
+            status: 'active',
+            periodMonths: 12,
+        });
+
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
         await client.query(
-            'INSERT INTO users (name, email, password, role, org_id) VALUES ($1, $2, $3, $4, $5)',
-            [adminName, adminEmail, hashedPassword, 'orgadmin', org.id]
+            `INSERT INTO users (org_id, full_name, email, password_hash, role, timezone, is_active)
+             VALUES ($1, $2, $3, $4, 'orgadmin', $5, true)`,
+            [org.id, adminName, adminEmail.toLowerCase().trim(), hashedPassword, timezone || 'UTC']
         );
 
         await client.query('COMMIT');
@@ -58,12 +69,22 @@ export const getOrgs = async (req, res) => {
                 o.name, 
                 o.domain, 
                 o.max_users_limit, 
-                o.is_active, 
+                o.is_active,
+                COALESCE(o.subscription_required, true) as subscription_required,
                 o.created_at,
                 (SELECT COUNT(*) FROM users u WHERE u.org_id = o.id) as current_users,
-                COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled
+                (SELECT COUNT(*) FROM users u WHERE u.org_id = o.id AND u.role = 'user' AND u.is_active = true
+                    AND (u.deleted_at IS NULL)) as seats_used,
+                COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled,
+                s.plan_id,
+                s.status as subscription_status,
+                s.licensed_seats,
+                s.current_period_end,
+                s.trial_ends_at,
+                s.provider
             FROM organizations o
             LEFT JOIN org_features of ON of.org_id = o.id
+            LEFT JOIN subscriptions s ON s.org_id = o.id
             ORDER BY o.name ASC
         `);
         res.json(result.rows);
@@ -76,17 +97,21 @@ export const getOrgs = async (req, res) => {
 // Update an organization (subscription limit, active status etc)
 export const updateOrg = async (req, res) => {
     const { id } = req.params;
-    const { max_users_limit, is_active, is_campaigns_enabled } = req.body;
+    const { max_users_limit, is_active, is_campaigns_enabled, subscription_required, name, domain, timezone } = req.body;
 
     try {
         const result = await query(`
             UPDATE organizations 
             SET max_users_limit = COALESCE($1, max_users_limit),
                 is_active = COALESCE($2, is_active),
+                subscription_required = COALESCE($3, subscription_required),
+                name = COALESCE($4, name),
+                domain = COALESCE($5, domain),
+                timezone = COALESCE($6, timezone),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3
-            RETURNING id, name, max_users_limit, is_active
-        `, [max_users_limit, is_active, id]);
+            WHERE id = $7
+            RETURNING id, name, max_users_limit, is_active, subscription_required
+        `, [max_users_limit, is_active, subscription_required, name, domain, timezone, id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Organization not found' });

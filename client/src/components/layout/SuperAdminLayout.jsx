@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import useAuthStore from '@/lib/useAuthStore';
+import useSuperAdminStore from '@/lib/useSuperAdminStore';
+import api from '@/lib/api';
+import SuperAdminOrgContextPanel from '@/components/superadmin/SuperAdminOrgContextPanel';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -64,7 +68,15 @@ const SuperAdminSidebar = ({ className, onLinkClick }) => {
 
 export default function SuperAdminLayout({ children }) {
     const { user, logout } = useAuthStore();
+    const { selectedOrgId, setSelectedOrg } = useSuperAdminStore();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [orgs, setOrgs] = useState([]);
+
+    useEffect(() => {
+        api.get('/superadmin/orgs')
+            .then((res) => setOrgs(res.data || []))
+            .catch(() => setOrgs([]));
+    }, []);
 
     return (
         <div className="h-screen flex bg-muted/20">
@@ -90,7 +102,32 @@ export default function SuperAdminLayout({ children }) {
                         </div>
                     </div>
 
-                    <div className="flex-1" />
+                    <div className="flex-1 flex items-center justify-center px-4 max-w-md mx-auto w-full">
+                        <Select
+                            value={selectedOrgId || '__none__'}
+                            onValueChange={(v) => {
+                                if (v === '__none__') {
+                                    setSelectedOrg(null, null);
+                                } else {
+                                    const org = orgs.find((o) => o.id === v);
+                                    setSelectedOrg(v, org?.name);
+                                }
+                            }}
+                        >
+                            <SelectTrigger className="w-full max-w-sm bg-background">
+                                <SelectValue placeholder="Select organization to inspect…" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[280px]">
+                                <SelectItem value="__none__">— No organization selected —</SelectItem>
+                                {orgs.map((org) => (
+                                    <SelectItem key={org.id} value={org.id}>
+                                        {org.name}
+                                        {org.subscription_status ? ` (${org.subscription_status})` : ''}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
 
                     <div className="flex items-center gap-3">
                         <div className="flex flex-col items-end hidden sm:flex text-right">
@@ -123,6 +160,7 @@ export default function SuperAdminLayout({ children }) {
                         </DropdownMenu>
                     </div>
                 </header>
+                <SuperAdminOrgContextPanel />
                 <main className="flex-1 overflow-auto bg-slate-50/50 dark:bg-background">
                     {children}
                 </main>

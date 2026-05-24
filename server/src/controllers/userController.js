@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { query } from '../db.js';
+import { assertSeatAvailable } from '../services/subscriptionService.js';
 import { getManagerTeamIds, managerCanAccessTeamMember } from '../utils/managerTeamAccess.js';
 
 export const getUsers = async (req, res) => {
@@ -81,6 +82,14 @@ export const createUser = async (req, res) => {
             }
         }
 
+        if (role === 'user') {
+            try {
+                await assertSeatAvailable(req.user.org_id, 1);
+            } catch (seatErr) {
+                return res.status(seatErr.status || 403).json({ error: seatErr.message, code: seatErr.code });
+            }
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const result = await query(
@@ -144,6 +153,33 @@ export const updateUser = async (req, res) => {
         }
 
         const isActive = status === 'active';
+
+        if (isActive) {
+            const existing = await query(
+                'SELECT role, is_active FROM users WHERE id = $1 AND org_id = $2',
+                [id, req.user.org_id]
+            );
+            if (existing.rows.length === 0) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+            const target = existing.rows[0];
+            const effectiveRole = role || target.role;
+            const wasInactive = !target.is_active;
+            if (wasInactive && effectiveRole === 'user') {
+                try {
+                    await assertSeatAvailable(req.user.org_id, 1);
+                } catch (seatErr) {
+                    return res.status(seatErr.status || 403).json({ error: seatErr.message, code: seatErr.code });
+                }
+            }
+            if (role === 'user' && target.role !== 'user' && target.is_active) {
+                try {
+                    await assertSeatAvailable(req.user.org_id, 1);
+                } catch (seatErr) {
+                    return res.status(seatErr.status || 403).json({ error: seatErr.message, code: seatErr.code });
+                }
+            }
+        }
 
         const result = await query(
             `UPDATE users SET 

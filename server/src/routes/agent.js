@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { logHeartbeat, syncActivitySession, uploadScreenshot, logActivity, logBreak, getBreaks, logBrowserActivity, getAssignedCampaigns } from '../controllers/agentController.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { requireActiveSubscription } from '../middleware/subscription.js';
 
 const router = express.Router();
 
@@ -70,8 +71,8 @@ const upload = multer({
     }
 });
 
-// All agent routes require authentication
-router.use(authenticateToken);
+// All agent routes require authentication + valid org subscription
+router.use(authenticateToken, requireActiveSubscription);
 
 router.post('/heartbeat', logHeartbeat);
 router.post('/activity-session', syncActivitySession);

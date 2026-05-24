@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { format, parseISO } from 'date-fns';
 
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -23,6 +24,7 @@ const hoursSelectValue = (v, fallback = 9) => {
 export default function Settings() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [subscription, setSubscription] = useState(null);
     const [settings, setSettings] = useState({
         name: '',
         max_users_limit: 0,
@@ -51,6 +53,15 @@ export default function Settings() {
         fetchSettings();
     }, []);
 
+    const fetchSubscription = async () => {
+        try {
+            const { data } = await api.get('/org/subscription');
+            setSubscription(data);
+        } catch (error) {
+            console.error('Failed to fetch subscription:', error);
+        }
+    };
+
     const fetchSettings = async () => {
         try {
             const { data } = await api.get('/org/settings');
@@ -74,6 +85,7 @@ export default function Settings() {
         } finally {
             setLoading(false);
         }
+        fetchSubscription();
     };
 
     const handleToggle = (key) => {
@@ -210,6 +222,59 @@ export default function Settings() {
                 <h1 className="text-3xl font-bold tracking-tight">Organization Settings</h1>
                 <p className="text-muted-foreground">Manage your organization-level monitoring preferences and limits.</p>
             </div>
+
+            {subscription && (
+                <Card className={!subscription.access?.valid ? 'border-destructive' : ''}>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            Subscription &amp; billing
+                            {subscription.access?.valid ? (
+                                <Badge>Active</Badge>
+                            ) : (
+                                <Badge variant="destructive">{subscription.access?.code || 'Inactive'}</Badge>
+                            )}
+                            {subscription.subscription_required === false && (
+                                <Badge variant="secondary">Exempt</Badge>
+                            )}
+                        </CardTitle>
+                        <CardDescription>
+                            {subscription.access?.valid
+                                ? 'Your organization has access to monitoring features.'
+                                : subscription.access?.reason || 'Contact your platform administrator to renew.'}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Plan</span>
+                            <span className="font-medium capitalize">{subscription.subscription?.plan_id || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Seats (employees)</span>
+                            <span className="font-medium">{subscription.seats_used} / {subscription.licensed_seats}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Status</span>
+                            <span className="font-medium capitalize">{subscription.subscription?.status || '—'}</span>
+                        </div>
+                        {subscription.subscription?.current_period_end && (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Period ends</span>
+                                <span className="font-medium">
+                                    {format(parseISO(subscription.subscription.current_period_end), 'MMM d, yyyy')}
+                                </span>
+                            </div>
+                        )}
+                        {subscription.subscription?.trial_ends_at && (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Trial ends</span>
+                                <span className="font-medium">
+                                    {format(parseISO(subscription.subscription.trial_ends_at), 'MMM d, yyyy')}
+                                </span>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             <Card>
                 <CardHeader>

@@ -2,12 +2,13 @@ import express from 'express';
 import { getUsers, createUser, updateUser, deleteUser, forceLogoutUser, resetUserPassword } from '../controllers/userController.js';
 import { getUserFeatures, updateUserFeatures } from '../controllers/userFeaturesController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
+import { requireActiveSubscriptionForDashboard } from '../middleware/subscription.js';
 import { auditMiddleware } from '../middleware/auditLog.js';
 import { query } from '../db.js';
 
 const router = express.Router();
 
-router.use(authenticateToken);
+router.use(authenticateToken, requireActiveSubscriptionForDashboard);
 
 // Old-value fetchers for audit logging
 const fetchUserOldValues = async (req) => {

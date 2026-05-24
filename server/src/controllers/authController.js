@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { query, getClient } from '../db.js';
 import { broadcastToManagers } from '../websocket.js';
+import { evaluateOrgSubscription, createTrialSubscription } from '../services/subscriptionService.js';
 
 const googleClient = new OAuth2Client(process.env.VITE_GOOGLE_CLIENT_ID);
 
@@ -69,6 +70,8 @@ export const registerOrg = async (req, res) => {
         );
         const user = userResult.rows[0];
 
+        await createTrialSubscription(client, orgId, { licensedSeats: 5, trialDays: 14 });
+
         await client.query('COMMIT');
 
         const token = jwt.sign(
@@ -113,6 +116,8 @@ export const login = async (req, res) => {
                    o.primary_color_light as org_primary_color_light, 
                    o.primary_color_dark as org_primary_color_dark, 
                    o.timezone as org_timezone,
+                   o.is_active as org_is_active,
+                   o.subscription_required as org_subscription_required,
                    COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled
             FROM users u
             LEFT JOIN organizations o ON u.org_id = o.id
@@ -137,6 +142,19 @@ export const login = async (req, res) => {
         const isActive = user.is_active !== undefined ? user.is_active : user.status !== 'suspended';
         if (!isActive) {
             return res.status(403).json({ error: 'Account suspended' });
+        }
+
+        if (user.role !== 'superadmin') {
+            if (user.org_is_active === false) {
+                return res.status(403).json({ error: 'Organization is deactivated. Contact your administrator.' });
+            }
+            const subCheck = await evaluateOrgSubscription(user.org_id);
+            if (!subCheck.valid) {
+                return res.status(403).json({
+                    error: subCheck.reason || 'Subscription is not active',
+                    code: subCheck.code,
+                });
+            }
         }
 
         // Update last login and heartbeat status (only when using new schema)
@@ -315,6 +333,16 @@ export const getMe = async (req, res) => {
             [req.user.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+        if (req.user.role !== 'superadmin') {
+            const subCheck = await evaluateOrgSubscription(req.user.org_id);
+            if (!subCheck.valid) {
+                return res.status(403).json({
+                    error: subCheck.reason || 'Subscription is not active',
+                    code: subCheck.code,
+                });
+            }
+        }
         
         const userData = result.rows[0];
         const response = {
@@ -397,7 +425,8 @@ export const verifySSO = async (req, res) => {
 
         // Login user if they exist
         const result = await query(`
-            SELECT u.*, o.primary_color_light as org_primary_color_light, o.primary_color_dark as org_primary_color_dark, o.timezone as org_timezone
+            SELECT u.*, o.primary_color_light as org_primary_color_light, o.primary_color_dark as org_primary_color_dark, o.timezone as org_timezone,
+                   o.is_active as org_is_active
             FROM users u
             LEFT JOIN organizations o ON u.org_id = o.id
             WHERE u.email = $1
@@ -411,6 +440,19 @@ export const verifySSO = async (req, res) => {
         const isActive = user.is_active !== undefined ? user.is_active : user.status !== 'suspended';
         if (!isActive) {
             return res.status(403).json({ error: 'Account suspended' });
+        }
+
+        if (user.role !== 'superadmin') {
+            if (user.org_is_active === false) {
+                return res.status(403).json({ error: 'Organization is deactivated.' });
+            }
+            const subCheck = await evaluateOrgSubscription(user.org_id);
+            if (!subCheck.valid) {
+                return res.status(403).json({
+                    error: subCheck.reason || 'Subscription is not active',
+                    code: subCheck.code,
+                });
+            }
         }
 
         if (user.password_hash != null) {

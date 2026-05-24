@@ -6,21 +6,27 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Plus, Pencil, Trash2, Power, PowerOff, Megaphone } from 'lucide-react';
+import { MoreHorizontal, Plus, Pencil, Trash2, Power, PowerOff, Megaphone, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import useSuperAdminStore from '@/lib/useSuperAdminStore';
+import { format, parseISO } from 'date-fns';
 
 export default function SuperAdminOrgs() {
+    const { setSelectedOrg } = useSuperAdminStore();
     const [orgs, setOrgs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
-    const [selectedOrg, setSelectedOrg] = useState(null);
+    const [editingOrg, setEditingOrg] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         domain: '',
         max_users_limit: 10,
+        licensed_seats: 10,
+        subscription_required: true,
+        plan_id: 'starter',
         timezone: 'UTC',
         adminName: '',
         adminEmail: '',
@@ -54,6 +60,9 @@ export default function SuperAdminOrgs() {
                 name: '',
                 domain: '',
                 max_users_limit: 10,
+                licensed_seats: 10,
+                subscription_required: true,
+                plan_id: 'starter',
                 timezone: 'UTC',
                 adminName: '',
                 adminEmail: '',
@@ -68,7 +77,13 @@ export default function SuperAdminOrgs() {
     const handleUpdate = async (e) => {
         e.preventDefault();
         try {
-            await api.put(`/superadmin/orgs/${selectedOrg.id}`, formData);
+            await api.put(`/superadmin/orgs/${editingOrg.id}`, {
+                name: formData.name,
+                domain: formData.domain,
+                max_users_limit: formData.max_users_limit,
+                timezone: formData.timezone,
+                subscription_required: formData.subscription_required,
+            });
             toast.success('Organization updated successfully');
             setIsEditOpen(false);
             fetchData();
@@ -98,11 +113,13 @@ export default function SuperAdminOrgs() {
     };
 
     const openEdit = (org) => {
-        setSelectedOrg(org);
+        setEditingOrg(org);
         setFormData({
             name: org.name,
             domain: org.domain || '',
             max_users_limit: org.max_users_limit,
+            licensed_seats: org.licensed_seats ?? org.max_users_limit,
+            subscription_required: org.subscription_required !== false,
             timezone: org.timezone || 'UTC'
         });
         setIsEditOpen(true);
@@ -142,14 +159,23 @@ export default function SuperAdminOrgs() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="limit">User Limit</Label>
-                                        <Input id="limit" type="number" required value={formData.max_users_limit} onChange={e => setFormData({ ...formData, max_users_limit: parseInt(e.target.value) })} />
+                                        <Label htmlFor="limit">Licensed seats</Label>
+                                        <Input id="limit" type="number" required value={formData.licensed_seats} onChange={e => setFormData({ ...formData, licensed_seats: parseInt(e.target.value), max_users_limit: parseInt(e.target.value) })} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="timezone">Timezone</Label>
                                         <Input id="timezone" value={formData.timezone} onChange={e => setFormData({ ...formData, timezone: e.target.value })} />
                                     </div>
                                 </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-2">
+                                <Label>Subscription required</Label>
+                                <input
+                                    type="checkbox"
+                                    checked={formData.subscription_required}
+                                    onChange={(e) => setFormData({ ...formData, subscription_required: e.target.checked })}
+                                    className="h-4 w-4"
+                                />
                             </div>
 
                             <div className="space-y-4 pt-4 border-t">
@@ -188,7 +214,8 @@ export default function SuperAdminOrgs() {
                                 <TableHead>Organization Name</TableHead>
                                 <TableHead>Domain</TableHead>
                                 <TableHead>Current Users</TableHead>
-                                <TableHead>Max Users Limit</TableHead>
+                                <TableHead>Seats</TableHead>
+                                <TableHead>Subscription</TableHead>
                                 <TableHead>Campaigns</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="w-[100px]">Actions</TableHead>
@@ -200,7 +227,31 @@ export default function SuperAdminOrgs() {
                                     <TableCell className="font-medium">{org.name}</TableCell>
                                     <TableCell>{org.domain || 'N/A'}</TableCell>
                                     <TableCell>{org.current_users}</TableCell>
-                                    <TableCell>{org.max_users_limit}</TableCell>
+                                    <TableCell>
+                                        {org.seats_used ?? '—'} / {org.licensed_seats ?? org.max_users_limit}
+                                    </TableCell>
+                                    <TableCell>
+                                        {org.subscription_required === false ? (
+                                            <Badge variant="outline">Exempt</Badge>
+                                        ) : (
+                                            <div className="flex flex-col gap-0.5">
+                                                <Badge variant="secondary" className="w-fit text-xs capitalize">
+                                                    {org.subscription_status || 'none'}
+                                                </Badge>
+                                                {org.current_period_end && (() => {
+                                                    try {
+                                                        return (
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                until {format(parseISO(org.current_period_end), 'MMM d, yyyy')}
+                                                            </span>
+                                                        );
+                                                    } catch {
+                                                        return null;
+                                                    }
+                                                })()}
+                                            </div>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         <Badge variant={org.is_campaigns_enabled ? 'default' : 'secondary'} className="text-xs gap-1">
                                             <Megaphone className="w-3 h-3" />
@@ -222,6 +273,10 @@ export default function SuperAdminOrgs() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                <DropdownMenuItem onClick={() => setSelectedOrg(org.id, org.name)}>
+                                                    <Eye className="mr-2 h-4 w-4" />
+                                                    Inspect (navbar)
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => openEdit(org)}>
                                                     <Pencil className="mr-2 h-4 w-4" />
                                                     Edit Details
@@ -280,6 +335,16 @@ export default function SuperAdminOrgs() {
                             <Label htmlFor="edit-limit">Max Users Limit</Label>
                             <Input id="edit-limit" type="number" required value={formData.max_users_limit} onChange={e => setFormData({ ...formData, max_users_limit: parseInt(e.target.value) })} />
                         </div>
+                        <div className="flex items-center justify-between">
+                            <Label>Subscription required</Label>
+                            <input
+                                type="checkbox"
+                                checked={formData.subscription_required}
+                                onChange={(e) => setFormData({ ...formData, subscription_required: e.target.checked })}
+                                className="h-4 w-4"
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Use the navbar org selector to edit plan, status, and renewal dates.</p>
                         <div className="space-y-2">
                             <Label htmlFor="edit-timezone">Timezone</Label>
                             <Input id="edit-timezone" value={formData.timezone} onChange={e => setFormData({ ...formData, timezone: e.target.value })} />

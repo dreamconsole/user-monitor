@@ -1,5 +1,6 @@
 import express from 'express';
 import { getOrgs, createOrg, updateOrg, deleteOrg, getSettings, updateSettings, getSystemHealth, getDBStats, cleanupData } from '../controllers/superadminController.js';
+import { getOrgSubscriptionAdmin, updateOrgSubscriptionAdmin } from '../controllers/subscriptionController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -11,6 +12,8 @@ router.use(authenticateToken, authorizeRoles('superadmin'));
 router.get('/orgs', getOrgs);
 router.post('/orgs', createOrg);
 router.put('/orgs/:id', updateOrg);
+router.get('/orgs/:id/subscription', getOrgSubscriptionAdmin);
+router.put('/orgs/:id/subscription', updateOrgSubscriptionAdmin);
 router.delete('/orgs/:id', deleteOrg); // Note: Should probably soft-delete or deactivate
 
 // System Settings
