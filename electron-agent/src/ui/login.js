@@ -216,7 +216,7 @@ function updateStatus(status) {
         idleAlertNotified = false;
         if (shiftTimerPaused && isTracking) {
             shiftTimerPaused = false;
-            startTimer();
+            startTimer({ reanchor: true });
         }
     } else if (status === 'SHIFT_PAUSED') {
         statusBadge.classList.add('bg-amber-500/10', 'border-amber-500/20', 'text-amber-600');
@@ -230,6 +230,12 @@ function updateStatus(status) {
                 clearInterval(timerInterval);
                 timerInterval = null;
             }
+            // Freeze displayed elapsed time (wall clock kept running while paused)
+            if (sessionStartTime) {
+                secondsElapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+                timerDisplay.innerText = formatTime(secondsElapsed);
+            }
+            sessionStartTime = null;
         }
         if (!idleAlertNotified) {
             idleAlertNotified = true;
@@ -269,9 +275,9 @@ function updateLastSync() {
     lastSyncText.innerText = `Last Sync: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-function startTimer() {
+function startTimer(opts = {}) {
     if (timerInterval) clearInterval(timerInterval);
-    if (!sessionStartTime) {
+    if (!sessionStartTime || opts.reanchor) {
         sessionStartTime = Date.now() - (secondsElapsed * 1000);
     }
     timerInterval = setInterval(() => {

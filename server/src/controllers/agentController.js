@@ -3,6 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { broadcastToManagers } from '../websocket.js';
+import { markUserShiftOffline } from '../lib/presence.js';
+
+export { markUserShiftOffline };
 
 /** After org max shift hours from today's first check-in, force logout if idle this long (seconds). Applies during break. */
 const SHIFT_CAP_POST_MAX_IDLE_SEC = 30 * 60;
@@ -202,6 +205,11 @@ export const logHeartbeat = async (req, res) => {
             return res.status(200).json({ success: true, command: 'FORCE_LOGOUT' });
         }
 
+        // Presence only while agent is on shift (desktop sends on_shift: true)
+        if (req.body.on_shift !== true) {
+            return res.status(200).json({ success: true, presence: 'ignored_not_on_shift' });
+        }
+
         // Update last_heartbeat_at in agent_sessions or insert if not exists
         const { agent_version, device_name, state, current_idle_time, shift_cap_idle_seconds } = req.body;
         let { token } = req.body;
@@ -327,7 +335,8 @@ export const logHeartbeat = async (req, res) => {
             broadcastToManagers(org_id, {
                 type: 'USER_HEARTBEAT',
                 userId: user_id,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                on_shift: true,
             });
         } catch (_) { /* non-critical */ }
 
@@ -341,8 +350,28 @@ export const logHeartbeat = async (req, res) => {
     }
 };
 
+/** Agent ended shift or is logged in without an active shift — clear CRM online presence. */
+export const logShiftOffline = async (req, res) => {
+    const { org_id, user_id } = req.body;
+    if (!org_id || !user_id) {
+        return res.status(400).json({ error: 'org_id and user_id are required' });
+    }
+    try {
+        const userCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
+        if (userCheck.rows.length === 0) {
+            return res.status(403).json({ success: false, error: 'Invalid organization or user' });
+        }
+        await markUserShiftOffline(user_id, org_id);
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error('logShiftOffline error:', error);
+        res.status(500).json({ error: 'Failed to mark user offline' });
+    }
+};
+
 export const syncActivitySession = async (req, res) => {
     const { id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, status, campaign_id } = req.body;
+    const sessionStatus = status === 'ended' ? 'completed' : (status || 'active');
     try {
         // Validate user and org existence
         const userCheck = await query('SELECT id FROM users WHERE id = $1 AND org_id = $2', [user_id, org_id]);
@@ -368,17 +397,20 @@ export const syncActivitySession = async (req, res) => {
              status = EXCLUDED.status,
              work_date = EXCLUDED.work_date,
              campaign_id = EXCLUDED.campaign_id`,
-            [id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, req.body.total_break_seconds || 0, status, campaign_id || null]
+            [id, org_id, user_id, start_time, end_time, total_work_seconds, total_idle_seconds, req.body.total_break_seconds || 0, sessionStatus, campaign_id || null]
         );
-        // Refresh heartbeat status
-        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
-        try {
-            broadcastToManagers(org_id, {
-                type: 'USER_HEARTBEAT',
-                userId: user_id,
-                timestamp: new Date().toISOString()
-            });
-        } catch (_) { /* non-critical */ }
+        const shiftEnded =
+            req.body.shift_ended === true ||
+            sessionStatus === 'completed' ||
+            sessionStatus === 'force_logged_out' ||
+            sessionStatus === 'abandoned';
+        if (shiftEnded) {
+            await markUserShiftOffline(user_id, org_id);
+        } else if (sessionStatus === 'active') {
+            try {
+                broadcastToManagers(org_id, { type: 'USER_ON_SHIFT', userId: user_id });
+            } catch (_) { /* non-critical */ }
+        }
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Work session sync failed:', error);
@@ -408,15 +440,6 @@ export const uploadScreenshot = async (req, res) => {
             'INSERT INTO screenshots (id, org_id, user_id, session_id, storage_path, captured_at, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7)',
             [crypto.randomUUID(), org_id, user_id, session_id, storagePath, captured_at, metadata || {}]
         );
-        // Refresh heartbeat status
-        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
-        try {
-            broadcastToManagers(org_id, {
-                type: 'USER_HEARTBEAT',
-                userId: user_id,
-                timestamp: new Date().toISOString()
-            });
-        } catch (_) { /* non-critical */ }
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Screenshot upload failed:', error);
@@ -444,15 +467,6 @@ export const logActivity = async (req, res) => {
             [org_id, user_id, session_id, log_time, keyboard_events || 0, mouse_events || 0, left_clicks || 0, right_clicks || 0, state, metadata || null]
         );
         console.log('[logActivity] SUCCESS, inserted ID:', result.rows[0].id);
-        // Refresh heartbeat status
-        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
-        try {
-            broadcastToManagers(org_id, {
-                type: 'USER_HEARTBEAT',
-                userId: user_id,
-                timestamp: new Date().toISOString()
-            });
-        } catch (_) { /* non-critical */ }
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('[logActivity] CRITICAL ERROR:', error);
@@ -520,15 +534,6 @@ export const logBreak = async (req, res) => {
                 .catch(err => console.error('Break violation check failed:', err));
         }
 
-        // Refresh heartbeat status
-        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
-        try {
-            broadcastToManagers(org_id, {
-                type: 'USER_HEARTBEAT',
-                userId: user_id,
-                timestamp: new Date().toISOString()
-            });
-        } catch (_) { /* non-critical */ }
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Break log failed:', error);
@@ -676,15 +681,6 @@ export const logBrowserActivity = async (req, res) => {
         }
 
         console.log(`[BrowserActivity] Synced ${inserted} logs for user ${user_id}`);
-        // Refresh heartbeat status
-        await query('UPDATE users SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1', [user_id]);
-        try {
-            broadcastToManagers(org_id, {
-                type: 'USER_HEARTBEAT',
-                userId: user_id,
-                timestamp: new Date().toISOString()
-            });
-        } catch (_) { /* non-critical */ }
         res.status(200).json({ success: true, inserted });
     } catch (error) {
         console.error('[BrowserActivity] Sync failed:', error);

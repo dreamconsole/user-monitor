@@ -122,6 +122,7 @@ class MonitorService {
         this.currentState = 'ACTIVE';
         if (global.statusUpdateCallback) global.statusUpdateCallback('ACTIVE');
         screenshotService.setCurrentState('ACTIVE');
+        require('./sync').pushPresenceNow();
     }
 
     _evaluateNoBreaksPolicy(idleTime) {
@@ -246,8 +247,9 @@ class MonitorService {
             );
             console.log(`Started Work Session: ${this.currentWorkSessionId} (Campaign: ${this.campaignId || 'None'})`);
 
-            // Immediate sync to server
+            // Immediate sync + presence so CRM shows online before first interval tick
             require('./sync').forceSync();
+            require('./sync').pushPresenceNow();
         } catch (error) {
             console.error('CRITICAL ERROR in startWorkSession:', error);
         }
@@ -256,13 +258,11 @@ class MonitorService {
     stop() {
         if (this.interval) clearInterval(this.interval);
 
-        // Final update before stopping
         if (this.currentWorkSessionId) {
-            // Check if we were idle since last check
-            this.updateWorkSessionInDB();
+            this.finalizeWorkSessionInDB();
             this.currentWorkSessionId = null;
-            // Immediate sync to server
-            require('./sync').forceSync();
+            const sync = require('./sync');
+            sync.endShiftPresence().catch((e) => console.error('[MonitorService] endShiftPresence failed:', e));
         }
 
         this.shiftClockPaused = false;
@@ -399,6 +399,7 @@ class MonitorService {
         this.currentState = 'ACTIVE';
         if (global.statusUpdateCallback) global.statusUpdateCallback('ACTIVE');
         screenshotService.setCurrentState('ACTIVE');
+        require('./sync').pushPresenceNow();
     }
 
     checkAndLogActivity() {
@@ -413,6 +414,13 @@ class MonitorService {
         console.log(`[checkAndLogActivity] Idle: ${idleTime}s, Elapsed: ${secondsElapsed}s, Threshold: ${this.afkThresholdSeconds}s, ShiftPaused: ${this.shiftClockPaused}`);
 
         this._evaluateNoBreaksPolicy(idleTime);
+
+        // Shift clock paused (grace expired): do not advance work/idle totals until user returns
+        if (this.shiftClockPaused) {
+            this.lastCheckTime = now;
+            this.updateWorkSessionInDB();
+            return;
+        }
 
         let state = 'active';
         const wasActive = this.currentState === 'ACTIVE' || this.currentState === 'SHIFT_PAUSED';
@@ -492,14 +500,29 @@ class MonitorService {
         );
     }
 
+    /** Periodic totals while shift is open — do not set end_time (that closed the shift on the server). */
     updateWorkSessionInDB() {
-        const stmt = db.getDB().prepare(`
+        if (!this.currentWorkSessionId) return;
+        db.getDB().prepare(`
+            UPDATE work_sessions
+            SET total_work_seconds = ?, total_idle_seconds = ?, total_break_seconds = ?, sync_status = 'pending'
+            WHERE id = ?
+        `).run(
+            this.totalWorkSeconds,
+            this.totalIdleSeconds,
+            this.totalBreakSeconds,
+            this.currentWorkSessionId
+        );
+    }
+
+    /** End shift: set end_time once, then sync marks completed + CRM offline. */
+    finalizeWorkSessionInDB() {
+        if (!this.currentWorkSessionId) return;
+        db.getDB().prepare(`
             UPDATE work_sessions
             SET end_time = ?, total_work_seconds = ?, total_idle_seconds = ?, total_break_seconds = ?, sync_status = 'pending'
             WHERE id = ?
-        `);
-
-        stmt.run(
+        `).run(
             Date.now(),
             this.totalWorkSeconds,
             this.totalIdleSeconds,

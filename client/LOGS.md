@@ -2,6 +2,20 @@
 
 All updates to the client application are tracked here.
 
+## 1.1.8 - 2026-05-21
+### Changes
+- [Bugfix] Users presence grace: **`2 × heartbeat interval + 90s`** before showing offline (matches 3 min agent interval).
+- [Bugfix] Periodic presence re-check so status dots update when heartbeats age out.
+
+## 1.1.7 - 2026-05-21
+### Changes
+- [Bugfix] **Users** presence: **online** only when `is_on_shift` + fresh heartbeat (fixes logged-in agent without shift showing green).
+- [Bugfix] WebSocket: handle **`USER_ON_SHIFT`**; stop treating generic **`HEARTBEAT`** as user presence.
+
+## 1.1.6 - 2026-05-21
+### Changes
+- [Bugfix] Users list: ignore `USER_HEARTBEAT` events without a timestamp (offline signal).
+
 ## 1.1.5 - 2026-05-21
 ### Changes
 - [Bugfix] Sidebar **Break Management** hidden when `user.features.is_breaks_enabled` is false (aligned with campaigns).

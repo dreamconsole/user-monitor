@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { query } from '../db.js';
-import { logHeartbeat, syncActivitySession, uploadScreenshot, logActivity, logBreak, getBreaks, logBrowserActivity, getAssignedCampaigns } from '../controllers/agentController.js';
+import { logHeartbeat, logShiftOffline, syncActivitySession, uploadScreenshot, logActivity, logBreak, getBreaks, logBrowserActivity, getAssignedCampaigns } from '../controllers/agentController.js';
 import { getAgentUpdateInfo } from '../controllers/agentUpdateInfoController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -77,6 +77,7 @@ const upload = multer({
 router.use(authenticateToken);
 
 router.post('/heartbeat', logHeartbeat);
+router.post('/shift-offline', logShiftOffline);
 router.post('/activity-session', syncActivitySession);
 router.post('/activity-log', logActivity);
 router.post('/break-log', logBreak);

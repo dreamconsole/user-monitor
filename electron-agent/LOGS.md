@@ -2,6 +2,49 @@
 
 All updates to the electron-agent are tracked here.
 
+## 1.2.20 - 2026-05-26
+### Changes
+- [Bugfix] **Critical:** Do not set `end_time` on open shifts in local DB — periodic sync was sending `completed` + `shift_ended`, clearing CRM presence and `is_on_shift` while the agent still showed on shift.
+- [Bugfix] `finalizeWorkSessionInDB()` only on **End shift**; server offline only when `shift_ended` / completed status (not any `end_time`).
+
+## 1.2.19 - 2026-05-21
+### Changes
+- [Bugfix] **Dedicated presence heartbeat timer** every `heartbeat_interval_seconds` (not only after full sync) — fixes CRM showing offline at 3 min while agent is on shift.
+- [Bugfix] Apply org **heartbeat/AFK/grace** settings from login `features` before sync starts (no 5-minute default lag).
+- [Bugfix] Immediate heartbeat on **start shift**.
+
+## 1.2.18 - 2026-05-21
+### Changes
+- [Bugfix] **`pushPresenceNow()`** on shift resume (after pause) and break **Resume** — immediate heartbeat so CRM `/users` shows **online** without waiting for the 5-minute sync.
+
+## 1.2.17 - 2026-05-21
+### Changes
+- [Bugfix] **Shift paused** timer freezes at pause time (e.g. 11:00) and resumes from there — no longer jumps ahead by idle minutes while paused.
+- [Bugfix] Monitor skips work/idle accumulation while **`shiftClockPaused`** (no-breaks grace policy).
+
+## 1.2.16 - 2026-05-21
+### Changes
+- [Bugfix] Heartbeat payload includes **`on_shift: true`** (server ignores heartbeats without it).
+- [Bugfix] **`clearPresenceViaAuthMe()`** fallback: `GET /auth/me?client=agent` when `shift-offline` returns 404.
+- [Bugfix] Auto-login **`/auth/me`** parses `response.data` or `response.data.user`; fixes electron-store `Use delete() to clear values` error.
+
+## 1.2.15 - 2026-05-21
+### Changes
+- [Bugfix] **Removed activity-session fallback** from `sendShiftOffline` — on login it re-synced an old closed shift and legacy APIs refreshed `last_heartbeat`, showing the user **online without starting shift**.
+- [Bugfix] Login calls **`clearStalePresence()`** (shift-offline only) before starting the sync interval.
+
+## 1.2.14 - 2026-05-21
+### Changes
+- [Bugfix] End-shift sync sends **`status: completed`** (DB enum has no `ended`) — fixes 500 and offline fallback failure.
+
+## 1.2.13 - 2026-05-21
+### Changes
+- [Bugfix] End shift: **`shift_ended`** on activity-session; **`sendShiftOffline`** fallback if `/agent/shift-offline` returns 404; trim **`API_URL`** trailing slash.
+
+## 1.2.12 - 2026-05-21
+### Changes
+- [Bugfix] **`sendShiftOffline`** on end shift so CRM shows offline when logged in but not on shift; login no longer marks user online on server.
+
 ## 1.2.11 - 2026-05-21
 ### Changes
 - [Feature] **No-breaks shift policy**: after org **grace** minutes idle, shift UI timer pauses (`SHIFT_PAUSED`); after **absence** minutes, shift ends + optional notify; config from heartbeat `features`.

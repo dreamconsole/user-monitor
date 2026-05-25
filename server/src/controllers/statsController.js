@@ -42,8 +42,13 @@ export const getAdminStats = async (req, res) => {
         const totalUsers = await query('SELECT COUNT(*) FROM users WHERE org_id = $1 AND deleted_at IS NULL', [orgId]);
 
         const activeUsers = await query(
-            `SELECT COUNT(DISTINCT user_id) FROM agent_sessions 
-             WHERE org_id = $1 AND last_heartbeat_at > NOW() - INTERVAL '5 minutes'`,
+            `SELECT COUNT(DISTINCT ws.user_id) FROM work_sessions ws
+             WHERE ws.org_id = $1 AND ws.end_time IS NULL AND ws.status = 'active'
+               AND ws.work_date = (
+                   CURRENT_TIMESTAMP AT TIME ZONE COALESCE(
+                       (SELECT timezone FROM organizations WHERE id = $1), 'UTC'
+                   )
+               )::date`,
             [orgId]
         );
 
@@ -82,15 +87,31 @@ export const getAdminStats = async (req, res) => {
             [orgId, refDate]
         );
 
-        // 2. Status Distribution (Online vs Offline)
-        // Use the same 5-minute window as activeUsers (agent_sessions) and default agent heartbeat;
-        // a 2-minute window made most agents "offline" here while still counted in Active Now.
+        // 2. Status Distribution — on shift only (matches Active Now / Users page)
         const statusDist = await query(
             `SELECT
-                COUNT(*) FILTER (WHERE last_heartbeat > NOW() - INTERVAL '5 minutes') as online,
-                COUNT(*) FILTER (WHERE last_heartbeat <= NOW() - INTERVAL '5 minutes' OR last_heartbeat IS NULL) as offline
-             FROM users
-             WHERE org_id = $1 AND is_active = true AND deleted_at IS NULL`,
+                COUNT(*) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM work_sessions ws
+                    WHERE ws.user_id = u.id AND ws.org_id = u.org_id
+                      AND ws.end_time IS NULL AND ws.status = 'active'
+                      AND ws.work_date = (
+                          CURRENT_TIMESTAMP AT TIME ZONE COALESCE(
+                              (SELECT timezone FROM organizations WHERE id = u.org_id), 'UTC'
+                          )
+                      )::date
+                )) as online,
+                COUNT(*) FILTER (WHERE NOT EXISTS (
+                    SELECT 1 FROM work_sessions ws
+                    WHERE ws.user_id = u.id AND ws.org_id = u.org_id
+                      AND ws.end_time IS NULL AND ws.status = 'active'
+                      AND ws.work_date = (
+                          CURRENT_TIMESTAMP AT TIME ZONE COALESCE(
+                              (SELECT timezone FROM organizations WHERE id = u.org_id), 'UTC'
+                          )
+                      )::date
+                )) as offline
+             FROM users u
+             WHERE u.org_id = $1 AND u.is_active = true AND u.deleted_at IS NULL`,
             [orgId]
         );
 
@@ -172,16 +193,28 @@ export const getManagerStats = async (req, res) => {
             [orgId, req.user.id, teamIds, refDate]
         );
 
-        // 2. Team Status Distribution (same 5-minute presence window as admin stats / Active Now)
-        const now = new Date();
-        const fiveMinsAgo = new Date(now.getTime() - 5 * 60000);
-
-        // Calculate from teamStats which basically has the user rows
+        // 2. Team Status Distribution — on shift only (matches admin stats / Users page)
         let onlineCount = 0;
         let offlineCount = 0;
 
-        teamStats.rows.forEach(user => {
-            if (user.last_heartbeat && new Date(user.last_heartbeat) > fiveMinsAgo) {
+        const onShiftRes = await query(
+            `SELECT DISTINCT ws.user_id
+             FROM work_sessions ws
+             JOIN users u ON u.id = ws.user_id AND u.org_id = ws.org_id
+             WHERE ws.org_id = $1 AND ws.end_time IS NULL AND ws.status = 'active'
+               AND ws.work_date = (
+                   CURRENT_TIMESTAMP AT TIME ZONE COALESCE(
+                       (SELECT timezone FROM organizations WHERE id = $1), 'UTC'
+                   )
+               )::date
+               AND u.deleted_at IS NULL AND u.role != 'orgadmin'
+               AND (u.id = $2 OR u.team_id = ANY($3::uuid[]))`,
+            [orgId, req.user.id, teamIds]
+        );
+        const onShiftIds = new Set(onShiftRes.rows.map((r) => r.user_id));
+
+        teamStats.rows.forEach((user) => {
+            if (onShiftIds.has(user.id)) {
                 onlineCount++;
             } else {
                 offlineCount++;
@@ -323,14 +356,25 @@ export const getUserHourlyStats = async (req, res) => {
         let currentStatus = 'offline';
         if (queryDate === orgTodayStr) {
             const userStatus = await query(
-                `SELECT last_heartbeat, current_state,
-                  EXISTS(SELECT 1 FROM break_logs WHERE user_id = $1 AND end_time IS NULL) as on_break
-                  FROM users WHERE id = $1`,
+                `SELECT u.last_heartbeat, u.current_state,
+                  EXISTS(SELECT 1 FROM break_logs WHERE user_id = $1 AND end_time IS NULL) as on_break,
+                  EXISTS(
+                    SELECT 1 FROM work_sessions ws
+                    WHERE ws.user_id = $1 AND ws.org_id = u.org_id
+                      AND ws.end_time IS NULL AND ws.status = 'active'
+                      AND ws.work_date = (
+                          CURRENT_TIMESTAMP AT TIME ZONE COALESCE(
+                              (SELECT timezone FROM organizations WHERE id = u.org_id), 'UTC'
+                          )
+                      )::date
+                  ) as on_shift
+                  FROM users u WHERE u.id = $1`,
                 [userId]
             );
             if (userStatus.rows.length > 0) {
                 const u = userStatus.rows[0];
-                const isOnline = u.last_heartbeat && (Date.now() - new Date(u.last_heartbeat).getTime() < 5 * 60 * 1000); // 5 mins tolerance
+                const hbFresh = u.last_heartbeat && (Date.now() - new Date(u.last_heartbeat).getTime() < 5 * 60 * 1000);
+                const isOnline = u.on_shift && hbFresh;
                 if (!isOnline) {
                     currentStatus = 'offline';
                 } else if (u.on_break || u.current_state === 'break') {

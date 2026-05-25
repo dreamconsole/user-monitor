@@ -14,7 +14,8 @@ class ConfigService extends EventEmitter {
             is_breaks_enabled: true,
             shift_grace_minutes: 5,
             shift_absence_minutes: 120,
-            shift_absence_action: 'logout'
+            shift_absence_action: 'logout',
+            heartbeat_interval_seconds: 300,
         };
         this.loadFromStore();
     }

@@ -30,10 +30,15 @@ class AuthService {
         try {
             console.log('Verifying token for auto-login...');
             const response = await axios.get(`${API_URL}/auth/me`, {
-                headers: { Authorization: `Bearer ${this.token}` }
+                headers: { Authorization: `Bearer ${this.token}` },
+                params: { client: 'agent' },
             });
-            this.user = response.data.user;
-            store.set('user', this.user);
+            const profile = response.data.user || response.data;
+            if (!profile?.id) {
+                throw new Error('Invalid profile from /auth/me');
+            }
+            this.user = profile;
+            store.set('user', profile);
             return { user: this.user, token: this.token };
         } catch (error) {
             console.error('Auto-login verification failed:', error.message);

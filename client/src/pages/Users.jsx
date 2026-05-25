@@ -42,6 +42,8 @@ export default function Users() {
         return 'all';
     }, [searchParams]);
     const [hbInterval, setHbInterval] = useState(300); // Default 5 mins
+    /** Re-evaluate presence dots when heartbeats age out (no websocket). */
+    const [presenceTick, setPresenceTick] = useState(0);
 
     const fetchOrgSettings = async () => {
         try {
@@ -70,25 +72,37 @@ export default function Users() {
         fetchOrgSettings();
     }, []);
 
+    useEffect(() => {
+        const sec = hbInterval > 0 ? hbInterval : 300;
+        const pollMs = Math.min(Math.max(sec * 500, 15000), 60000);
+        const id = setInterval(() => setPresenceTick((t) => t + 1), pollMs);
+        return () => clearInterval(id);
+    }, [hbInterval]);
+
     // WebSocket for real-time status updates
     useWebSocket((message) => {
         if (message.type === 'USER_OFFLINE') {
             setUsers(prev => prev.map(u =>
                 u.id === message.userId
-                    ? { ...u, last_heartbeat: null, is_on_break: false }
+                    ? { ...u, last_heartbeat: null, is_on_break: false, is_on_shift: false }
                     : u
             ));
-        } else if (message.type === 'USER_HEARTBEAT' || message.type === 'HEARTBEAT') {
-            // Keep user list live; server uses USER_HEARTBEAT
+        } else if (message.type === 'USER_ON_SHIFT') {
+            setUsers(prev => prev.map(u =>
+                u.id === message.userId ? { ...u, is_on_shift: true } : u
+            ));
+        } else if (message.type === 'USER_HEARTBEAT') {
+            if (!message.timestamp) return;
             setUsers(prev => prev.map(u =>
                 u.id === message.userId
-                    ? { ...u, last_heartbeat: message.timestamp }
+                    ? { ...u, last_heartbeat: message.timestamp, is_on_shift: true }
                     : u
             ));
         }
     });
 
-    const hbThreshold = (hbInterval + 60) * 1000; // Interval + 1 minute grace
+    // Allow up to ~2 missed heartbeats + 90s (3 min interval → offline only after ~7.5 min)
+    const hbThreshold = (hbInterval * 2 + 90) * 1000;
 
     // Apply all filters whenever any filter or users change
     useEffect(() => {
@@ -122,19 +136,20 @@ export default function Users() {
         if (presenceFilter === 'offline') {
             const now = Date.now();
             result = result.filter(u => {
+                if (!u.is_on_shift) return true;
                 if (!u.last_heartbeat) return true;
                 return (now - new Date(u.last_heartbeat).getTime()) > hbThreshold;
             });
         } else if (presenceFilter === 'online') {
             const now = Date.now();
             result = result.filter(u => {
-                if (!u.last_heartbeat) return false;
+                if (!u.is_on_shift || !u.last_heartbeat) return false;
                 return (now - new Date(u.last_heartbeat).getTime()) < hbThreshold;
             });
         }
 
         setFilteredUsers(result);
-    }, [users, searchQuery, roleFilter, accountFilter, presenceFilter, hbInterval]);
+    }, [users, searchQuery, roleFilter, accountFilter, presenceFilter, hbInterval, presenceTick]);
 
     const setPresenceFilter = (value) => {
         const next = new URLSearchParams(searchParams);
@@ -208,6 +223,8 @@ export default function Users() {
     // Helper to check status
     const getUserStatus = (user) => {
         if (user.is_on_break) return 'break';
+        // Online only while on an active shift (not merely logged into the agent)
+        if (!user.is_on_shift) return 'offline';
         if (!user.last_heartbeat) return 'offline';
         const diff = Date.now() - new Date(user.last_heartbeat).getTime();
         return diff < hbThreshold ? 'online' : 'offline';

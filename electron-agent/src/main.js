@@ -150,12 +150,13 @@ global.forceEndShiftCallback = (action) => {
     } catch (e) {
         console.error('forceEndShiftCallback monitor stop:', e);
     }
+    // monitor.stop() already syncs + shift-offline; ensure offline if stop was skipped
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('force-end-shift', { action: action || 'logout' });
     }
 };
 
-function handleLoginSuccess(user, token) {
+async function handleLoginSuccess(user, token) {
     console.log('--- handleLoginSuccess START ---');
     try {
         const authService = require('./services/auth');
@@ -168,7 +169,13 @@ function handleLoginSuccess(user, token) {
         console.log('DB Initialized.');
 
         console.log('Requiring Sync Service...');
+        const configService = require('./services/config');
+        if (user?.features) {
+            configService.update(user.features);
+        }
         const syncService = require('./services/sync');
+        // Logged in but not on shift — clear stale CRM online before periodic sync
+        await syncService.clearStalePresence();
         console.log('Starting Sync Service...');
         syncService.start();
         console.log('Sync Service Started.');
@@ -308,6 +315,7 @@ function performLogout() {
         monitorService.stop();
 
         const syncService = require('./services/sync');
+        void syncService.clearStalePresence().catch(() => {});
         syncService.stop();
 
         const browserActivityService = require('./services/browserActivityService');

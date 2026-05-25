@@ -2,6 +2,40 @@
 
 All updates to the server application are tracked here.
 
+## 1.2.19 - 2026-05-26
+### Changes
+- [Bugfix] `syncActivitySession` marks user offline only when **`shift_ended`** or session status is ended — not on every progress sync that included `end_time`.
+
+## 1.2.18 - 2026-05-21
+### Changes
+- [Bugfix] Agent **login** returns `heartbeat_interval_seconds`, `afk_threshold_seconds`, `shift_grace_minutes` in `user.features` so the desktop agent uses org settings immediately.
+
+## 1.2.17 - 2026-05-21
+### Changes
+- [Bugfix] **Users list** and dashboard stats use **`is_on_shift`** (open `work_sessions` with `status = active`) instead of stale `users.last_heartbeat` alone.
+- [Bugfix] **Active Now** KPI counts users on shift, not `agent_sessions` heartbeats.
+- [Feature] **`USER_ON_SHIFT`** websocket when agent syncs an active work session.
+
+## 1.2.16 - 2026-05-21
+### Changes
+- [Bugfix] **Agent login** (`device_id` in body) and **`GET /auth/me?client=agent`** call **`markUserShiftOffline`** so CRM stays offline until shift start (works without `/agent/shift-offline`).
+- [Bugfix] **`POST /agent/heartbeat`** updates presence only when **`on_shift: true`**.
+- [Refactor] Shared **`server/src/lib/presence.js`** for offline marking + `USER_OFFLINE` broadcast.
+
+## 1.2.15 - 2026-05-21
+### Changes
+- [Bugfix] Agent work-session sync: use **`completed`** (not `ended`) for `session_status` enum — fixes 500 on end shift and offline not applying.
+
+## 1.2.14 - 2026-05-21
+### Changes
+- [Bugfix] **`markUserShiftOffline`** also clears **`agent_sessions.last_heartbeat_at`** (dashboard “Active Now” was still counting ended shifts).
+- [Bugfix] **`shift_ended`** flag on activity-session sync; offline when `end_time` or `shift_ended`.
+
+## 1.2.13 - 2026-05-21
+### Changes
+- [Bugfix] CRM **online** only while agent is **on shift**: `last_heartbeat` set only via **`POST /agent/heartbeat`**; removed from login, activity sync, screenshots, breaks, browser logs.
+- [Bugfix] **End shift** / closed work session → `last_heartbeat` cleared, `USER_OFFLINE` broadcast; agent **`POST /agent/shift-offline`**.
+
 ## 1.2.12 - 2026-05-21
 ### Changes
 - [Bugfix] Login, SSO, and **`GET /auth/me`** expose **`features.is_breaks_enabled`** so the CRM sidebar can hide break management.

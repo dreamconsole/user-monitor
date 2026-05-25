@@ -14,7 +14,17 @@ export const getUsers = async (req, res) => {
                 u.device_id, u.agent_version, u.token, u.last_heartbeat, 
                 u.force_logout, u.created_at,
                 u.shift_start_time, u.shift_end_time, u.shift_duration, u.work_days, u.start_of_day,
-                EXISTS(SELECT 1 FROM break_logs bl WHERE bl.user_id = u.id AND bl.end_time IS NULL) as is_on_break
+                EXISTS(SELECT 1 FROM break_logs bl WHERE bl.user_id = u.id AND bl.end_time IS NULL) as is_on_break,
+                EXISTS(
+                    SELECT 1 FROM work_sessions ws
+                    WHERE ws.user_id = u.id AND ws.org_id = u.org_id
+                      AND ws.end_time IS NULL AND ws.status = 'active'
+                      AND ws.work_date = (
+                          CURRENT_TIMESTAMP AT TIME ZONE COALESCE(
+                              (SELECT timezone FROM organizations WHERE id = u.org_id), 'UTC'
+                          )
+                      )::date
+                ) AS is_on_shift
             FROM users u 
             LEFT JOIN teams t ON u.team_id = t.id
             WHERE u.org_id = $1

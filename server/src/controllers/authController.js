@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { query, getClient } from '../db.js';
-import { broadcastToManagers } from '../websocket.js';
+import { markUserShiftOffline } from '../lib/presence.js';
 
 const googleClient = new OAuth2Client(process.env.VITE_GOOGLE_CLIENT_ID);
 
@@ -117,7 +117,10 @@ export const login = async (req, res) => {
                    o.primary_color_dark as org_primary_color_dark, 
                    o.timezone as org_timezone,
                    COALESCE(of.is_campaigns_enabled, false) as is_campaigns_enabled,
-                   COALESCE(of.is_breaks_enabled, true) as is_breaks_enabled
+                   COALESCE(of.is_breaks_enabled, true) as is_breaks_enabled,
+                   COALESCE(of.heartbeat_interval_seconds, 300) as heartbeat_interval_seconds,
+                   COALESCE(of.afk_threshold_seconds, 300) as afk_threshold_seconds,
+                   COALESCE(of.shift_grace_minutes, 5) as shift_grace_minutes
             FROM users u
             LEFT JOIN organizations o ON u.org_id = o.id
             LEFT JOIN org_features of ON of.org_id = o.id
@@ -147,18 +150,9 @@ export const login = async (req, res) => {
         if (user.password_hash != null) {
             try {
                 await query(
-                    'UPDATE users SET last_login_at = CURRENT_TIMESTAMP, last_heartbeat = CURRENT_TIMESTAMP, force_logout = false WHERE id = $1',
+                    'UPDATE users SET last_login_at = CURRENT_TIMESTAMP, force_logout = false WHERE id = $1',
                     [user.id]
                 );
-
-                // Broadcast heartbeat to managers for live dashboard updates
-                try {
-                    broadcastToManagers(user.org_id, {
-                        type: 'USER_HEARTBEAT',
-                        userId: user.id,
-                        timestamp: new Date().toISOString()
-                    });
-                } catch (_) { /* non-critical */ }
             } catch (_) { /* column may not exist in legacy schema */ }
         }
 
@@ -167,6 +161,11 @@ export const login = async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '1d' }
         );
+
+        // Desktop agent login must not show CRM online until user starts a shift
+        if (req.body.device_id) {
+            await markUserShiftOffline(user.id, user.org_id);
+        }
 
         const userName = user.full_name ?? user.name;
         res.json({ 
@@ -185,7 +184,10 @@ export const login = async (req, res) => {
                 org_primary_color_dark: user.org_primary_color_dark,
                 features: {
                     is_campaigns_enabled: user.is_campaigns_enabled,
-                    is_breaks_enabled: user.is_breaks_enabled
+                    is_breaks_enabled: user.is_breaks_enabled,
+                    heartbeat_interval_seconds: user.heartbeat_interval_seconds,
+                    afk_threshold_seconds: user.afk_threshold_seconds,
+                    shift_grace_minutes: user.shift_grace_minutes,
                 }
             } 
         });
@@ -322,8 +324,13 @@ export const getMe = async (req, res) => {
             [req.user.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-        
+
         const userData = result.rows[0];
+
+        // Agent token refresh / auto-login — clear stale online without requiring shift-offline route
+        if (req.query.client === 'agent') {
+            await markUserShiftOffline(userData.id, userData.org_id);
+        }
         const response = {
             ...userData,
             features: {
