@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Timer, Pause, Coffee, Clock, Activity, Monitor, Camera, MousePointerClick, MousePointer2, Moon, Mouse, ZoomIn, ZoomOut } from 'lucide-react';
-import { formatSeconds, PRODUCTIVITY_COLORS } from './utils';
+import { formatSeconds, PRODUCTIVITY_COLORS, computeDayTimeTotals } from './utils';
 import { utcToLocal, getWorkDate, getSecondsSinceMidnightInTz } from '@/lib/dateUtils';
 import api from '@/lib/api';
 import AppUsageList from './AppUsageList';
@@ -97,6 +97,8 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
     if (!data) return null;
 
     const { sessions, breaks, apps, screenshots, activity, totals } = data;
+    const isAutoBreakPolicy = user?.features?.is_breaks_enabled === false;
+    const dayTotals = computeDayTimeTotals(totals, isAutoBreakPolicy);
     const dateLabel = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
@@ -113,21 +115,27 @@ export default function DailyTimeline({ date, data, loading, screenshotUrl, setS
                 <SummaryCard
                     icon={<Monitor className="w-4 h-4 text-indigo-600" />}
                     label="Available for the day"
-                    value={formatSeconds((totals.work_seconds || 0) + (totals.idle_seconds || 0) + (totals.break_seconds || 0))}
+                    value={formatSeconds(dayTotals.availableSeconds)}
                     color="indigo"
+                    subtitle={isAutoBreakPolicy && dayTotals.clockSpanSeconds > 0 ? 'Clock in → out span' : undefined}
                 />
                 <SummaryCard
                     icon={<Timer className="w-4 h-4 text-green-600" />}
                     label="Work Session"
-                    value={formatSeconds(totals.work_seconds)}
+                    value={formatSeconds(dayTotals.workSeconds)}
                     color="green"
                 />
 
                 <SummaryCard
                     icon={<Coffee className="w-4 h-4 text-orange-500" />}
-                    label="Break Time"
-                    value={formatSeconds(totals.break_seconds)}
+                    label={isAutoBreakPolicy ? 'Break / pause' : 'Break Time'}
+                    value={formatSeconds(dayTotals.breakSeconds)}
                     color="orange"
+                    subtitle={
+                        isAutoBreakPolicy && dayTotals.pauseBreakSeconds > 0
+                            ? `${formatSeconds(dayTotals.pauseBreakSeconds)} auto pause`
+                            : undefined
+                    }
                 />
                 <SummaryCard
                     icon={<Clock className="w-4 h-4 text-blue-500" />}

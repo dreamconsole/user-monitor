@@ -7,6 +7,47 @@ export function formatSeconds(s) {
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+/**
+ * Day summary totals. When org uses auto pause (breaks off), gap between clock in/out and
+ * tracked work+idle+break is shown as pause/break time (client-side only).
+ */
+export function computeDayTimeTotals(totals, isAutoBreakPolicy) {
+    const workSeconds = totals?.work_seconds || 0;
+    const idleSeconds = totals?.idle_seconds || 0;
+    const loggedBreakSeconds = totals?.break_seconds || 0;
+
+    let clockSpanSeconds = 0;
+    if (totals?.first_clock_in && totals?.last_clock_out) {
+        const end = new Date(totals.last_clock_out).getTime();
+        const start = new Date(totals.first_clock_in).getTime();
+        if (end > start) clockSpanSeconds = Math.floor((end - start) / 1000);
+    }
+
+    let pauseBreakSeconds = 0;
+    if (isAutoBreakPolicy && clockSpanSeconds > 0) {
+        pauseBreakSeconds = Math.max(
+            0,
+            clockSpanSeconds - workSeconds - idleSeconds - loggedBreakSeconds
+        );
+    }
+
+    const breakSeconds = isAutoBreakPolicy
+        ? loggedBreakSeconds + pauseBreakSeconds
+        : loggedBreakSeconds;
+
+    const availableSeconds = workSeconds + idleSeconds + breakSeconds;
+
+    return {
+        workSeconds,
+        idleSeconds,
+        breakSeconds,
+        availableSeconds,
+        pauseBreakSeconds,
+        clockSpanSeconds,
+        isAutoBreakPolicy,
+    };
+}
+
 export function formatTime(iso) {
     if (!iso) return '--:--';
     const d = new Date(iso);
