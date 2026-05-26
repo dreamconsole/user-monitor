@@ -633,23 +633,21 @@ function setCaptionUpdateUi(payload) {
             captionUpdateLabel.textContent = 'Download';
             captionUpdateBtn.title =
                 process.platform === 'win32'
-                    ? `Download v${payload.version || ''} and run installer`
+                    ? `Download and install v${payload.version || ''} (app will restart)`
                     : `Open download v${payload.version || ''} in browser`;
             break;
         case 'downloading':
             captionUpdateBtn.disabled = true;
             captionUpdateLabel.textContent = '0%';
             captionUpdateIcon.classList.add('spin-icon');
-            captionUpdateBtn.title = 'Downloading installer…';
+            captionUpdateBtn.title = 'Downloading update…';
             break;
+        case 'installing':
         case 'install_launched':
-            captionUpdateBtn.disabled = false;
-            captionUpdateLabel.textContent = 'Setup';
-            captionUpdateBtn.title = 'Complete the installer window when it appears';
-            if (updateUiResetTimer) clearTimeout(updateUiResetTimer);
-            updateUiResetTimer = setTimeout(() => {
-                setCaptionUpdateUi({ phase: 'available', version: payload.version });
-            }, 5000);
+            captionUpdateBtn.disabled = true;
+            captionUpdateLabel.textContent = 'Installing';
+            captionUpdateIcon.classList.add('spin-icon');
+            captionUpdateBtn.title = 'Installing update — the app will close and restart';
             break;
         case 'error':
             captionUpdateBtn.disabled = false;
@@ -692,7 +690,7 @@ ipcRenderer.on('update-download-progress', (_e, p) => {
         captionUpdateBtn.disabled = true;
         captionUpdateLabel.textContent = `${Math.round(p.percent)}%`;
         captionUpdateIcon.classList.add('spin-icon');
-        captionUpdateBtn.title = 'Downloading installer…';
+        captionUpdateBtn.title = 'Downloading update…';
         const rounded = Math.round(p.percent);
         if (rounded <= 0 || rounded >= 100 || rounded - lastUpdaterProgressLog >= 10) {
             lastUpdaterProgressLog = rounded;

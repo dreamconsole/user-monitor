@@ -2,6 +2,11 @@
 
 All updates to the electron-agent are tracked here.
 
+## 1.2.21 - 2026-05-21
+### Changes
+- [Bugfix] **Windows in-place update**: NSIS `oneClick` + fixed per-user install path (no directory / all-users wizard). Agent downloads installer, runs **`/S`**, quits, then installer upgrades same `appId` and relaunches (`runAfterFinish`).
+- [Config] `build/installer.nsh` kills previous process on upgrade if still running. Reject **MSI** URLs for in-app update (NSIS `.exe` only).
+
 ## 1.2.20 - 2026-05-26
 ### Changes
 - [Bugfix] **Critical:** Do not set `end_time` on open shifts in local DB — periodic sync was sending `completed` + `shift_ended`, clearing CRM presence and `is_on_shift` while the agent still showed on shift.

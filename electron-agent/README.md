@@ -83,7 +83,9 @@ The output files will be in the `dist/` folder.
 
 The agent compares its **semver** (`app.getVersion()`) to **`GET {API_URL}/agent/update-info`** on your API server (same base URL as login). Values come from **Super Admin → Global Settings** (`global_settings`): **Agent latest version**, **Windows installer URL**, optional MSI URL and release notes. Legacy **`AGENT_UPDATE_*`** env vars on the API server only apply when the matching DB field is empty.
 
-If the server version is newer, the caption bar shows **Download**. On **Windows**, the agent downloads the **HTTPS** installer to a temp file (progress shown), then **starts the installer** so the user can complete setup (NSIS may ask to close the running app). On **Linux/macOS**, the download URL opens in the browser. There is no GitHub Releases requirement for this flow.
+If the server version is newer, the caption bar shows **Download**. On **Windows**, the agent downloads the **HTTPS NSIS `.exe`** to a temp file (progress shown), quits, runs a **silent in-place upgrade** (`/S`, same `appId` / install folder — no setup wizard), then **restarts** the app. Host only the **NSIS** installer built with this repo’s `package.json` → `build.nsis` settings (not MSI) in Global Settings. On **Linux/macOS**, the download URL opens in the browser. There is no GitHub Releases requirement for this flow.
+
+**Important:** Rebuild and re-host the installer after changing NSIS options. Users with an old side-by-side install (e.g. two Start Menu entries) should uninstall the duplicate once, then use **Download** again.
 
 ### Publishing a Windows release (CI)
 
@@ -111,7 +113,7 @@ npm run release:win
 ### In-app behavior
 
 - Top caption bar **Update** checks **`/agent/update-info`**; when a newer **`latestVersion`** is configured, the button becomes **Download** (green).
-- **Windows**: **Download** streams the **`.exe`** in-app, shows **%**, then launches the installer.
+- **Windows**: **Download** streams the **NSIS `.exe`**, shows **%**, then installs silently and restarts (no wizard).
 - **Other OS**: **Download** opens **`downloadUrl`** in the default browser.
 - OS notifications fire once per remote version when an update is **available**, and when the installer process is started on Windows.
 

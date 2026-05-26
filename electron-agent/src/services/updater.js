@@ -1,7 +1,7 @@
 /**
  * Agent updates via server API: GET {API_URL}/agent/update-info
  * (no GitHub). When remote latestVersion > app version, user can download the installer
- * in-app and run it (Windows .exe); other platforms fall back to opening downloadUrl.
+ * in-app and apply it (Windows: silent NSIS upgrade in place); other platforms open downloadUrl.
  */
 const fs = require('fs');
 const path = require('path');
@@ -12,11 +12,15 @@ const { app, Notification, shell } = require('electron');
 const { spawn } = require('child_process');
 const { API_URL } = require('../config');
 
+/** NSIS silent install — replaces existing install (same appId), no wizard. */
+const NSIS_SILENT_ARGS = ['/S'];
+
 let mainWindowRef = null;
 /** @type {{ phase: string, remoteVersion?: string, downloadUrl?: string, message?: string, appVersion?: string }} */
 let lastState = { phase: 'idle' };
 let notifiedForVersion = null;
 let downloadInProgress = false;
+let quitForInstallScheduled = false;
 
 function send(channel, payload) {
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
@@ -31,7 +35,54 @@ async function fetchUpdateManifest() {
 }
 
 /**
- * Download installer to temp and launch it (Windows NSIS .exe).
+ * Run downloaded NSIS installer silently, then quit so files can be replaced.
+ * @param {string} destPath
+ * @param {string} remoteVersion
+ */
+function launchSilentUpgradeAndQuit(destPath, remoteVersion) {
+    const child = spawn(destPath, NSIS_SILENT_ARGS, {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true
+    });
+    child.unref();
+
+    lastState = {
+        ...lastState,
+        phase: 'installing',
+        remoteVersion,
+        appVersion: app.getVersion()
+    };
+    send('update-status', {
+        phase: 'installing',
+        version: remoteVersion,
+        appVersion: app.getVersion()
+    });
+
+    if (Notification.isSupported()) {
+        try {
+            new Notification({
+                title: 'Installing update',
+                body: 'The app will close and restart with the new version.'
+            }).show();
+        } catch (_) { /* ignore */ }
+    }
+
+    if (quitForInstallScheduled) return;
+    quitForInstallScheduled = true;
+
+    setTimeout(() => {
+        try {
+            app.quit();
+        } catch (err) {
+            console.warn('[Updater] app.quit failed', err.message);
+            process.exit(0);
+        }
+    }, 500);
+}
+
+/**
+ * Download installer to temp and apply in-place (Windows NSIS /S).
  * @param {string} downloadUrl
  * @param {string} remoteVersion
  */
@@ -54,6 +105,14 @@ async function downloadAndRunInstaller(downloadUrl, remoteVersion) {
 
     if (!/^https:\/\//i.test(downloadUrl)) {
         return { ok: false, message: 'Download URL must use HTTPS' };
+    }
+
+    const lowerUrl = downloadUrl.toLowerCase();
+    if (lowerUrl.endsWith('.msi')) {
+        return {
+            ok: false,
+            message: 'MSI installers are not supported for in-app update. Use the NSIS .exe URL in Global Settings.'
+        };
     }
 
     downloadInProgress = true;
@@ -83,7 +142,6 @@ async function downloadAndRunInstaller(downloadUrl, remoteVersion) {
 
         const total = parseInt(response.headers['content-length'] || '0', 10);
         let loaded = 0;
-        const writer = fs.createWriteStream(destPath);
 
         response.data.on('data', (chunk) => {
             loaded += chunk.length;
@@ -93,7 +151,7 @@ async function downloadAndRunInstaller(downloadUrl, remoteVersion) {
             }
         });
 
-        await pipeline(response.data, writer);
+        await pipeline(response.data, fs.createWriteStream(destPath));
 
         const stat = fs.statSync(destPath);
         if (stat.size < 64 * 1024) {
@@ -105,35 +163,9 @@ async function downloadAndRunInstaller(downloadUrl, remoteVersion) {
 
         send('update-download-progress', { percent: 100 });
 
-        const child = spawn(destPath, [], {
-            detached: true,
-            stdio: 'ignore'
-        });
-        child.unref();
+        launchSilentUpgradeAndQuit(destPath, remoteVersion);
 
-        lastState = {
-            ...lastState,
-            phase: 'install_launched',
-            remoteVersion,
-            downloadUrl,
-            appVersion: app.getVersion()
-        };
-        send('update-status', {
-            phase: 'install_launched',
-            version: remoteVersion,
-            appVersion: app.getVersion()
-        });
-
-        if (Notification.isSupported()) {
-            try {
-                new Notification({
-                    title: 'Installer started',
-                    body: 'Complete the steps in the setup wizard to finish updating.'
-                }).show();
-            } catch (_) { /* ignore */ }
-        }
-
-        return { ok: true };
+        return { ok: true, quitting: true };
     } catch (err) {
         console.warn('[Updater] download/install', err.message);
         try {
@@ -166,7 +198,7 @@ function initUpdater(mainWindow) {
     lastState = { phase: 'idle', appVersion: app.getVersion() };
 
     const runCheck = async () => {
-        if (downloadInProgress) return;
+        if (downloadInProgress || quitForInstallScheduled) return;
 
         const manifestUrl = `${API_URL.replace(/\/$/, '')}/agent/update-info`;
         console.info('[Updater] GET', manifestUrl);

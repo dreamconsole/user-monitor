@@ -1,7 +1,7 @@
 {
   "name": "user-monitor-agent",
   "productName": "User Monitor Agent",
-  "version": "1.2.20",
+  "version": "1.2.21",
   "description": "Desktop Agent for User Activity Monitoring",
   "main": "src/main.js",
   "scripts": {
@@ -58,8 +58,15 @@
       "icon": "assets/icon.png"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "allowElevation": false,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh",
+      "installerLanguages": ["en_US"],
+      "shortcutName": "User Monitor Agent"
     },
     "msi": {
       "perMachine": false,
