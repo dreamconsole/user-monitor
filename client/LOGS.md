@@ -2,6 +2,11 @@
 
 All updates to the client application are tracked here.
 
+## 1.1.10 - 2026-05-21
+### Changes
+- [Feature] **Login**: email normalized to lowercase on submit (case-insensitive login).
+- [Feature] **Login**: password field show/hide toggle (eye icon).
+
 ## 1.1.9 - 2026-05-26
 ### Changes
 - [Feature] **Auto break policy** (org breaks off): day view assigns clock-span gap to **Break / pause** and **Available** totals (Users activity + Timeline); normal break orgs unchanged.

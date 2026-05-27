@@ -11,11 +11,15 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { GoogleLogin } from '@react-oauth/google';
 import { FaApple, FaMicrosoft } from 'react-icons/fa';
+import { Eye, EyeOff } from 'lucide-react';
 import bgImage from '@/assets/login_bg.png';
 import logoLight from '@/assets/logo-light.png';
 
 const schema = z.object({
-    email: z.string().email(),
+    email: z
+        .string()
+        .email()
+        .transform((val) => val.trim().toLowerCase()),
     password: z.string().min(6),
 });
 
@@ -23,6 +27,7 @@ export default function Login() {
     const { login, getSSOStatus, verifySSO } = useAuthStore();
     const navigate = useNavigate();
     const [error, setError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [ssoStatus, setSsoStatus] = useState({ google: false, microsoft: false, apple: false });
 
     useEffect(() => {
@@ -105,12 +110,40 @@ export default function Login() {
                         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
-                                <Input id="email" type="email" {...register('email')} />
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                    {...register('email')}
+                                />
                                 {errors.email && <span className="text-red-500 text-sm">{errors.email.message}</span>}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="password">Password</Label>
-                                <Input id="password" type="password" {...register('password')} />
+                                <div className="relative">
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        className="pr-10"
+                                        autoCapitalize="none"
+                                        autoCorrect="off"
+                                        {...register('password')}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        onClick={() => setShowPassword((v) => !v)}
+                                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    >
+                                        {showPassword ? (
+                                            <EyeOff className="h-4 w-4" aria-hidden />
+                                        ) : (
+                                            <Eye className="h-4 w-4" aria-hidden />
+                                        )}
+                                    </button>
+                                </div>
                                 {errors.password && <span className="text-red-500 text-sm">{errors.password.message}</span>}
                             </div>
                             {error && <div className="text-red-500 text-sm">{error}</div>}

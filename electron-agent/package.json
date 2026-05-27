@@ -1,7 +1,7 @@
 {
   "name": "user-monitor-agent",
   "productName": "User Monitor Agent",
-  "version": "1.2.21",
+  "version": "1.2.22",
   "description": "Desktop Agent for User Activity Monitoring",
   "main": "src/main.js",
   "scripts": {
