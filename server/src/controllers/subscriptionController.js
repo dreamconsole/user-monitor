@@ -7,7 +7,7 @@ import {
 /** Org admin: own subscription summary */
 export const getMyOrgSubscription = async (req, res) => {
     try {
-        const summary = await getSubscriptionSummary(req.user.org_id);
+        const summary = await getSubscriptionSummary(req.user.org_id, req.user.role);
         res.json(summary);
     } catch (error) {
         console.error('getMyOrgSubscription error:', error);

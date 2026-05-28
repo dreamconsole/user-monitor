@@ -32,6 +32,7 @@ import {
     ChevronRight,
     ChevronDown,
     Megaphone,
+    CreditCard,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import HeaderClocks from './HeaderClocks';
@@ -57,6 +58,7 @@ const Sidebar = ({ className, onLinkClick }) => {
             label: 'MAIN',
             links: [
                 { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['orgadmin', 'manager', 'user'] },
+                { href: '/payment', label: 'Billing & Payment', icon: CreditCard, roles: ['orgadmin'] },
             ]
         },
         {
@@ -239,6 +241,7 @@ export default function Layout({ children }) {
     const { user, logout } = useAuthStore();
     const { theme } = useThemeStore();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const billingLocked = user?.role === 'orgadmin' && user?.billing?.billing_locked === true;
 
     // Dynamic primary color injection
     const orgPrimaryLight = user?.org_primary_color_light || '#0f172a'; // Default slate-900
@@ -250,6 +253,22 @@ export default function Layout({ children }) {
     useEffect(() => {
         document.documentElement.style.setProperty('--primary', activeHslColor);
     }, [activeHslColor]);
+
+    if (billingLocked) {
+        return (
+            <div className="min-h-screen flex flex-col bg-muted/20">
+                <header className="h-14 bg-background border-b flex items-center justify-between px-6 shrink-0">
+                    <div className="flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-primary" />
+                        <span className="font-semibold">{user?.org_name || 'Billing'}</span>
+                        <span className="text-xs text-amber-600 font-medium ml-2">Subscription renewal required</span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={logout}>Sign out</Button>
+                </header>
+                <main className="flex-1 overflow-auto">{children}</main>
+            </div>
+        );
+    }
 
     return (
         <div className="h-screen flex bg-muted/20">

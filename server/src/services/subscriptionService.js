@@ -275,11 +275,46 @@ export async function upsertOrgSubscription(orgId, payload) {
     return getSubscriptionSummary(orgId);
 }
 
-export async function getSubscriptionSummary(orgId) {
+/** Days until subscription period/trial end (0 if past). */
+export function getDaysRemaining(sub) {
+    if (!sub) return 0;
+    const endRaw = sub.status === 'trialing' && sub.trial_ends_at
+        ? sub.trial_ends_at
+        : sub.current_period_end;
+    if (!endRaw) return 0;
+    const end = new Date(endRaw);
+    const now = new Date();
+    return Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
+}
+
+export function getBillingUiState(evaluation, sub, role) {
+    const daysRemaining = getDaysRemaining(sub);
+    const accessValid = evaluation.valid === true;
+    const billingLocked = !accessValid && role === 'orgadmin' && evaluation.exempt !== true;
+    const renewalWarning = accessValid && daysRemaining > 0 && daysRemaining <= 7;
+
+    let periodTotalDays = 30;
+    if (sub?.current_period_start && sub?.current_period_end) {
+        const start = new Date(sub.current_period_start);
+        const end = new Date(sub.current_period_end);
+        periodTotalDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    }
+
+    return {
+        days_remaining: daysRemaining,
+        period_total_days: periodTotalDays,
+        billing_locked: billingLocked,
+        renewal_warning: renewalWarning,
+        show_days_chart: role === 'orgadmin',
+    };
+}
+
+export async function getSubscriptionSummary(orgId, role = null) {
     const org = await getOrgBillingFlags(orgId);
     const sub = await getSubscriptionByOrgId(orgId);
     const seatsUsed = await countBillableSeats(orgId);
     const evaluation = await evaluateOrgSubscription(orgId);
+    const billing = getBillingUiState(evaluation, sub, role);
 
     return {
         org_id: orgId,
@@ -307,6 +342,7 @@ export async function getSubscriptionSummary(orgId) {
             reason: evaluation.reason,
             exempt: evaluation.exempt === true,
         },
+        billing,
     };
 }
 

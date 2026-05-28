@@ -18,8 +18,10 @@ import {
     UserCheck,
     UserMinus,
     BarChart3,
-    Calendar
+    Calendar,
+    CreditCard
 } from 'lucide-react';
+import SubscriptionDaysChart from '@/components/billing/SubscriptionDaysChart';
 import { utcToLocal, getTodayInTimezone } from '@/lib/dateUtils';
 import { format, subDays, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -459,6 +461,8 @@ export default function Dashboard() {
         if (user) fetchStats();
     }, [user, fetchStats]);
 
+    const billing = user?.billing;
+
     const maxSelectableDate = getTodayInTimezone(orgTz);
 
     const goToOrgToday = () => setSelectedDate(maxSelectableDate);
@@ -476,6 +480,42 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
+            {user.role === 'orgadmin' && billing?.renewal_warning && (
+                <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/40">
+                    <CardContent className="pt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex gap-3">
+                            <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
+                            <div>
+                                <p className="font-semibold text-amber-900 dark:text-amber-100">
+                                    Subscription renews in {billing.days_remaining} day{billing.days_remaining !== 1 ? 's' : ''}
+                                </p>
+                                <p className="text-sm text-amber-800/80 dark:text-amber-200/80 mt-1">
+                                    Submit payment before expiry to avoid losing dashboard access for your team.
+                                </p>
+                            </div>
+                        </div>
+                        <Button asChild variant="default" className="shrink-0">
+                            <Link to="/payment"><CreditCard className="w-4 h-4 mr-2" />Pay / renew</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {user.role === 'orgadmin' && billing?.show_days_chart && !billing?.billing_locked && (
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Subscription period</CardTitle>
+                        <CardDescription>Days remaining in your current billing period</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-center pb-4">
+                        <SubscriptionDaysChart
+                            daysRemaining={billing.days_remaining}
+                            periodTotalDays={billing.period_total_days}
+                        />
+                    </CardContent>
+                </Card>
+            )}
+
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
                     <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.name}</h1>

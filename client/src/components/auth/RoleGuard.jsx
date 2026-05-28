@@ -18,7 +18,13 @@ const RoleGuard = ({ allowedRoles }) => {
 
     const hasAccess = allowedRoles.includes(user.role);
 
-    return hasAccess ? <Outlet /> : <Navigate to="/" replace />;
+    if (hasAccess) return <Outlet />;
+
+    if (user.role === 'superadmin') {
+        return <Navigate to="/superadmin" replace />;
+    }
+
+    return <Navigate to="/" replace />;
 };
 
 export default RoleGuard;

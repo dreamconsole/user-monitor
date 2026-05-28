@@ -83,7 +83,7 @@ function buttonHtml(text, url, color = '#2563eb') {
     </table>`;
 }
 
-async function sendEmail({ to, subject, html }) {
+export async function sendMail({ to, subject, html }) {
     const smtp = getTransporter();
 
     const logMsg = `[Email] To: ${to} | Subject: ${subject}`;
@@ -138,7 +138,7 @@ export async function sendWelcomeEmail({ to, userName, orgName, tempPassword, lo
         </p>
     `);
 
-    return sendEmail({ to, subject: `Welcome to ${APP_NAME()} - Your Account is Ready`, html });
+    return sendMail({ to, subject: `Welcome to ${APP_NAME()} - Your Account is Ready`, html });
 }
 
 export async function sendPasswordResetEmail({ to, userName, resetToken, resetUrl }) {
@@ -167,7 +167,7 @@ export async function sendPasswordResetEmail({ to, userName, resetToken, resetUr
         </table>
     `);
 
-    return sendEmail({ to, subject: `${APP_NAME()} - Password Reset Request`, html });
+    return sendMail({ to, subject: `${APP_NAME()} - Password Reset Request`, html });
 }
 
 export async function sendSecurityAlertEmail({ to, userName, loginTime, ipAddress, userAgent, location }) {
@@ -198,7 +198,7 @@ export async function sendSecurityAlertEmail({ to, userName, loginTime, ipAddres
         ${buttonHtml('Change Password', `${APP_URL()}/login`, '#f59e0b')}
     `);
 
-    return sendEmail({ to, subject: `${APP_NAME()} - New Login to Your Account`, html });
+    return sendMail({ to, subject: `${APP_NAME()} - New Login to Your Account`, html });
 }
 
 export async function sendPasswordChangedEmail({ to, userName }) {
@@ -221,7 +221,7 @@ export async function sendPasswordChangedEmail({ to, userName }) {
         </table>
     `);
 
-    return sendEmail({ to, subject: `${APP_NAME()} - Your Password Was Changed`, html });
+    return sendMail({ to, subject: `${APP_NAME()} - Your Password Was Changed`, html });
 }
 
 export async function sendAdminPasswordResetEmail({ to, userName, adminName }) {
@@ -236,5 +236,5 @@ export async function sendAdminPasswordResetEmail({ to, userName, adminName }) {
         ${buttonHtml('Log In', `${APP_URL()}/login`)}
     `);
 
-    return sendEmail({ to, subject: `${APP_NAME()} - Your Password Has Been Reset`, html });
+    return sendMail({ to, subject: `${APP_NAME()} - Your Password Has Been Reset`, html });
 }

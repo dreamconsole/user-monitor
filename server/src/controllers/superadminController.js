@@ -8,6 +8,64 @@ import fs from 'fs';
 import path from 'path';
 const execAsync = promisify(exec);
 
+function formatBytes(bytes) {
+    if (!bytes || bytes <= 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+function getFolderSizeBytes(dirPath) {
+    if (!fs.existsSync(dirPath)) return 0;
+    let total = 0;
+    for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+        const full = path.join(dirPath, entry.name);
+        try {
+            if (entry.isDirectory()) {
+                total += getFolderSizeBytes(full);
+            } else if (entry.isFile()) {
+                total += fs.statSync(full).size;
+            }
+        } catch {
+            /* skip inaccessible files */
+        }
+    }
+    return total;
+}
+
+async function getDiskInfoCrossPlatform() {
+    if (process.platform === 'win32') {
+        try {
+            const { stdout } = await execAsync('wmic logicaldisk where "DeviceID=\'C:\'" get Size,FreeSpace /format:list');
+            const sizeMatch = stdout.match(/Size=(\d+)/);
+            const freeMatch = stdout.match(/FreeSpace=(\d+)/);
+            if (sizeMatch && freeMatch) {
+                const total = parseInt(sizeMatch[1], 10);
+                const free = parseInt(freeMatch[1], 10);
+                const used = total - free;
+                const percent = total > 0 ? `${Math.round((used / total) * 100)}%` : 'N/A';
+                return {
+                    total: formatBytes(total),
+                    used: formatBytes(used),
+                    free: formatBytes(free),
+                    percent,
+                };
+            }
+        } catch {
+            /* fall through */
+        }
+        return { total: 'N/A', used: 'N/A', free: 'N/A', percent: 'N/A' };
+    }
+    try {
+        const { stdout } = await execAsync("df -h / | tail -1 | awk '{print $2,$3,$4,$5}'");
+        const [total, used, free, percent] = stdout.trim().split(/\s+/);
+        return { total, used, free, percent };
+    } catch {
+        return { total: 'N/A', used: 'N/A', free: 'N/A', percent: 'N/A' };
+    }
+}
+
 // Get all organizations with some additional stats
 export const createOrg = async (req, res) => {
     const {
@@ -215,14 +273,8 @@ export const getDBStats = async (req, res) => {
             ORDER BY pg_total_relation_size(relid) DESC
         `);
 
-        // Get uploads folder size
-        let uploadSize = '0 B';
-        try {
-            const { stdout } = await execAsync("du -sh uploads/ | awk '{print $1}'");
-            uploadSize = stdout.trim() || '0 B';
-        } catch (err) {
-            console.error('Failed to get upload folder size:', err);
-        }
+        const uploadsDir = path.resolve('uploads');
+        const uploadSize = formatBytes(getFolderSizeBytes(uploadsDir));
 
         res.json({
             tables: stats.rows,
@@ -306,15 +358,7 @@ export const getSystemHealth = async (req, res) => {
         const cpuModel = os.cpus()[0].model;
         const loadAvg = os.loadavg();
 
-        // Disk usage via df -h for the root partition
-        let diskInfo = { total: 'N/A', used: 'N/A', free: 'N/A', percent: 'N/A' };
-        try {
-            const { stdout } = await execAsync("df -h / | tail -1 | awk '{print $2,$3,$4,$5}'");
-            const [total, used, free, percent] = stdout.trim().split(/\s+/);
-            diskInfo = { total, used, free, percent };
-        } catch (err) {
-            console.error('Failed to get disk info:', err);
-        }
+        const diskInfo = await getDiskInfoCrossPlatform();
 
         res.json({
             uptime: process.uptime(),

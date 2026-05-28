@@ -41,15 +41,17 @@ export default function Login() {
         resolver: zodResolver(schema),
     });
 
+    const afterLoginRoute = (currentUser) => {
+        if (currentUser?.role === 'superadmin') return '/superadmin';
+        if (currentUser?.role === 'orgadmin' && currentUser?.billing?.billing_locked) return '/payment';
+        return '/';
+    };
+
     const onSubmit = async (data) => {
         try {
             await login(data.email, data.password);
             const currentUser = useAuthStore.getState().user;
-            if (currentUser?.role === 'superadmin') {
-                navigate('/superadmin');
-            } else {
-                navigate('/');
-            }
+            navigate(afterLoginRoute(currentUser));
         } catch (e) {
             setError(e.response?.data?.error || 'Login failed');
         }
@@ -59,11 +61,7 @@ export default function Login() {
         try {
             await verifySSO('google', credentialResponse.credential);
             const currentUser = useAuthStore.getState().user;
-            if (currentUser?.role === 'superadmin') {
-                navigate('/superadmin');
-            } else {
-                navigate('/');
-            }
+            navigate(afterLoginRoute(currentUser));
         } catch (e) {
             setError(e.response?.data?.error || 'Google Login failed');
         }

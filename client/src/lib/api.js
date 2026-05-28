@@ -30,6 +30,9 @@ api.interceptors.response.use(
                     toast.error('Session expired. Please log in again.');
                     window.location.href = '/login';
                 }
+            } else if (status === 403 && data?.billing_locked && window.location.pathname !== '/payment') {
+                toast.error(data?.error || 'Subscription expired. Complete payment to continue.');
+                window.location.href = '/payment';
             } else if (status === 429) {
                 toast.error('Too many requests. Please slow down.');
             } else if (status >= 500) {

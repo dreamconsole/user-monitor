@@ -4,6 +4,18 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import SuperAdminBillingSettings from '@/components/superadmin/SuperAdminBillingSettings';
+
+/** Settings edited on a dedicated card — skip in the generic list. */
+const HIDDEN_SETTING_KEYS = new Set(['billing_manual_payment']);
+
+function settingDisplayValue(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return value.replace(/^"|"$/g, '');
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+}
 
 export default function SuperAdminSettings() {
     const [settings, setSettings] = useState({});
@@ -50,20 +62,26 @@ export default function SuperAdminSettings() {
                 <p className="text-muted-foreground mt-2">System-wide configurations applicable to all users and organizations.</p>
             </div>
 
+            <SuperAdminBillingSettings />
+
             <Card>
                 <CardHeader>
                     <CardTitle>Configuration Flags</CardTitle>
                     <CardDescription>Toggle SSO providers and manage version control directly from here.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {Object.entries(settings).map(([key, item]) => (
+                    {Object.entries(settings)
+                        .filter(([key]) => !HIDDEN_SETTING_KEYS.has(key))
+                        .map(([key, item]) => {
+                        const isBool = typeof item.value === 'boolean';
+                        return (
                         <div key={key} className="flex flex-row items-center justify-between rounded-lg border p-4 bg-card hover:bg-muted/50 transition-colors">
                             <div className="space-y-0.5">
                                 <div className="text-base font-semibold">{key}</div>
-                                <div className="text-sm text-muted-foreground">{item.description}</div>
+                                <div className="text-sm text-muted-foreground">{item?.description || ''}</div>
                             </div>
                             <div>
-                                {typeof item.value === 'boolean' ? (
+                                {isBool ? (
                                     <Switch
                                         checked={item.value}
                                         onCheckedChange={() => toggleSetting(key, item.value)}
@@ -72,7 +90,7 @@ export default function SuperAdminSettings() {
                                 ) : (
                                     <Input
                                         type="text"
-                                        defaultValue={item.value?.replace(/\"/g, '') || ''} // remove quotes if it was stringified as json
+                                        defaultValue={settingDisplayValue(item.value)}
                                         className="w-48 font-mono border-slate-300"
                                         onBlur={async (e) => {
                                             const val = e.target.value;
@@ -89,8 +107,8 @@ export default function SuperAdminSettings() {
                                 )}
                             </div>
                         </div>
-                    ))}
-                    {Object.keys(settings).length === 0 && (
+                    );})}
+                    {Object.keys(settings).filter((k) => !HIDDEN_SETTING_KEYS.has(k)).length === 0 && (
                         <div className="text-center text-muted-foreground py-8">No global settings found.</div>
                     )}
                 </CardContent>

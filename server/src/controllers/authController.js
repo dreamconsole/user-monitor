@@ -149,9 +149,9 @@ export const login = async (req, res) => {
                 return res.status(403).json({ error: 'Organization is deactivated. Contact your administrator.' });
             }
             const subCheck = await evaluateOrgSubscription(user.org_id);
-            if (!subCheck.valid) {
+            if (!subCheck.valid && user.role !== 'orgadmin') {
                 return res.status(403).json({
-                    error: subCheck.reason || 'Subscription is not active',
+                    error: subCheck.reason || 'Subscription is not active. Contact your organization administrator.',
                     code: subCheck.code,
                 });
             }
@@ -183,6 +183,13 @@ export const login = async (req, res) => {
         );
 
         const userName = user.full_name ?? user.name;
+        let billing = null;
+        if (user.role !== 'superadmin') {
+            const { getSubscriptionSummary } = await import('../services/subscriptionService.js');
+            const summary = await getSubscriptionSummary(user.org_id, user.role);
+            billing = summary.billing;
+        }
+
         res.json({ 
             token, 
             user: { 
@@ -198,7 +205,8 @@ export const login = async (req, res) => {
                 org_primary_color_dark: user.org_primary_color_dark,
                 features: {
                     is_campaigns_enabled: user.is_campaigns_enabled
-                }
+                },
+                billing,
             } 
         });
     } catch (error) {
@@ -334,22 +342,31 @@ export const getMe = async (req, res) => {
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
-        if (req.user.role !== 'superadmin') {
+        const userData = result.rows[0];
+        const role = userData.role;
+
+        if (role !== 'superadmin') {
             const subCheck = await evaluateOrgSubscription(req.user.org_id);
-            if (!subCheck.valid) {
+            if (!subCheck.valid && role !== 'orgadmin') {
                 return res.status(403).json({
                     error: subCheck.reason || 'Subscription is not active',
                     code: subCheck.code,
                 });
             }
         }
-        
-        const userData = result.rows[0];
+
+        const { getSubscriptionSummary } = await import('../services/subscriptionService.js');
+        const summary = role !== 'superadmin'
+            ? await getSubscriptionSummary(req.user.org_id, role)
+            : null;
+
         const response = {
             ...userData,
             features: {
                 is_campaigns_enabled: userData.is_campaigns_enabled
-            }
+            },
+            billing: summary?.billing ?? null,
+            subscription_access: summary?.access ?? null,
         };
         delete response.is_campaigns_enabled;
         
@@ -447,7 +464,7 @@ export const verifySSO = async (req, res) => {
                 return res.status(403).json({ error: 'Organization is deactivated.' });
             }
             const subCheck = await evaluateOrgSubscription(user.org_id);
-            if (!subCheck.valid) {
+            if (!subCheck.valid && user.role !== 'orgadmin') {
                 return res.status(403).json({
                     error: subCheck.reason || 'Subscription is not active',
                     code: subCheck.code,
@@ -468,7 +485,29 @@ export const verifySSO = async (req, res) => {
         );
 
         const userName = user.full_name ?? user.name;
-        res.json({ token, user: { id: user.id, name: userName, email: user.email, role: user.role, org_id: user.org_id, team_id: user.team_id || null, timezone: user.timezone, org_timezone: user.org_timezone, org_primary_color_light: user.org_primary_color_light, org_primary_color_dark: user.org_primary_color_dark } });
+        let billing = null;
+        if (user.role !== 'superadmin') {
+            const { getSubscriptionSummary } = await import('../services/subscriptionService.js');
+            const summary = await getSubscriptionSummary(user.org_id, user.role);
+            billing = summary.billing;
+        }
+
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                name: userName,
+                email: user.email,
+                role: user.role,
+                org_id: user.org_id,
+                team_id: user.team_id || null,
+                timezone: user.timezone,
+                org_timezone: user.org_timezone,
+                org_primary_color_light: user.org_primary_color_light,
+                org_primary_color_dark: user.org_primary_color_dark,
+                billing,
+            },
+        });
 
     } catch (error) {
         console.error('verifySSO error:', error);

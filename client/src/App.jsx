@@ -28,8 +28,10 @@ import Campaigns from '@/pages/Campaigns';
 import SuperAdminOverview from '@/pages/SuperAdminOverview';
 import SuperAdminOrgs from '@/pages/SuperAdminOrgs';
 import SuperAdminSettings from '@/pages/SuperAdminSettings';
+import Payment from '@/pages/Payment';
 import Layout from './components/layout/Layout';
 import SuperAdminLayout from './components/layout/SuperAdminLayout';
+import SubscriptionBillingGate from './components/auth/SubscriptionBillingGate';
 
 const AppLayout = () => (
   <Layout>
@@ -76,9 +78,12 @@ function App() {
               </Route>
             </Route>
 
-            {/* STANDARD LAYOUT - Non-SuperAdmin */}
+            {/* STANDARD LAYOUT - tenant roles only (not superadmin) */}
+            <Route element={<RoleGuard allowedRoles={['orgadmin', 'manager', 'user']} />}>
             <Route element={<AppLayout />}>
+              <Route element={<SubscriptionBillingGate />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/payment" element={<Payment />} />
 
               {/* Admin & Manager Only */}
               <Route element={<RoleGuard allowedRoles={['orgadmin', 'manager']} />}>
@@ -112,6 +117,8 @@ function App() {
               {/* All authenticated users */}
               <Route path="/timeline" element={<Timeline />} />
               <Route path="/profile" element={<Profile />} />
+              </Route>
+            </Route>
             </Route>
           </Route>
 
